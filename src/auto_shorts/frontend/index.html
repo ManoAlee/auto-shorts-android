@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YouTube Studio — AutoShorts Studio</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23E11D48'/><polygon points='25,18 48,32 25,46' fill='%23FFFFFF'/></svg>" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <style>
+__INLINE_CSS__
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Ir para o conteudo principal</a>
+  <header class="masthead">
+    <div class="wrap">
+      <div class="masthead-top">
+        <div class="brand-row">
+          <span class="yt-logo-badge" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="6,4 20,12 6,20"/></svg>
+          </span>
+          <div>
+            <h1 class="brand-title">YouTube Studio — AutoShorts</h1>
+            <p class="brand-sub">Estudio modular • Multi-Cena B-Roll • Legenda Dinamica • Opus Scorecard</p>
+          </div>
+        </div>
+        <div class="yt-search-bar">
+          <label for="studio-search" class="skip-link">Filtrar acervo por titulo ou tema</label>
+          <input id="studio-search" type="search" placeholder="Buscar Short no acervo..." aria-label="Filtrar Shorts por titulo ou nicho" />
+          <button type="button" class="btn-yt-create" id="btn-quick-create">+ Criar</button>
+        </div>
+      </div>
+      <div id="channel-telemetry" class="telemetry-strip" aria-live="polite">
+        <span class="pill">Conectando ao canal...</span>
+        <span class="pill">Motor de voz: __TTS_ENGINE__</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="studio-shell">
+    <aside class="side-rail" aria-label="Menu do Estudio">
+      <div role="tablist" aria-label="Areas do estudio">
+        <button type="button" role="tab" id="tab-cortes" aria-selected="true" aria-controls="panel-cortes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Criar &amp; Radar</span>
+        </button>
+        <button type="button" role="tab" id="tab-equipe" aria-selected="false" aria-controls="panel-equipe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Equipe &amp; Planner</span>
+        </button>
+        <button type="button" role="tab" id="tab-voz" aria-selected="false" aria-controls="panel-voz">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+          <span>Roteiro &amp; Voz</span>
+        </button>
+        <button type="button" role="tab" id="tab-videos" aria-selected="false" aria-controls="panel-videos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Acervo &amp; YouTube</span>
+        </button>
+        <button type="button" role="tab" id="tab-synapse" aria-selected="false" aria-controls="panel-synapse">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Synapse RE</span>
+        </button>
+        <button type="button" role="tab" id="tab-sistema" aria-selected="false" aria-controls="panel-sistema">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Sistema &amp; FFmpeg</span>
+        </button>
+      </div>
+    </aside>
+
+    <main id="main-content">
+      <!-- Live 5-Stage Render Stepper (Persistent Visibility) -->
+      <section id="render-bar" class="render-bar" aria-live="polite" aria-atomic="true">
+        <div class="render-head">
+          <div class="render-title-wrap">
+            <span class="live-dot" aria-hidden="true"></span>
+            <span id="render-badge" class="render-badge">Ocioso</span>
+            <span id="live-status">Carregando estado do motor...</span>
+          </div>
+          <span id="render-meta" class="render-meta">Verificando fila...</span>
+        </div>
+        <div class="render-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso da renderizacao">
+          <div id="render-fill" class="render-fill"></div>
+        </div>
+        <div class="stage-pills" aria-hidden="true">
+          <div class="stage-step">1. Coleta</div>
+          <div class="stage-step">2. Voz/Legenda</div>
+          <div class="stage-step">3. B-Roll/FFmpeg</div>
+          <div class="stage-step">4. Visao/Opus</div>
+          <div class="stage-step">5. Fila/YT</div>
+        </div>
+      </section>
+
+      <div id="kpi-strip" class="kpi-grid" aria-live="polite">
+        <div class="kpi-card"><div class="kpi-head"><span>Canal</span></div><div class="kpi-val" id="kpi-channel-val">...</div><div class="kpi-sub" id="kpi-channel-sub">Consultando YouTube</div></div>
+        <div class="kpi-card"><div class="kpi-head"><span>Acervo Seguro</span></div><div class="kpi-val" id="kpi-queue-val">...</div><div class="kpi-sub" id="kpi-queue-sub">Visao + Opus</div></div>
+        <div class="kpi-card"><div class="kpi-head"><span>Fundos UCB1</span></div><div class="kpi-val" id="kpi-bg-val">...</div><div class="kpi-sub" id="kpi-bg-sub">Multi-cena 4.2s</div></div>
+        <div class="kpi-card"><div class="kpi-head"><span>Motor IA/Voz</span></div><div class="kpi-val" id="kpi-ai-val">Kokoro PT-BR</div><div class="kpi-sub" id="kpi-ai-sub">Nuvem + Local</div></div>
+      </div>
+
+      <section id="panel-cortes" role="tabpanel" aria-labelledby="tab-cortes" class="panel">
+        <div class="workstation-grid">
+          <div>
+            <h2>Estudio de Cortes &amp; Piloto Automatico</h2>
+            <p class="panel-lead">Cole um link do YouTube ou deixe vazio para descoberta automatica com heatmap Most Replayed e legenda karaoke.</p>
+            <form id="cut-form" novalidate>
+              <div class="grid">
+                <div>
+                  <label for="cut-niche">Nicho do canal</label>
+                  <select id="cut-niche" name="niche">__NICHE_OPTIONS__</select>
+                </div>
+                <div>
+                  <label for="cut-platform">Plataforma alvo</label>
+                  <select id="cut-platform" name="platform">__PLATFORM_OPTIONS__</select>
+                </div>
+                <div>
+                  <label for="cut-layout">Enquadramento vertical 9:16</label>
+                  <select id="cut-layout" name="layout">
+                    <option value="blur_bg">Fundo desfocado tela cheia (blur_bg)</option>
+                    <option value="split_top_bottom">Podcast dividido topo/base</option>
+                    <option value="center_crop">Corte central com rastreio facial</option>
+                  </select>
+                  <div class="layout-picker" role="group" aria-label="Atalho visual de enquadramento">
+                    <button type="button" class="layout-tile" data-layout="blur_bg" aria-pressed="true">
+                      <span class="layout-glyph" aria-hidden="true"><span></span></span>
+                      <span>Blur 9:16</span>
+                    </button>
+                    <button type="button" class="layout-tile" data-layout="split_top_bottom" aria-pressed="false">
+                      <span class="layout-glyph g-split" aria-hidden="true"><span></span><span></span></span>
+                      <span>2 Telas</span>
+                    </button>
+                    <button type="button" class="layout-tile" data-layout="center_crop" aria-pressed="false">
+                      <span class="layout-glyph g-face" aria-hidden="true"><span></span></span>
+                      <span>Rasto Facial</span>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label for="cut-clips">Quantidade de cortes</label>
+                  <input id="cut-clips" name="clips" type="number" min="1" max="5" value="1" />
+                </div>
+              </div>
+              <div class="grid" style="margin-top:12px;">
+                <div>
+                  <label for="cut-source">Link do video no YouTube (opcional)</label>
+                  <input id="cut-source" name="source" type="url" placeholder="https://www.youtube.com/watch?v=... (vazio = piloto auto)" />
+                </div>
+                <div>
+                  <label for="cut-playlist">Playlist do YouTube</label>
+                  <input id="cut-playlist" name="playlist" type="text" placeholder="Ex: Cortes de Podcast Brasil" />
+                </div>
+              </div>
+              <div class="check-row">
+                <input id="cut-auto-publish" name="auto_publish" type="checkbox" checked />
+                <label for="cut-auto-publish">Validar midia/visao e publicar no YouTube automaticamente</label>
+              </div>
+              <div class="actions">
+                <button type="submit" class="btn btn-primary" id="btn-run-cut">Gerar Short Agora</button>
+                <button type="button" class="btn btn-secondary" id="btn-horizon-radar">Atualizar Horizontes</button>
+                <button type="button" class="btn btn-secondary" id="btn-anime-radar">Radar Animes</button>
+                <button type="button" class="btn btn-secondary" id="btn-world-news">Noticias BR</button>
+              </div>
+            </form>
+          </div>
+          <div class="preview-card" aria-label="Previa visual 9 por 16">
+            <div class="hook-meter">
+              <span>Simulador Visual 9:16</span>
+              <span class="pill pill-ok" id="hook-meter-label">Pronto</span>
+            </div>
+            <div class="phone-preview-frame" id="phone-preview-frame" data-layout="blur_bg">
+              <img id="phone-preview-bg" class="phone-preview-bg" alt="" hidden />
+              <div class="hook-preview-pill" id="preview-hook-title">GANCHO DE RETENCAO 3S</div>
+              <div class="phone-preview-stage" id="phone-preview-stage">
+                <div class="phone-zone-card">Corte 16:9 Centralizado + Fundo Desfocado</div>
+              </div>
+              <div class="phone-safe-icons" aria-hidden="true">
+                <span>♥</span><span>💬</span><span>↗</span>
+              </div>
+              <div class="karaoke-preview-text" id="preview-subs-line">PALAVRA POR PALAVRA</div>
+            </div>
+            <div class="check-row" style="margin-top:0; justify-content:space-between; flex-wrap:wrap;">
+              <div>
+                <strong>Piloto 24/7</strong>
+                <div id="scheduler-info" style="font-size:0.78rem; color:var(--ink-muted);">Carregando...</div>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-scheduler">Alternar</button>
+                <button type="button" class="btn btn-success btn-sm" id="btn-trigger-autopilot">Lote Agora</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:18px 0 12px 0;" />
+        <div class="radar-header">
+          <div style="flex:1 1 260px;">
+            <label for="horizon-topic">Radar de Pautas em Alta (clique para Cortar ou Narrar)</label>
+            <select id="horizon-topic">
+              <option value="todos">Todos os Horizontes</option>
+              <option value="podcast_debates">Podcasts, Debates &amp; Cortes</option>
+              <option value="dinheiro_ia">Dinheiro, Negocios &amp; IA</option>
+              <option value="psicologia_misterios">Psicologia, Mente &amp; Misterios</option>
+              <option value="ciencia_espaco">Ciencia, Espaco &amp; Mundo Hoje</option>
+              <option value="saude_treino">Saude, Neurociencia &amp; Treino</option>
+              <option value="entretenimento_cultura">Cinema, Series, Games &amp; Animes</option>
+            </select>
+          </div>
+          <div class="radar-mode-tabs" role="group" aria-label="Fonte do radar">
+            <button type="button" class="radar-mode-btn" id="mode-radar-horizon" data-radar-mode="horizon" aria-pressed="true">Em Alta</button>
+            <button type="button" class="radar-mode-btn" id="mode-radar-anime" data-radar-mode="anime" aria-pressed="false">Animes (4 Frentes)</button>
+            <button type="button" class="radar-mode-btn" id="mode-radar-news" data-radar-mode="news" aria-pressed="false">Noticias BR</button>
+          </div>
+        </div>
+        <div id="horizon-cat-chips" class="filter-chips" role="group" aria-label="Filtros rapidos de conteudo">
+          <button type="button" class="filter-chip" data-horizon="todos" aria-pressed="true">Tudo em alta</button>
+          <button type="button" class="filter-chip" data-horizon="ciencia_espaco" aria-pressed="false">Noticias &amp; Ciencia</button>
+          <button type="button" class="filter-chip" data-horizon="entretenimento_cultura" aria-pressed="false">Animes &amp; Teorias</button>
+          <button type="button" class="filter-chip" data-horizon="podcast_debates" aria-pressed="false">Podcasts</button>
+          <button type="button" class="filter-chip" data-horizon="dinheiro_ia" aria-pressed="false">Dinheiro &amp; IA</button>
+        </div>
+        <div id="anime-cat-chips" class="filter-chips" role="group" aria-label="Filtros de Animes" hidden>
+          <button type="button" class="filter-chip anime-chip" data-anime-cat="all" aria-pressed="true">Todos Animes</button>
+          <button type="button" class="filter-chip anime-chip" data-anime-cat="em_exibicao" aria-pressed="false">Em Exibicao</button>
+          <button type="button" class="filter-chip anime-chip" data-anime-cat="famosos_ano" aria-pressed="false">Mais Famosos do Ano</button>
+          <button type="button" class="filter-chip anime-chip" data-anime-cat="mais_curtidos" aria-pressed="false">Mais Curtidos Temporada</button>
+          <button type="button" class="filter-chip anime-chip" data-anime-cat="proximos" aria-pressed="false">Estreias Ano &amp; Proximo</button>
+        </div>
+        <div id="horizon-radar-box" class="item-grid" aria-live="polite"></div>
+        <div id="anime-radar-box" class="item-grid" aria-live="polite" hidden></div>
+        <div id="world-news-box" class="item-grid" aria-live="polite" hidden></div>
+        <div class="radar-footer">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-radar-more" hidden>Ver mais pautas</button>
+        </div>
+      </section>
+
+      <section id="panel-equipe" role="tabpanel" aria-labelledby="tab-equipe" class="panel" hidden>
+        <h2>Equipe IA do Canal &amp; Planner Semanal</h2>
+        <p class="panel-lead">7 especialistas coordenando gancho, roteiro em 3 atos e pautas semanais.</p>
+        <div id="team-personas-grid" class="item-grid" aria-live="polite">Carregando equipe...</div>
+
+        <h3 style="margin-top:20px; margin-bottom:8px;">Gerador de Roteiro em 3 Atos</h3>
+        <form id="brief-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="brief-topic">Assunto ou anime do dia</label>
+              <input id="brief-topic" name="topic" type="text" placeholder="Ex: Por que o novo episodio mudou a teoria toda" required />
+            </div>
+            <div>
+              <label for="brief-niche">Nicho do roteiro</label>
+              <select id="brief-niche" name="niche">__NICHE_SIMPLE_OPTIONS__</select>
+            </div>
+            <div>
+              <label for="brief-platform">Duracao alvo</label>
+              <select id="brief-platform" name="platform">__PLATFORM_OPTIONS__</select>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="btn-generate-brief">Gerar Roteiro</button>
+            <button type="button" class="btn btn-secondary" id="btn-load-planner">Agenda 7 Dias</button>
+          </div>
+        </form>
+        <div id="brief-output" class="meta-pre" hidden></div>
+        <div id="team-planner-grid" class="item-grid"></div>
+      </section>
+
+      <section id="panel-voz" role="tabpanel" aria-labelledby="tab-voz" class="panel" hidden>
+        <h2>Roteiro, Voz Kokoro PT-BR &amp; B-Roll Multi-Cena</h2>
+        <p class="panel-lead">Sintese offline natural com alternancia de cenas a cada 4.2s e ducking automatico.</p>
+        <form id="voice-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="voice-style">Perfil de voz</label>
+              <select id="voice-style" name="style" required aria-required="true">__VOICE_OPTIONS__</select>
+            </div>
+            <div>
+              <label for="voice-hook">Titulo no topo (Hook)</label>
+              <input id="voice-hook" name="hook_title" type="text" placeholder="Ex: O detalhe que mudou tudo" />
+            </div>
+          </div>
+          <div class="grid" style="margin-top:12px;">
+            <div>
+              <label for="voice-bg">Fundo visual (use gameplay ou auto)</label>
+              <input id="voice-bg" name="bg_video" type="text" value="gameplay" list="clean-bg-list" required aria-required="true" aria-describedby="voice-bg-err" />
+              <datalist id="clean-bg-list">
+                <option value="gameplay">Multi-Cena Parkour / Subway / Drone 9:16</option>
+                <option value="auto">Automatico adaptativo</option>
+                __BG_OPTIONS__
+              </datalist>
+              <span id="voice-bg-err" class="error-msg" role="alert" hidden>Informe um fundo valido.</span>
+            </div>
+            <div>
+              <label for="voice-playlist">Playlist de destino</label>
+              <input id="voice-playlist" name="playlist" type="text" placeholder="Ex: Cortes de Podcast Brasil" />
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <label for="voice-script">Roteiro em portugues <small id="voice-pace-meta" style="color:var(--ink-muted); font-weight:600;"></small></label>
+            <textarea id="voice-script" name="script" required aria-required="true" aria-describedby="voice-script-err" placeholder="Escreva frases curtas e diretas em portugues natural..."></textarea>
+            <span id="voice-script-err" class="error-msg" role="alert" hidden>Digite o roteiro da narracao.</span>
+          </div>
+          <div class="check-row">
+            <input id="voice-humanize" name="humanize" type="checkbox" checked />
+            <label for="voice-humanize">Ajustar acentos em portugues automaticamente</label>
+          </div>
+          <div class="check-row">
+            <input id="voice-auto-publish" name="auto_publish" type="checkbox" />
+            <label for="voice-auto-publish">Publicar no YouTube apos validacao</label>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn btn-secondary" id="btn-voice-preview">Ouvir Amostra</button>
+            <button type="button" class="btn btn-secondary" id="btn-sync-gameplay">Baixar Novo Fundo</button>
+            <button type="submit" class="btn btn-primary" id="btn-run-voice">Gerar Short &amp; Validar</button>
+          </div>
+          <div id="voice-preview-box" style="margin-top:10px;" aria-live="polite"></div>
+        </form>
+      </section>
+
+      <section id="panel-videos" role="tabpanel" aria-labelledby="tab-videos" class="panel" hidden>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2>Acervo Local, Visao &amp; Opus Scorecard</h2>
+            <p class="panel-lead" style="margin-bottom:0;">Visualizacao limpa — clique em Inspecionar para capa 16:9, Scorecard 5D e publicacao.</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-success btn-sm" id="btn-auto-validate-all">Auto-Validar Visao &amp; Fila</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-optimize-all">Otimizar IA</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-videos">Atualizar</button>
+          </div>
+        </div>
+        <div id="acervo-filter-chips" class="filter-chips" role="group" aria-label="Filtrar videos do acervo">
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="all" aria-pressed="true">Todos</button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="approved" aria-pressed="false">Aprovados</button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="queued" aria-pressed="false">Na Fila YT</button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="published" aria-pressed="false">Publicados</button>
+        </div>
+        <div id="videos-list" class="item-grid">Carregando videos...</div>
+      </section>
+
+      <section id="panel-synapse" role="tabpanel" aria-labelledby="tab-synapse" class="panel" hidden>
+        <h2>Engenharia Reversa, InnerTube &amp; OMEGA-SYNAPSE</h2>
+        <p class="panel-lead">Extracao InnerTube Most Replayed, trace REA em C11 ELF/AST e Roda do Dharma (10 defesas).</p>
+        <div id="synapse-overview-grid" class="diag-grid" aria-live="polite">Carregando Synapse...</div>
+
+        <h3 style="margin-top:18px; margin-bottom:8px;">1. Heatmap YouTube InnerTube (Most Replayed)</h3>
+        <form id="synapse-innertube-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="innertube-url">URL ou ID do video YouTube</label>
+              <input id="innertube-url" type="text" placeholder="https://www.youtube.com/watch?v=..." required />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="btn-innertube-scan">Extrair Curva Most Replayed</button>
+          </div>
+        </form>
+        <div id="innertube-result" class="video-card" style="margin-top:12px;" hidden></div>
+
+        <h3 style="margin-top:18px; margin-bottom:8px;">2. REA Trace — C11 ELF &amp; Python AST</h3>
+        <form id="synapse-trace-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="rea-trace-query">Simbolo ou texto literal (ex: autopilot, moov, Kokoro)</label>
+              <input id="rea-trace-query" type="text" value="autopilot" required />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-secondary" id="btn-rea-trace">Executar REA Trace</button>
+            <button type="button" class="btn btn-secondary" id="btn-refresh-synapse">Atualizar Synapse</button>
+          </div>
+        </form>
+        <div id="rea-trace-result" class="meta-pre" hidden></div>
+
+        <h3 style="margin-top:18px; margin-bottom:8px;">3. Roda do Dharma (Defesas Mahoraga)</h3>
+        <div id="synapse-immunities-box" class="item-grid" aria-live="polite"></div>
+      </section>
+
+      <section id="panel-sistema" role="tabpanel" aria-labelledby="tab-sistema" class="panel" hidden>
+        <h2>Saude do Sistema &amp; Editor FFmpeg</h2>
+        <p class="panel-lead">Monitoramento de hardware, rede SSH empresa/casa e corte preciso por segundos.</p>
+        <div id="system-diag" class="diag-grid" aria-live="polite">Carregando diagnostico...</div>
+
+        <h3 style="margin-top:18px; margin-bottom:8px;">Corte Deterministico (FFmpeg)</h3>
+        <form id="trim-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="trim-file">Arquivo MP4 em output/</label>
+              <input id="trim-file" name="filename" type="text" placeholder="Ex: ZKOK8x2c1Rs_short_01_youtube_shorts.mp4" required />
+            </div>
+            <div>
+              <label for="trim-start">Inicio (s)</label>
+              <input id="trim-start" name="start" type="number" step="0.5" min="0" value="0" />
+            </div>
+            <div>
+              <label for="trim-end">Fim (s)</label>
+              <input id="trim-end" name="end" type="number" step="0.5" min="2" value="30" />
+            </div>
+          </div>
+          <div class="check-row">
+            <input id="trim-normalize" name="normalize" type="checkbox" checked />
+            <label for="trim-normalize">Normalizar audio para -16 LUFS</label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" id="btn-run-trim">Exportar Trecho</button>
+            <button type="button" class="btn btn-secondary" id="btn-refresh-system">Atualizar Diagnostico</button>
+            <button type="button" class="btn btn-secondary" id="btn-ai-benchmark">Benchmark IA Offline</button>
+            <button type="button" class="btn btn-success" id="btn-start-tunnel">Gerar Link 4G Cloudflare</button>
+          </div>
+          <div id="tunnel-info" style="margin-top:10px; font-size:0.86rem; color:var(--ink-muted);" aria-live="polite"></div>
+        </form>
+
+        <h3 style="margin-top:18px; margin-bottom:8px;">Assistente IA Offline (BM25 + GGUF / LAN /v1)</h3>
+        <form id="ai-chat-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="ai-chat-input">Pergunte sobre o acervo ou pautas offline</label>
+              <input id="ai-chat-input" type="text" placeholder="Ex: Quais shorts sobre IA ou anime temos prontos?" required />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-ai-chat">Consultar IA Offline</button>
+          </div>
+        </form>
+        <div id="ai-chat-output" class="meta-pre" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Accessible Slide-Over / Bottom-Sheet Inspector Dialog -->
+  <dialog id="short-inspector-dlg" class="inspector-dialog" aria-labelledby="dlg-title">
+    <div class="dlg-head">
+      <h3 id="dlg-title">Detalhes do Short</h3>
+      <button type="button" class="btn btn-secondary btn-sm" id="dlg-close" aria-label="Fechar janela">Fechar</button>
+    </div>
+    <div id="dlg-body" class="dlg-body"></div>
+  </dialog>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+
+  <button type="button" id="floating-render-dock" class="floating-render-dock" hidden>
+    <span class="live-dot" aria-hidden="true"></span>
+    <span id="floating-render-text">Renderizando...</span>
+  </button>
+
+  <nav class="mobile-nav" aria-label="Navegacao rapida mobile">
+    <button type="button" class="mobile-nav-btn" data-tab-idx="0" aria-current="page">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span>Criar</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-tab-idx="1">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Equipe</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-tab-idx="2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+      <span>Voz</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-tab-idx="3">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>Acervo</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-tab-idx="4">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>Synapse</span>
+    </button>
+  </nav>
+
+  <script>
+__INLINE_JS__
+  </script>
+</body>
+</html>
+

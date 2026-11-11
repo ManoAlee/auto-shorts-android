@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-shorts-android"
+version = "2.5.0"
+description = "Autonomous 9:16 vertical Shorts factory for Android (Termux aarch64) & Desktop with Offline LLM/BM25, Kokoro PT-BR, Multi-Scene B-Roll, Vision QA & Opus Scorecard."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+  { name = "Alessandro Meneses", email = "153291497+ManoAlee@users.noreply.github.com" },
+]
+keywords = ["youtube-shorts", "termux", "android", "ffmpeg", "tts", "kokoro", "offline-llm", "video-automation"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Video",
+]
+
+[project.urls]
+Homepage = "https://github.com/ManoAlee/auto-shorts-android"
+Repository = "https://github.com/ManoAlee/auto-shorts-android"
+Issues = "https://github.com/ManoAlee/auto-shorts-android/issues"
+
+[project.scripts]
+autoshorts = "auto_shorts.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+

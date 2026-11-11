@@ -1,0 +1,50 @@
+# Secrets, OAuth & local state (NEVER commit credentials)
+.env
+.env.*
+!.env.example
+*secret*
+*token*
+!src/auto_shorts/frontend/tokens.css
+credentials*.json
+cookies.txt
+*.db
+*.sqlite*
+
+# Runtime media, models & temporary workspaces
+output/
+refs/
+vendor-research/
+*.mp4
+*.mkv
+*.webm
+*.mp3
+*.wav
+!assets/voices/*.wav
+*.ass
+*.srt
+*.gguf
+*.onnx
+*.bin
+*.jpg
+*.png
+
+# Compiled binaries & build artifacts
+bin/
+*.exe
+*.arm64
+*.o
+*.so
+build/
+dist/
+*.egg-info/
+
+# Python, tests & editor caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.coverage
+htmlcov/
+.playwright-mcp/
+.vscode/
+.idea/

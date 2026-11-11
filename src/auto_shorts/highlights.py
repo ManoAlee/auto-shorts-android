@@ -1,0 +1,717 @@
+"""Highlight detection for Brazilian short-form content (LLM + offline heuristic)."""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
+
+from .config import NICHES, PLATFORMS, NicheProfile, PlatformPreset
+from .transcript import format_transcript_for_llm
+
+CHUNK_SIZE_SECONDS = 1200.0
+LONG_VIDEO_THRESHOLD = 1800.0
+CHUNK_OVERLAP_SECONDS = 60.0
+
+BR_HIGHLIGHT_PROMPT = """Você é um editor especialista em retenção e viralização para {platform_name} no Brasil (nicho: {niche_label}).
+
+Critérios de viralidade (prioridade):
+1. HOOK NOS 3 PRIMEIROS SEGUNDOS — afirmação forte, dúvida imediata ou quebra de expectativa.
+2. PICOS EMOCIONAIS / OPINIÃO FORTE — declarações polarizadoras ou revelações práticas.
+3. HISTÓRIA COMPLETA / VALOR PRÁTICO — começo, meio e clímax sem cortar no meio de uma frase.
+
+Regras obrigatórias:
+- Duração alvo de cada corte: entre {min_dur}s e {max_dur}s ({sweet_spot}).
+- Retorne no máximo {num_clips} cortes sem sobreposição entre si.
+- Crie um "hook_title" curto em PT-BR (máximo 6 palavras em caixa alta) para colocar no topo do vídeo.
+- Sugira um "cta_line" curto alinhado ao nicho ({cta_suggestion}).
+
+Responda SOMENTE com JSON válido seguindo exatamente estas chaves (NUNCA copie os nomes das chaves como valor, gere textos reais baseados na transcrição):
+{{"highlights":[{{"title":"Titulo curioso em PT-BR com max 65 chars","hook_title":"GANCHO EM 4 PALAVRAS","start_time":12.5,"end_time":54.0,"score":92,"virality_reason":"Motivo real de retencao","cta_line":"Chamada curta para comentarios ou parte 2"}}]}}
+
+Transcrição:
+{transcript_text}"""
+
+
+def _parse_json_loose(raw: str) -> Dict:
+    text = raw.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            return json.loads(text[start:end + 1])
+        raise
+
+
+def chunk_segments(segments: List[Dict], duration: float) -> List[List[Dict]]:
+    """Split long transcripts (>30min) into 20-min windows with 60s overlap."""
+    if duration <= LONG_VIDEO_THRESHOLD or not segments:
+        return [segments]
+    chunks: List[List[Dict]] = []
+    cursor = 0.0
+    step = CHUNK_SIZE_SECONDS - CHUNK_OVERLAP_SECONDS
+    while cursor < duration:
+        window_end = cursor + CHUNK_SIZE_SECONDS
+        window = [s for s in segments if s["end"] >= cursor and s["start"] <= window_end]
+        if window:
+            chunks.append(window)
+        if window_end >= duration:
+            break
+        cursor += step
+    return chunks
+
+
+def dedupe_highlights(highlights: List[Dict], overlap_ratio: float = 0.35) -> List[Dict]:
+    """Keep highest-scoring clips while suppressing overlapping candidates."""
+    ranked = sorted(highlights, key=lambda h: int(h.get("score", 0)), reverse=True)
+    kept: List[Dict] = []
+    for cand in ranked:
+        cs, ce = float(cand["start_time"]), float(cand["end_time"])
+        c_dur = max(0.1, ce - cs)
+        overlaps = False
+        for existing in kept:
+            es, ee = float(existing["start_time"]), float(existing["end_time"])
+            inter = max(0.0, min(ce, ee) - max(cs, es))
+            if inter / min(c_dur, max(0.1, ee - es)) > overlap_ratio:
+                overlaps = True
+                break
+        if not overlaps:
+            kept.append(cand)
+    return kept
+
+
+_PLACEHOLDER_LITERALS = {
+    "",
+    "string",
+    "string curta",
+    "titulo",
+    "title",
+    "hook",
+    "gancho",
+    "cta",
+    "n/a",
+    "...",
+    "null",
+    "none",
+}
+
+
+def _is_placeholder_text(val: object) -> bool:
+    txt = str(val or "").strip().lower()
+    return (
+        txt in _PLACEHOLDER_LITERALS
+        or txt.startswith("titulo curioso")
+        or txt.startswith("gancho em ")
+        or txt.startswith("motivo real")
+        or txt.startswith("chamada curta")
+    )
+
+
+def _ends_complete_sentence(text: str) -> bool:
+    """Return True if segment text ends with terminal punctuation (not cut mid-phrase)."""
+    stripped = (text or "").strip().rstrip('"\')]}» ')
+    return bool(stripped) and stripped[-1] in ".!?…"
+
+
+def _snap_end_to_sentence(
+    segments: List[Dict],
+    start: float,
+    raw_end: float,
+    min_dur: float,
+    hard_cap: float,
+) -> float:
+    """Snap clip end to the nearest clean sentence boundary within [min_dur, hard_cap]."""
+    if not segments:
+        return min(raw_end, start + hard_cap)
+    capped = min(raw_end, start + hard_cap)
+    clean_ends = [
+        float(s["end"])
+        for s in segments
+        if (start + min_dur) <= float(s["end"]) <= (start + hard_cap)
+        and _ends_complete_sentence(str(s.get("text", "")))
+    ]
+    if clean_ends:
+        # Prefer the clean ending closest to capped without overflowing hard_cap
+        before_or_eq = [e for e in clean_ends if e <= capped + 1.5]
+        return before_or_eq[-1] if before_or_eq else clean_ends[-1]
+    seg_ends = [float(s["end"]) for s in segments if (start + min_dur) <= float(s["end"]) <= (start + hard_cap)]
+    return seg_ends[-1] if seg_ends else capped
+
+
+def _sanitize_highlights(
+    raw_items: object,
+    duration: float,
+    platform: PlatformPreset,
+    segments: Optional[List[Dict]] = None,
+    source_title: str = "",
+    niche: Optional[NicheProfile] = None,
+) -> List[Dict]:
+    if not isinstance(raw_items, list):
+        return []
+    cleaned: List[Dict] = []
+    segs = segments or []
+    hard_cap = 57.0 if platform.name in {"youtube_shorts", "instagram_reels"} else float(platform.max_duration)
+    min_ok = max(12.0, platform.min_duration * 0.5)
+    for idx, item in enumerate(raw_items, start=1):
+        if not isinstance(item, dict):
+            continue
+        try:
+            start = max(0.0, float(item.get("start_time", -1)))
+            end = float(item.get("end_time", -1))
+            score = int(float(item.get("score", 50)))
+        except (TypeError, ValueError):
+            continue
+        if duration > 0:
+            end = min(end, duration)
+        dur = end - start
+        if dur < min_ok:
+            continue
+        if segs or dur > hard_cap:
+            end = _snap_end_to_sentence(segs, start, end, min_dur=min_ok, hard_cap=hard_cap)
+
+        clip_texts = [s["text"] for s in segs if float(s["end"]) > start and float(s["start"]) < end]
+        raw_hook = str(item.get("hook_title") or "").strip()
+        if _is_placeholder_text(raw_hook):
+            hook_title = _pick_best_hook(clip_texts, source_title, niche or NICHES["geral"])
+        else:
+            hook_title = raw_hook[:48].upper()
+
+        raw_title = str(item.get("title") or "").strip()
+        if _is_placeholder_text(raw_title):
+            title = _build_clip_title(source_title, hook_title, idx, niche or NICHES["geral"])
+        else:
+            title = raw_title[:90]
+
+        raw_reason = str(item.get("virality_reason") or "").strip()
+        virality_reason = (
+            "Gancho forte nos primeiros segundos e alta densidade de fala."
+            if _is_placeholder_text(raw_reason)
+            else raw_reason
+        )
+        raw_cta = str(item.get("cta_line") or "").strip()
+        cta_line = (
+            (niche.cta_suggestion if niche else "Comenta aqui sua opiniao e siga para a parte 2!")
+            if _is_placeholder_text(raw_cta)
+            else raw_cta
+        )
+
+        cleaned.append({
+            "title": title,
+            "hook_title": hook_title,
+            "start_time": round(start, 2),
+            "end_time": round(end, 2),
+            "score": max(0, min(100, score)),
+            "virality_reason": virality_reason,
+            "cta_line": cta_line,
+        })
+    return cleaned
+
+
+def _chat_completion_call(base_url: str, api_key: str, model: str, prompt: str, extra_headers: Optional[Dict[str, str]] = None) -> str:
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 900,
+    }).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "AutoShorts/1.0",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+    req = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions", data=payload, headers=headers)
+    with urllib.request.urlopen(req, timeout=45) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    msg = (body.get("choices") or [{}])[0].get("message") or {}
+    text = msg.get("content") or msg.get("reasoning") or ""
+    if not str(text).strip():
+        raise RuntimeError(f"Empty LLM response for model {model}")
+    return str(text)
+
+
+def call_gemini_or_openai(prompt: str) -> str:
+    """Resilient stdlib LLM cascade: OpenRouter (:free) -> Gemini -> Local llama-server/OpenAI."""
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/")
+    if not openrouter_key and (openai_key.startswith("sk-or-") or "openrouter.ai" in base_url):
+        openrouter_key = openai_key
+
+    last_err: Optional[Exception] = None
+    if openrouter_key:
+        cfg_model = os.getenv("OPENROUTER_MODEL", os.getenv("OPENAI_MODEL", "")).strip()
+        free_candidates = [
+            *( [cfg_model] if cfg_model and (cfg_model == "openrouter/free" or cfg_model.endswith(":free")) else [] ),
+            "google/gemma-4-26b-a4b-it:free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "liquid/lfm-2.5-2.6b:free",
+            "openrouter/free",
+        ]
+        seen = set()
+        for m in free_candidates:
+            if m in seen:
+                continue
+            seen.add(m)
+            try:
+                return _chat_completion_call(
+                    "https://openrouter.ai/api/v1",
+                    openrouter_key,
+                    m,
+                    prompt,
+                    extra_headers={"HTTP-Referer": "https://github.com/AleplayTV/auto-shorts"},
+                )
+            except Exception as exc:
+                last_err = exc
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        try:
+            model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
+            payload = json.dumps({
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3},
+            }).encode("utf-8")
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            return body["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as exc:
+            last_err = exc
+
+    local_or_openai_url = os.getenv("LOCAL_LLM_URL", "").strip() or (base_url if "openrouter.ai" not in base_url else "")
+    local_or_openai_key = "local" if (local_or_openai_url and "127.0.0.1" in local_or_openai_url) else (openai_key if not openai_key.startswith("sk-or-") else "")
+    if local_or_openai_url and local_or_openai_key:
+        model = os.getenv("OPENAI_MODEL", "qwen2.5-1.5b-instruct").strip()
+        try:
+            from .offline_llm import strip_reasoning_tags
+
+            return strip_reasoning_tags(_chat_completion_call(local_or_openai_url, local_or_openai_key, model, prompt))
+        except Exception as exc:
+            if last_err is None:
+                last_err = exc
+
+    # On-demand 1-shot Termux fallback using Qwen2.5-1.5B GGUF without idle daemon RAM pressure
+    llama_bin = shutil.which("llama-cli")
+    gguf_cand = next(
+        iter(sorted((Path.home() / "models" / "llm").glob("*.gguf"))),
+        None,
+    ) if (Path.home() / "models" / "llm").is_dir() else None
+    if llama_bin and gguf_cand and gguf_cand.is_file():
+        from .offline_llm import strip_reasoning_tags
+
+        chatml_prompt = f"<|im_start|>system\nVoce responde apenas o texto final pedido em PT-BR, sem explicacoes ou meta-comentarios.<|im_end|>\n<|im_start|>user\n{prompt[:2800]}<|im_end|>\n<|im_start|>assistant\n"
+        try:
+            proc = subprocess.run(
+                [
+                    llama_bin, "-m", str(gguf_cand),
+                    "-t", "4", "-c", "1536", "-n", "260", "--temp", "0.25",
+                    "--single-turn", "--no-display-prompt", "--log-disable", "-p", chatml_prompt,
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=45,
+                check=False,
+            )
+            raw_out = proc.stdout or ""
+            if "<|im_start|>assistant" in raw_out:
+                raw_out = raw_out.rsplit("<|im_start|>assistant", 1)[-1]
+            raw_out = re.sub(r"\[ Prompt:.*?\]|Exiting\.\.\.|<\|im_end\|>", "", raw_out, flags=re.S)
+            raw_out = strip_reasoning_tags(raw_out)
+            clean_lines = [
+                ln for ln in raw_out.splitlines()
+                if not any(m in ln.lower() for m in (".gguf", "/data/data/", "files/home", "llama_", "common_", "sampler", "build:", "model :", "modalities", "available commands", "▄▄", "██"))
+                and not ln.lstrip().startswith((">", "/"))
+            ]
+            out_txt = "\n".join(clean_lines).strip()
+            if out_txt and len(out_txt) >= 12:
+                return out_txt
+        except Exception as exc:
+            if last_err is None:
+                last_err = exc
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("No OPENROUTER_API_KEY, GEMINI_API_KEY, or local llama-server configured.")
+
+
+def _clean_source_title(raw_title: str) -> str:
+    cleaned = html_unescape = (raw_title or "").replace("&gt;", ">").replace("&quot;", '"')
+    cleaned = re.sub(r"\[[^\]]*\]", "", cleaned)
+    cleaned = re.sub(r"[>»]{1,3}", " ", cleaned)
+    cleaned = re.sub(r"!{2,}", "!", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:\"'“”")
+    return cleaned
+
+
+def _build_clip_summary(texts: List[str], max_chars: int = 340) -> str:
+    """Join clip transcript lines into a clean, readable PT-BR summary."""
+    seen = set()
+    ordered: List[str] = []
+    for raw in texts:
+        line = " ".join(str(raw).split()).strip()
+        if not line or line.lower() in seen:
+            continue
+        seen.add(line.lower())
+        ordered.append(line)
+    joined = " ".join(ordered)
+    if joined and joined[0].islower():
+        joined = joined[0].upper() + joined[1:]
+    if len(joined) <= max_chars:
+        return joined
+    cut = joined[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{cut}..."
+
+
+def _looks_english_title(title: str) -> bool:
+    t = f" {re.sub(r'[^a-zA-ZÀ-ÿ0-9 ]+', ' ', (title or '').lower())} "
+    if not t.strip():
+        return False
+    pt_hits = sum(
+        1
+        for m in (
+            " de ", " do ", " da ", " dos ", " das ", " para ", " com ", " como ",
+            " por ", " nao ", " não ", " que ", " voce ", " você ", " em ", " no ",
+            " na ", " nos ", " nas ", " sobre ", " mais ", " tudo ", " vai ",
+        )
+        if m in t
+    )
+    en_hits = sum(
+        1
+        for m in (
+            " the ", " of ", " those ", " guys ", " how ", " to ", " get ", " rich ",
+            " fast ", " why ", " what ", " when ", " this ", " wealth ", " unlocking ",
+            " went ", " criticize ", " got ", " reality ", " check ", " most ",
+            " devastating ", " punch ", " revealed ", " reaching ", " level ",
+            " broke ", " internet ", " new ", " king ", " form ", " god ", " and ",
+            " with ", " from ", " into ", " s ", " in ", " on ", " has ", " more ",
+            " than ", " people ", " elderly ", " young ", " news ", " responds ",
+            " accusation ", " parallel ", " federal ", " police ", " was ", " created ",
+            " explains ", " says ", " warns ",
+        )
+        if m in t
+    )
+    return (en_hits >= 2 and pt_hits == 0) or (en_hits >= 3 and pt_hits <= 1)
+
+
+def _translate_title_to_ptbr(title: str) -> str:
+    """Translate auto-translated/English source titles back into clean PT-BR without network failure crash."""
+    clean = _clean_source_title(title)
+    if not clean or not _looks_english_title(clean):
+        return clean
+    try:
+        q = urllib.parse.quote(clean[:180])
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={"User-Agent": "AutoShorts/2.0"})
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        translated = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0]).strip()
+        if translated and len(translated) >= 6:
+            return _clean_source_title(translated)
+    except Exception:
+        pass
+    return ""
+
+
+def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
+    """Format a crisp 2-5 word uppercase hook without greetings, artifacts, or dangling words."""
+    weak_starts = {
+        "dele", "dela", "disso", "nisso", "entao", "então", "tipo", "mano", "cara",
+        "mas", "e", "aí", "ai", "afirma", "disse", "diz", "conta", "explica",
+        "usou", "fez", "teve", "foi", "era", "esta", "está", "falou", "fala",
+        "porque", "que", "se", "o", "a", "os", "as", "um", "uma", "no", "na",
+        "salve", "ola", "olá", "fala", "agora", "então", "bem", "já", "ja", "tá", "ta",
+        "eu", "ele", "ela", "isso", "isto",
+    }
+    dangling_ends = {
+        "a", "o", "as", "os", "um", "uma", "de", "da", "do", "das", "dos",
+        "em", "na", "no", "e", "ou", "para", "por", "com", "que", "se", "maior",
+        "melhor", "pior", "consegue", "nao", "não", "vai", "tem", "sao", "são", "muito",
+        "hip", "toda", "todo", "alguns", "algumas", "grande", "essa", "esse", "ainda",
+        "bem", "fala", "autoshorts", "foi", "era", "tá", "ta", "está", "gente", "coisa",
+    }
+    cleaned_words: List[str] = []
+    for raw_w in words:
+        w = re.sub(r'^[>"\'“”»]+|[<"\'“”«]+$', "", str(raw_w or "")).strip()
+        if w:
+            cleaned_words.append(w)
+    trimmed = list(cleaned_words)
+    while len(trimmed) > 2 and trimmed[0].lower().strip(",.:;!?") in weak_starts:
+        trimmed.pop(0)
+    chosen: List[str] = []
+    for w in trimmed[:5]:
+        cand = " ".join([*chosen, w])
+        if len(cand) > max_chars and len(chosen) >= 2:
+            break
+        chosen.append(w)
+    while len(chosen) > 2 and chosen[-1].lower().strip(",.:;!?") in dangling_ends:
+        chosen.pop()
+    while chosen and chosen[-1].lower().strip(",.:;!?") in dangling_ends and len(chosen) >= 2:
+        # Avoid leaving copulas/articles trailing even on 2-word hooks ("SENADO FOI")
+        if len([w for w in chosen[:-1] if len(w.strip(",.:;!?")) >= 4]) >= 1:
+            chosen.pop()
+        else:
+            break
+    return " ".join(chosen).upper().strip(" ,;:-.\"'")
+
+
+def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) -> str:
+    """Choose a clean, high-signal 2-5 word hook instead of raw ASR opener or dangling clause."""
+    filler = {"eh", "ah", "entao", "então", "tipo", "mano", "cara", "bom", "galera", "ola", "oi", "la", "lá", "sei", "aí", "ai", "salve"}
+    best_line = ""
+    best_score = -1
+
+    for idx, raw in enumerate(texts[:10]):
+        if "salve, salve" in str(raw).lower() or str(raw).lstrip().startswith((">>", '"')):
+            continue
+        words = [w for w in str(raw).split() if (len(w) > 1 or w.lower() in {"e", "a", "o"}) and not w.isdigit()]
+        if len(words) < 3:
+            continue
+        lowered = " ".join(words).lower()
+        score = sum(3 for kw in niche.hook_keywords if kw in lowered)
+        score += 2 if ("?" in raw or "!" in raw) else 0
+        score -= sum(3 for w in words if w.lower().strip(",.?!") in filler)
+        score += max(0, 3 - idx)
+        if score > best_score:
+            cand = _polish_hook_phrase(words)
+            strong_tokens = [w for w in cand.split() if len(w.strip(",.:;!?")) >= 4]
+            if len(cand.split()) >= 2 and len(strong_tokens) >= 2:
+                best_score = score
+                best_line = cand
+
+    if best_line and best_score > 0:
+        return best_line
+
+    pt_src = _translate_title_to_ptbr(source_title)
+    if pt_src:
+        cand = _polish_hook_phrase(pt_src.split())
+        if len(cand.split()) >= 2:
+            return cand
+    return "PRESTA ATENCAO NISSO"
+
+
+def _build_clip_title(source_title: str, hook_title: str, part_num: int, niche: NicheProfile) -> str:
+    clean_src = _clean_source_title(source_title)
+    if clean_src and not _looks_english_title(clean_src):
+        suffix = f" (Parte {part_num})" if part_num > 1 else ""
+        base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
+        return f"{base}{suffix}"
+    pt_translated = _translate_title_to_ptbr(clean_src)
+    if pt_translated:
+        if pt_translated.isupper():
+            pt_translated = pt_translated.title()
+        suffix = f" (Parte {part_num})" if part_num > 1 else ""
+        base = pt_translated[: 90 - len(suffix)].rstrip(" -|:")
+        return f"{base}{suffix}"
+    if hook_title and hook_title != "PRESTA ATENCAO NISSO":
+        return f"{hook_title.title()} — {niche.label.split(',')[0]}"[:90]
+    return f"Corte Imperdivel de {niche.label.split(',')[0]}"[:90]
+
+
+def _heatmap_peak_for_window(heatmap: Optional[List[Dict]], start: float, end: float) -> float:
+    """Return peak YouTube 'Most Replayed' intensity (0.0-1.0) overlapping [start, end]."""
+    if not heatmap:
+        return 0.0
+    best = 0.0
+    for pt in heatmap:
+        hs = float(pt.get("start_time", 0.0))
+        he = float(pt.get("end_time", 0.0))
+        if he > start and hs < end:
+            best = max(best, float(pt.get("value", 0.0)))
+    return min(1.0, max(0.0, best))
+
+
+def score_segments_offline(
+    transcript: Dict,
+    platform: PlatformPreset,
+    niche: NicheProfile,
+    num_clips: int,
+    source_title: str = "",
+    heatmap: Optional[List[Dict]] = None,
+) -> List[Dict]:
+    """Zero-cost heuristic + YouTube Most-Replayed heatmap clipper when no LLM is used."""
+    segments = transcript.get("segments", [])
+    if not segments:
+        return []
+
+    hard_cap = 57.0 if platform.name in {"youtube_shorts", "instagram_reels"} else float(platform.max_duration)
+    target_dur = (platform.min_duration + platform.max_duration) / 2.0
+    candidates: List[Dict] = []
+
+    for i, first in enumerate(segments):
+        # Prefer starting right after a concluded previous sentence rather than mid-clause
+        if i > 0 and not _ends_complete_sentence(str(segments[i - 1].get("text", ""))):
+            first_txt = str(first.get("text", "")).lstrip()
+            if first_txt and first_txt[0].islower():
+                continue
+
+        start = float(first["start"])
+        texts: List[str] = []
+        end = start
+        last_clean_idx = -1
+        for offset, seg in enumerate(segments[i:]):
+            seg_end = float(seg["end"])
+            if seg_end - start > hard_cap and texts:
+                break
+            texts.append(seg["text"])
+            end = seg_end
+            if (end - start) >= platform.min_duration and _ends_complete_sentence(str(seg.get("text", ""))):
+                last_clean_idx = offset
+                if (end - start) >= target_dur - 4.0:
+                    break
+        if last_clean_idx >= 0 and last_clean_idx + 1 < len(texts):
+            texts = texts[: last_clean_idx + 1]
+            end = float(segments[i + last_clean_idx]["end"])
+
+        dur = end - start
+        if dur < platform.min_duration and i > 0:
+            continue
+        if dur <= 5.0:
+            continue
+
+        joined = " ".join(texts)
+        lowered = joined.lower()
+        keyword_hits = sum(1 for kw in niche.hook_keywords if kw in lowered)
+        first_lower = texts[0].lower()
+        first_line_bonus = 15 if any(kw in first_lower for kw in niche.hook_keywords) else 0
+        # Reward clips whose opening line mentions a key subject word from the video's title
+        title_words = {
+            w.lower().strip("[]():,.-!?")
+            for w in (source_title or "").split()
+            if len(w.strip("[]():,.-!?")) >= 5
+        }
+        topic_opener_bonus = 10 if any(tw in first_lower for tw in title_words) else 0
+        opener_energy_bonus = 6 if ("!" in texts[0] or "?" in texts[0]) else 0
+        punctuation_hits = joined.count("?") * 6 + joined.count("!") * 4
+        closure_bonus = 12 if texts[-1].strip().endswith("?") else (10 if _ends_complete_sentence(texts[-1]) else 0)
+        words_per_sec = len(joined.split()) / max(1.0, dur)
+        pace_score = min(25, int(words_per_sec * 8))
+        heat_peak = _heatmap_peak_for_window(heatmap, start, end)
+        heat_bonus = int(round(heat_peak * 22)) if heat_peak >= 0.45 else 0
+
+        raw_score = min(
+            99,
+            38 + keyword_hits * 8 + first_line_bonus + topic_opener_bonus + opener_energy_bonus + punctuation_hits + closure_bonus + pace_score + heat_bonus,
+        )
+        hook = _pick_best_hook(texts, source_title, niche)
+        heat_note = f", Most Replayed {int(heat_peak * 100)}%" if heat_bonus > 0 else ""
+        candidates.append({
+            "title": "",
+            "hook_title": hook,
+            "clip_summary": _build_clip_summary(texts),
+            "start_time": round(start, 2),
+            "end_time": round(min(end, start + platform.max_duration), 2),
+            "score": raw_score,
+            "virality_reason": f"Heuristica offline: {keyword_hits} gatilhos de nicho, ritmo {words_per_sec:.1f} pal/s{heat_note}.",
+            "cta_line": niche.cta_suggestion,
+        })
+
+    if not candidates and segments:
+        end = min(float(segments[-1]["end"]), float(segments[0]["start"]) + platform.max_duration)
+        texts = [s["text"] for s in segments]
+        hook = _pick_best_hook(texts, source_title, niche)
+        candidates.append({
+            "title": "",
+            "hook_title": hook,
+            "clip_summary": _build_clip_summary(texts),
+            "start_time": round(float(segments[0]["start"]), 2),
+            "end_time": round(end, 2),
+            "score": 60,
+            "virality_reason": "Janela unica disponivel no video.",
+            "cta_line": niche.cta_suggestion,
+        })
+
+    picked = dedupe_highlights(candidates)[:num_clips]
+    for idx, clip in enumerate(picked, start=1):
+        clip["title"] = _build_clip_title(source_title, clip["hook_title"], idx, niche)
+    return picked
+
+
+def detect_highlights(
+    transcript: Dict,
+    platform_key: str = "tiktok_rewards",
+    niche_key: str = "geral",
+    num_clips: int = 3,
+    llm_fn: Optional[Callable[[str], str]] = None,
+    use_llm: bool = True,
+    learning_context: str = "",
+    source_title: str = "",
+    heatmap: Optional[List[Dict]] = None,
+) -> List[Dict]:
+    """Select ranked viral clip intervals for the chosen platform and Brazilian niche."""
+    platform = PLATFORMS.get(platform_key, PLATFORMS["tiktok_rewards"])
+    niche = NICHES.get(niche_key, NICHES["geral"])
+    segments = transcript.get("segments", [])
+    duration = float(transcript.get("duration", 0.0))
+
+    if not segments:
+        return []
+
+    has_api = bool(
+        llm_fn
+        or os.getenv("OPENROUTER_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("LOCAL_LLM_URL")
+        or os.getenv("OPENAI_API_KEY")
+    )
+    if not use_llm or not has_api:
+        return score_segments_offline(
+            transcript, platform, niche, num_clips, source_title=source_title, heatmap=heatmap
+        )
+
+    caller = llm_fn or call_gemini_or_openai
+    all_candidates: List[Dict] = []
+    for chunk in chunk_segments(segments, duration):
+        prompt = BR_HIGHLIGHT_PROMPT.format(
+            platform_name=platform.name,
+            niche_label=niche.label,
+            min_dur=platform.min_duration,
+            max_dur=platform.max_duration,
+            sweet_spot=platform.sweet_spot,
+            num_clips=num_clips,
+            cta_suggestion=niche.cta_suggestion,
+            transcript_text=format_transcript_for_llm(chunk),
+        )
+        if source_title:
+            prompt = f"Titulo original do video: {source_title}\n\n{prompt}"
+        if learning_context:
+            prompt = f"{prompt}\n\n{learning_context}"
+        try:
+            raw = caller(prompt)
+            parsed = _parse_json_loose(raw)
+            all_candidates.extend(
+                _sanitize_highlights(
+                    parsed.get("highlights"),
+                    duration,
+                    platform,
+                    segments=chunk,
+                    source_title=source_title,
+                    niche=niche,
+                )
+            )
+        except Exception:
+            continue
+
+    deduped = dedupe_highlights(all_candidates)
+    if not deduped:
+        return score_segments_offline(
+            transcript, platform, niche, num_clips, source_title=source_title, heatmap=heatmap
+        )
+    for clip in deduped:
+        if not clip.get("clip_summary"):
+            s0, s1 = float(clip["start_time"]), float(clip["end_time"])
+            clip["clip_summary"] = _build_clip_summary(
+                [s["text"] for s in segments if float(s["end"]) > s0 and float(s["start"]) < s1]
+            )
+    return deduped[:num_clips]

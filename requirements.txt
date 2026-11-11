@@ -1,0 +1,4 @@
+# Zero mandatory third-party Python packages (uses stdlib + Termux ffmpeg / yt-dlp).
+# Optional for local dev & testing:
+pytest>=8.0
+
