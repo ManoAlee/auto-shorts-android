@@ -27,6 +27,8 @@ vendor-research/
 *.bin
 *.jpg
 *.png
+!docs/images/*.png
+!docs/images/*.svg
 
 # Compiled binaries & build artifacts
 bin/

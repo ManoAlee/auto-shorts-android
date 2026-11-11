@@ -1,0 +1,53 @@
+name: AutoShorts CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test Suite & Frontend Lint (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ "3.11", "3.12" ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node.js for frontend JS check
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Validate Frontend JS Syntax
+        run: node --check src/auto_shorts/frontend/studio.js
+
+      - name: Compile Python Bytecode
+        run: python -m compileall -q src tests main.py mcp_server.py
+
+      - name: Run Automated Test Suite
+        run: PYTHONPATH=src python -m pytest tests -q
+
+      - name: Verify Zero Secrets in Repository
+        run: |
+          test ! -f .env
+          echo "Verified clean repository without .env secrets."
