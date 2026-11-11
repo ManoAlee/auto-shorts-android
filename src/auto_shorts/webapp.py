@@ -57,6 +57,7 @@ from .offline_llm import (
 )
 from .retention import _dir_bytes, prune_storage
 from .team import build_persona_script_brief, generate_channel_planner, is_llm_configured, list_channel_personas
+from .tiktok_algorithm import build_mentalist_script_blueprint, get_tiktok_algorithm_blueprint
 from .validator import audit_short_end_to_end, validate_generated_short
 from .world_news import fetch_world_news_headlines, produce_world_news_short
 from .yt_algorithm import rank_feed_for_channel, score_short_for_youtube_algorithm
@@ -340,7 +341,7 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 use_llm=is_llm_configured(),
             )
             if bool(cfg.get("auto_publish", True)):
-                _auto_crosspost_tiktok(res)
+                _auto_crosspost_channels(res)
         else:
             _set_job_progress(3, 5, f"3/5 Renderizando corte 9:16 + Karaokê ({active_niche})...", 58)
             res = run_autopilot(
@@ -354,7 +355,7 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 auto_publish=bool(cfg.get("auto_publish", True)),
             )
             if bool(cfg.get("auto_publish", True)):
-                _auto_crosspost_tiktok(res)
+                _auto_crosspost_channels(res)
         _set_job_progress(5, 5, f"5/5 Ciclo ({active_niche}) validado na fila!", 100)
         cfg["runs_completed"] = int(cfg.get("runs_completed", 0)) + 1
         cfg["last_run_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -378,9 +379,13 @@ def _is_tiktok_configured() -> bool:
     )
 
 
-def _auto_crosspost_tiktok(result: Dict) -> None:
-    """Publish validated pipeline output(s) to TikTok when configured and not yet posted."""
-    if not _is_tiktok_configured() or not isinstance(result, dict):
+def _auto_crosspost_channels(result: Dict) -> None:
+    """Publish validated pipeline output(s) to both TikTok and YouTube when configured."""
+    if not isinstance(result, dict):
+        return
+    yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    tt_ready = _is_tiktok_configured()
+    if not (yt_ready or tt_ready):
         return
     candidates: List[Dict] = list(result.get("clips") or []) or [result]
     for item in candidates:
@@ -390,14 +395,20 @@ def _auto_crosspost_tiktok(result: Dict) -> None:
         pack_f = out_p.with_suffix(".publish.json")
         pack = json.loads(pack_f.read_text(encoding="utf-8")) if pack_f.is_file() else {}
         vis = pack.get("visual_audit") or item.get("visual_audit") or {}
-        if pack.get("tiktok") or (vis and not vis.get("approved")):
+        if vis and not vis.get("approved"):
             continue
         if not (pack.get("validation") or item.get("validation") or {}).get("valid", True):
             continue
-        try:
-            publish_pack_to_tiktok(out_p)
-        except Exception:
-            pass
+        if tt_ready and not (pack.get("tiktok") or {}).get("publish_id"):
+            try:
+                publish_pack_to_tiktok(out_p)
+            except Exception:
+                pass
+        if yt_ready and not (pack.get("youtube") or {}).get("video_id"):
+            try:
+                publish_pack_to_youtube(out_p)
+            except Exception:
+                pass
 
 
 def _flush_pending_publishes(out_dir: Path) -> bool:
@@ -743,6 +754,13 @@ def make_handler(out_dir: Path):
                 approved_n = sum(1 for x in vlist if (x.get("visual_audit") or {}).get("approved") or (x.get("validation") or {}).get("valid"))
                 queued_n = sum(1 for x in vlist if x.get("queued_for_auto_publish"))
                 rejected_n = sum(1 for x in vlist if (x.get("visual_audit") or {}).get("decision") == "REJECT")
+                tt_sent_n = sum(1 for x in vlist if (x.get("tiktok") or {}).get("publish_id"))
+                tt_ready_n = sum(
+                    1 for x in vlist
+                    if not (x.get("tiktok") or {}).get("publish_id")
+                    and ((x.get("visual_audit") or {}).get("approved") if x.get("visual_audit") else (x.get("validation") or {}).get("valid"))
+                )
+                top_opus = max([int((x.get("opus_scorecard") or {}).get("opus_score") or 0) for x in vlist], default=0)
                 evo_rows = []
                 try:
                     evo_rows = EvolutionStore(out_dir / "shorts_evolution.db").list_background_evolution()
@@ -752,9 +770,20 @@ def make_handler(out_dir: Path):
                     "channel": get_youtube_channel_summary(),
                     "tts_engine": active_tts_engine_label(),
                     "local_videos": len(vlist),
-                    "video_stats": {"total": len(vlist), "approved": approved_n, "queued": queued_n, "rejected": rejected_n},
+                    "video_stats": {
+                        "total": len(vlist),
+                        "approved": approved_n,
+                        "queued": queued_n,
+                        "rejected": rejected_n,
+                        "tiktok_sent": tt_sent_n,
+                        "tiktok_ready": tt_ready_n,
+                        "top_opus": top_opus,
+                    },
                     "local_llm": _probe_local_llm(),
                     "keys": {
+                        "youtube": bool(os.getenv("YT_REFRESH_TOKEN", "").strip()),
+                        "tiktok": _is_tiktok_configured(),
+                        "tiktok_mode": os.getenv("TIKTOK_PUBLISH_MODE", "inbox").strip() or "inbox",
                         "openrouter": bool(os.getenv("OPENROUTER_API_KEY", "").strip()),
                         "gemini": bool(os.getenv("GEMINI_API_KEY", "").strip()),
                         "openai": bool(os.getenv("OPENAI_API_KEY", "").strip()),
@@ -809,11 +838,16 @@ def make_handler(out_dir: Path):
                         continue
                     vis_ok = bool((v.get("visual_audit") or {}).get("approved") if v.get("visual_audit") else (v.get("validation") or {}).get("valid"))
                     is_pub = bool((v.get("youtube") or {}).get("video_id") or (v.get("youtube") or {}).get("url"))
+                    tt_sent = bool((v.get("tiktok") or {}).get("publish_id"))
                     if status_flt == "approved" and not vis_ok:
                         continue
                     if status_flt == "queued" and not v.get("queued_for_auto_publish"):
                         continue
                     if status_flt == "published" and not is_pub:
+                        continue
+                    if status_flt == "tiktok_ready" and (not vis_ok or tt_sent):
+                        continue
+                    if status_flt == "tiktok_sent" and not tt_sent:
                         continue
                     if status_flt == "rejected" and vis_ok:
                         continue
@@ -859,6 +893,10 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/synapse/status":
                 self._send_json(200, get_synapse_overview(out_dir))
+                return
+
+            if parsed.path == "/api/tiktok/intelligence":
+                self._send_json(200, get_tiktok_algorithm_blueprint())
                 return
 
             if parsed.path == "/api/synapse/trace":
@@ -1087,6 +1125,13 @@ def make_handler(out_dir: Path):
                 self._send_json(200, score_short_opus_runbook(body, duration=float(body.get("duration") or 0.0)))
                 return
 
+            if parsed.path == "/api/tiktok/mentalist-brief":
+                topic = str(body.get("topic") or "").strip() or "detalhe oculto"
+                niche = str(body.get("niche") or "geral").strip()
+                dur = int(body.get("duration_sec") or 64)
+                self._send_json(200, build_mentalist_script_blueprint(topic, niche=niche, target_duration_sec=dur))
+                return
+
             if parsed.path == "/api/publish-instagram":
                 target = _safe_child_path(out_dir, str(body.get("filename") or ""))
                 if not target or not target.is_file():
@@ -1220,8 +1265,6 @@ def make_handler(out_dir: Path):
                     cfg["interval_hours"] = max(1, int(body["interval_hours"]))
                 if body.get("niche"):
                     cfg["niche"] = str(body["niche"])
-                if body.get("platform"):
-                    cfg["platform"] = str(body["platform"])
                 if "auto_publish" in body:
                     cfg["auto_publish"] = bool(body["auto_publish"])
                 _save_scheduler_cfg(out_dir, cfg)

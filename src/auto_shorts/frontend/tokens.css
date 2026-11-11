@@ -1,9 +1,76 @@
-/* AutoShorts Studio Design System Tokens (/design-system + /frontend-a11y) */
+/* AutoShorts Studio Design Tokens — OLED Midnight Pro (Default) + Sunlit Light Mode (/ui-ux-pro-max + /frontend-a11y) */
 :root {
+  color-scheme: dark;
+  --canvas: #070B12;
+  --surface: #0F172A;
+  --surface-elevated: #151F34;
+  --surface-soft: #131C2E;
+  --surface-hover: #1E293B;
+  --header-bg: rgba(7, 11, 18, 0.88);
+  --nav-mobile-bg: rgba(15, 23, 42, 0.96);
+
+  --ink: #F8FAFC;
+  --ink-muted: #94A3B8;
+  --border: #1E293B;
+  --border-strong: #334155;
+
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-soft: rgba(59, 130, 246, 0.16);
+  --primary-border: rgba(96, 165, 250, 0.42);
+  --primary-ink: #93C5FD;
+
+  --tt-cyan: #25F4EE;
+  --tt-rose: #FE2C55;
+  --tt-bg: rgba(37, 244, 238, 0.12);
+  --tt-border: rgba(37, 244, 238, 0.36);
+  --tt-ink: #67E8F9;
+
+  --yt-red: #E11D48;
+  --yt-bg: rgba(225, 29, 72, 0.14);
+  --yt-border: rgba(251, 113, 133, 0.38);
+  --yt-ink: #FDA4AF;
+
+  --ok: #10B981;
+  --ok-solid: #059669;
+  --ok-bg: rgba(16, 185, 129, 0.14);
+  --ok-border: rgba(52, 211, 153, 0.38);
+  --ok-ink: #6EE7B7;
+
+  --warn: #F59E0B;
+  --warn-bg: rgba(245, 158, 11, 0.14);
+  --warn-ink: #FCD34D;
+
+  --danger: #EF4444;
+  --danger-solid: #DC2626;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.38);
+  --danger-ink: #FCA5A5;
+
+  --focus: #60A5FA;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 28px -8px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 24px 52px -12px rgba(0, 0, 0, 0.72);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --font-sans: 'Plus Jakarta Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: 'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
   --canvas: #F8FAFC;
   --surface: #FFFFFF;
+  --surface-elevated: #FFFFFF;
   --surface-soft: #F1F5F9;
   --surface-hover: #E2E8F0;
+  --header-bg: rgba(255, 255, 255, 0.94);
+  --nav-mobile-bg: rgba(255, 255, 255, 0.96);
+
   --ink: #0F172A;
   --ink-muted: #475569;
   --border: #E2E8F0;
@@ -12,70 +79,111 @@
   --primary: #2563EB;
   --primary-hover: #1D4ED8;
   --primary-soft: #EFF6FF;
-  --yt-red: #E11D48;
+  --primary-border: #BFDBFE;
+  --primary-ink: #1D4ED8;
+
+  --tt-bg: #ECFEFF;
+  --tt-border: #A5F3FC;
+  --tt-ink: #0E7490;
+
   --yt-bg: #FFF1F2;
   --yt-border: #FECDD3;
   --yt-ink: #9F1239;
 
   --ok: #059669;
+  --ok-solid: #059669;
   --ok-bg: #ECFDF5;
   --ok-border: #A7F3D0;
+  --ok-ink: #047857;
+
   --warn: #D97706;
   --warn-bg: #FFFBEB;
+  --warn-ink: #B45309;
+
   --danger: #DC2626;
+  --danger-solid: #DC2626;
   --danger-bg: #FEF2F2;
   --danger-border: #FECACA;
+  --danger-ink: #B91C1C;
 
   --focus: #2563EB;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 8px 24px -6px rgba(15, 23, 42, 0.10);
-  --shadow-lg: 0 20px 44px -10px rgba(15, 23, 42, 0.22);
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-pill: 999px;
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 10px 26px -6px rgba(15, 23, 42, 0.11);
+  --shadow-lg: 0 22px 48px -10px rgba(15, 23, 42, 0.22);
 }
 
 @keyframes pulseLive {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.35); opacity: 0.55; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.35);
+    opacity: 0.55;
+  }
 }
 
 @keyframes spinIcon {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmerSlide {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes barFlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 @keyframes panelIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-    transition: none !important;
-    animation: none !important;
     scroll-behavior: auto !important;
   }
 }
-

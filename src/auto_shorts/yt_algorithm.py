@@ -8,6 +8,8 @@ Based strictly on documented YouTube Browse/Search/Shorts benchmarks:
 
 from typing import Dict, List, Optional
 
+from .tiktok_algorithm import score_short_for_tiktok_algorithm
+
 
 def score_short_for_youtube_algorithm(
     pack: Optional[Dict] = None,
@@ -124,7 +126,12 @@ def rank_feed_for_channel(videos: List[Dict]) -> List[Dict]:
             validation=item.get("validation"),
             filename=item.get("filename", ""),
         )
-        enriched.append({**item, "algorithm": algo})
+        tt_algo = score_short_for_tiktok_algorithm(
+            pack={**pack, "niche": item.get("niche", "geral"), "background_style": item.get("background_style", ""), "visual_audit": item.get("visual_audit")},
+            validation=item.get("validation"),
+            filename=item.get("filename", ""),
+        )
+        enriched.append({**item, "algorithm": algo, "tiktok_algo": tt_algo})
     enriched.sort(key=lambda x: (1 if x.get("youtube") else 0, x["algorithm"]["algo_score"]), reverse=True)
     return enriched
 

@@ -1901,6 +1901,63 @@ def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
     assert flushed == ["ready_tiktok.mp4"]
 
 
+def test_tiktok_algorithm_and_mentalism_engine(tmp_path: Path) -> None:
+    import threading
+    import urllib.request
+    from auto_shorts.tiktok_algorithm import (
+        NICHE_MENTALISM_PLAYBOOKS,
+        build_mentalist_script_blueprint,
+        get_tiktok_algorithm_blueprint,
+        score_short_for_tiktok_algorithm,
+    )
+    from auto_shorts.webapp import _StudioHTTPServer, make_handler
+
+    assert "financas" in NICHE_MENTALISM_PLAYBOOKS and "ia_tech" in NICHE_MENTALISM_PLAYBOOKS
+    scored = score_short_for_tiktok_algorithm(
+        pack={
+            "niche": "financas",
+            "hook_title": "O ERRO DO PIX",
+            "title": "Por que seu banco esconde esse detalhe?",
+            "caption": "Veja agora esse segredo financeiro e comenta qual sua escolha! #financas #dinheiro #educacaofinanceira",
+            "hashtags": ["#financas", "#dinheiro", "#educacaofinanceira", "#tiktokbrasil"],
+            "background_style": "minecraft+urban_rain",
+            "visual_audit": {"approved": True, "visual": {"motion_delta": 18.0}},
+        },
+        validation={"valid": True, "duration": 64.0, "subtitle_cues": 16, "subtitle_overlaps": 0},
+    )
+    assert scored["tiktok_score"] >= 85
+    assert scored["monetization_eligible_60s"] is True
+    assert "Aversao a Perda" in scored["playbook"]["brain_trigger"]
+
+    bp = build_mentalist_script_blueprint("IA offline no Android", niche="ia_tech", target_duration_sec=64)
+    assert bp["beats"]["0_a_2s_pattern_interrupt"]
+    assert "full_narration_script" in bp and len(bp["full_narration_script"]) > 80
+
+    # HTTP endpoints check (/api/tiktok/intelligence & /api/tiktok/mentalist-brief)
+    srv = _StudioHTTPServer(("127.0.0.1", 0), make_handler(tmp_path))
+    port = srv.server_address[1]
+    th = threading.Thread(target=srv.serve_forever, daemon=True)
+    th.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/tiktok/intelligence", timeout=5) as r:
+            intel = json.loads(r.read().decode("utf-8"))
+        assert sum(w["weight_pct"] for w in intel["signal_weights"]) == 100
+        assert len(intel["cohort_stages"]) == 4
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/tiktok/mentalist-brief",
+            data=json.dumps({"topic": "Juros compostos", "niche": "financas", "duration_sec": 64}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            mb = json.loads(r.read().decode("utf-8"))
+        assert mb["niche"] == "financas" and mb["recommended_layout"] == "blur_bg"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 
 
 

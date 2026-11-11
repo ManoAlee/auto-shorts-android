@@ -823,12 +823,7 @@ def _resolve_tiktok_access_token(explicit_token: Optional[str]) -> str:
     rtok = os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()
     if ckey and csec and rtok:
         refreshed = refresh_tiktok_access_token(ckey, csec, rtok)
-        new_tok = str(refreshed.get("access_token") or "").strip()
-        if new_tok:
-            os.environ["TIKTOK_ACCESS_TOKEN"] = new_tok
-        if refreshed.get("refresh_token"):
-            os.environ["TIKTOK_REFRESH_TOKEN"] = str(refreshed["refresh_token"]).strip()
-        return new_tok
+        return str(refreshed.get("access_token") or "").strip()
     return ""
 
 

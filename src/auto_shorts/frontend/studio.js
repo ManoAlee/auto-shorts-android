@@ -1,4 +1,4 @@
-/* AutoShorts Studio Frontend Controller — Live Render Stepper, Interactive 9:16 Stage, Segmented Radar & Inspector */
+/* AutoShorts Studio Frontend Controller — Copiloto IA, Dual Theme, TikTok/YouTube Delivery & WCAG A11Y */
 (function () {
   const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
   const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
@@ -6,6 +6,7 @@
   const renderBadge = document.getElementById('render-badge');
   const statusEl = document.getElementById('live-status');
   const renderFill = document.getElementById('render-fill');
+  const renderProgress = document.getElementById('render-progress-bar');
   const renderMeta = document.getElementById('render-meta');
   const stageEls = Array.from(document.querySelectorAll('.stage-step'));
   const toastStack = document.getElementById('toast-stack');
@@ -16,6 +17,9 @@
   let _pollTimer = null;
   let _wasRunning = false;
   let _lastStatusData = { running: false };
+  let _lastChannelData = null;
+  let _lastSchedulerData = null;
+  let _inspectorTriggerEl = null;
   const _stageBaseLabels = stageEls.map((el) => el.textContent.trim());
 
   let _activeRadarMode = 'horizon';
@@ -26,6 +30,29 @@
   let _videosCache = [];
   let _acervoFilter = 'all';
   let _karaokeWordIdx = 0;
+
+  /* Theme Switcher (OLED Dark Default <-> Sunlit Editorial Light) */
+  const themeBtn = document.getElementById('btn-theme-toggle');
+  const iconSun = document.getElementById('theme-icon-sun');
+  const iconMoon = document.getElementById('theme-icon-moon');
+  function applyTheme(mode) {
+    const isLight = mode === 'light';
+    if (isLight) document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    if (themeBtn) themeBtn.setAttribute('aria-pressed', String(!isLight));
+    if (iconSun) iconSun.hidden = isLight;
+    if (iconMoon) iconMoon.hidden = !isLight;
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', isLight ? '#FFFFFF' : '#070B12');
+    try { localStorage.setItem('autoshorts_theme', isLight ? 'light' : 'dark'); } catch (e) {}
+  }
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+    });
+  }
 
   function showToast(msg, kind = 'info') {
     if (!toastStack || !msg) return;
@@ -85,17 +112,15 @@
   tabs.forEach((tab, idx) => {
     tab.addEventListener('click', () => activateTab(idx));
     tab.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      let target = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') target = (idx + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') target = (idx - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') target = 0;
+      else if (e.key === 'End') target = tabs.length - 1;
+      if (target >= 0) {
         e.preventDefault();
-        const n = (idx + 1) % tabs.length;
-        tabs[n].focus();
-        activateTab(n);
-      }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const p = (idx - 1 + tabs.length) % tabs.length;
-        tabs[p].focus();
-        activateTab(p);
+        tabs[target].focus();
+        activateTab(target);
       }
     });
   });
@@ -151,7 +176,9 @@
         : ('Pronto: ' + (data.last_status || 'Operando normalmente') + (data.last_error ? ' — Erro: ' + data.last_error : ''));
       statusEl.textContent = txt;
     }
-    if (renderFill) renderFill.style.width = (running ? pct : (data.last_status && data.last_status !== 'Pronto para operar' ? 100 : 0)) + '%';
+    const barPct = running ? pct : (data.last_status && data.last_status !== 'Pronto para operar' ? 100 : 0);
+    if (renderFill) renderFill.style.width = barPct + '%';
+    if (renderProgress) renderProgress.setAttribute('aria-valuenow', String(barPct));
     if (renderMeta) {
       const parts = [];
       if (running) {
@@ -170,10 +197,10 @@
       if (running) {
         if (stepNum < stageIdx) {
           el.classList.add('is-done');
-          el.textContent = '✓ ' + base;
+          el.textContent = 'OK ' + base;
         } else if (stepNum === stageIdx) {
           el.classList.add('is-active');
-          el.textContent = '● ' + base;
+          el.textContent = '> ' + base;
         } else {
           el.textContent = base;
         }
@@ -186,9 +213,7 @@
     if (_wasRunning && !running) {
       showToast(data.last_error ? ('Erro: ' + data.last_error) : ('Concluido: ' + (data.last_status || 'Video validado!')), data.last_error ? 'err' : 'ok');
       loadChannelTelemetry();
-      if (tabs.findIndex((t) => t.id === 'tab-videos' && t.getAttribute('aria-selected') === 'true') >= 0) {
-        loadVideos();
-      }
+      loadVideos();
     }
     _wasRunning = running;
   }
@@ -208,52 +233,157 @@
     }
   }
 
+  /* Intelligent Copiloto Recommendation Engine */
+  let _copilotFn = null;
+  function updateCopilotInsight() {
+    const insightEl = document.getElementById('copilot-insight');
+    const actBtn = document.getElementById('btn-copilot-action');
+    if (!insightEl || !actBtn) return;
+
+    const ch = _lastChannelData || {};
+    const sch = _lastSchedulerData || {};
+    const vs = ch.video_stats || {};
+    const keys = ch.keys || {};
+    const ttReadyList = _videosCache.filter((v) => {
+      const visOk = v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
+      return visOk && !(v.tiktok && v.tiktok.publish_id);
+    });
+
+    if (keys.tiktok && ttReadyList.length > 0) {
+      const top = ttReadyList[0];
+      const sc = top.opus_scorecard ? top.opus_scorecard.opus_score : '--';
+      insightEl.textContent = ttReadyList.length + ' Short(s) aprovados aguardando TikTok • Top: "' + String(top.title || top.filename).slice(0, 46) + '" (Opus ' + sc + '/100)';
+      actBtn.textContent = 'Enviar Top p/ TikTok';
+      _copilotFn = () => withBusyBtn(actBtn, 'Enviando TT...', async () => {
+        const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: top.filename }) });
+        const d = await r.json();
+        showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+        await loadVideos();
+        await loadChannelTelemetry();
+      });
+      return;
+    }
+
+    if (!sch.enabled) {
+      insightEl.textContent = 'Piloto 24/7 esta pausado — ative para gerar e publicar cortes no TikTok e YouTube a cada 4h.';
+      actBtn.textContent = 'Ativar Piloto 24/7';
+      _copilotFn = () => withBusyBtn(actBtn, 'Ativando...', async () => {
+        await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true, platform: 'tiktok_rewards', auto_publish: true }) });
+        await loadScheduler();
+        showToast('Piloto 24/7 ativado para TikTok + YouTube!', 'ok');
+      });
+      return;
+    }
+
+    insightEl.textContent = 'Piloto 24/7 ativo (' + (sch.platform || 'tiktok_rewards') + ') • Acervo com ' + (vs.approved || 0) + ' Shorts prontos (Top Opus ' + (vs.top_opus || 0) + '/100).';
+    actBtn.textContent = 'Gerar Novo Lote Agora';
+    _copilotFn = () => withBusyBtn(actBtn, 'Enfileirando...', async () => {
+      startOptimisticRender('1/5 Copiloto iniciando geracao multi-nicho...');
+      await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run_now: true, niche: 'all', platform: 'tiktok_rewards' }) });
+      showToast('Geracao inteligente iniciada!', 'ok');
+      refreshStatus();
+    });
+  }
+
+  const copilotBtn = document.getElementById('btn-copilot-action');
+  if (copilotBtn) {
+    copilotBtn.addEventListener('click', () => {
+      if (_copilotFn) _copilotFn();
+    });
+  }
+
+  const copilotForm = document.getElementById('copilot-cmd-form');
+  if (copilotForm) {
+    copilotForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = document.getElementById('copilot-cmd-input');
+      const cmdBtn = document.getElementById('btn-copilot-run');
+      const raw = (inp ? inp.value : '').trim();
+      if (!raw) return;
+      const lower = raw.toLowerCase();
+      if (lower.startsWith('gerar ') || lower.startsWith('crie ') || lower.startsWith('criar ') || lower.startsWith('faca ')) {
+        activateTab(0);
+        const query = raw.replace(/^(gerar|crie|criar|faca)\s+/i, '').trim();
+        withBusyBtn(cmdBtn, 'Enfileirando...', async () => {
+          startOptimisticRender('1/5 Copiloto produzindo: ' + query.slice(0, 34));
+          const plat = lower.includes('youtube') ? 'youtube_shorts' : (lower.includes('reels') ? 'instagram_reels' : 'tiktok_rewards');
+          const r = await fetch('/api/run', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ platform: plat, niche: 'all', query: query, clips: 1, auto_publish: true }),
+          });
+          const d = await r.json();
+          showToast(d.message || 'Comando enviado ao motor!', 'ok');
+          refreshStatus();
+        });
+        return;
+      }
+      withBusyBtn(cmdBtn, 'Consultando...', async () => {
+        const d = await (await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: raw }) })).json();
+        const insightEl = document.getElementById('copilot-insight');
+        if (insightEl && d.answer) insightEl.textContent = String(d.answer).split('\n')[0].slice(0, 140);
+        const out = document.getElementById('ai-chat-output');
+        if (out) { out.hidden = false; out.textContent = '[' + (d.backend || 'offline') + ']\n' + (d.answer || ''); }
+        showToast('Resposta do Copiloto pronta!', 'ok');
+      });
+    });
+  }
+
   async function loadChannelTelemetry() {
     const strip = document.getElementById('channel-telemetry');
     try {
       const res = await fetch('/api/channel');
       const d = await res.json();
+      _lastChannelData = d;
+      const keys = d.keys || {};
+      const vs = d.video_stats || {};
       if (strip) {
         strip.innerHTML = '';
+
+        const tt = document.createElement('span');
+        tt.className = keys.tiktok ? 'pill pill-tt' : 'pill';
+        tt.textContent = keys.tiktok
+          ? ('TikTok API: ' + (keys.tiktok_mode || 'inbox').toUpperCase() + ' (' + (vs.tiktok_sent || 0) + ' env)')
+          : 'TikTok: Aguardando OAuth';
+        strip.appendChild(tt);
+
         const ch = document.createElement('span');
         if (d.channel && d.channel.connected) {
           ch.className = 'pill pill-ok';
-          ch.textContent = 'Canal: ' + d.channel.title + ' (' + d.channel.videos + ' videos, ' + d.channel.views + ' views)';
+          ch.textContent = 'YouTube: ' + d.channel.title + ' (' + d.channel.videos + ' vids)';
         } else {
           ch.className = 'pill pill-err';
-          ch.textContent = 'Canal offline: ' + ((d.channel && d.channel.reason) || 'sem conexao');
+          ch.textContent = 'YouTube offline';
         }
         strip.appendChild(ch);
 
         const tts = document.createElement('span');
         tts.className = 'pill';
-        tts.textContent = 'Voz: ' + d.tts_engine;
+        tts.textContent = 'Voz: ' + (d.tts_engine || 'Kokoro').split('(')[0].trim();
         strip.appendChild(tts);
 
         const vid = document.createElement('span');
-        vid.className = 'pill';
+        vid.className = 'pill pill-info';
         vid.textContent = 'Acervo: ' + d.local_videos + ' MP4';
         strip.appendChild(vid);
 
         const llm = document.createElement('span');
-        const hasCloud = d.keys && (d.keys.openrouter || d.keys.gemini || d.keys.openai);
+        const hasCloud = keys.openrouter || keys.gemini || keys.openai;
         llm.className = (hasCloud || (d.local_llm && d.local_llm.online)) ? 'pill pill-ok' : 'pill';
-        llm.textContent = hasCloud ? 'IA Nuvem Ativa' : ((d.local_llm && d.local_llm.online) ? ('IA Local: ' + d.local_llm.model) : 'Modo Heuristico');
+        llm.textContent = hasCloud ? 'IA Nuvem + BM25' : ((d.local_llm && d.local_llm.online) ? ('IA Local: ' + d.local_llm.model) : 'Heuristica Offline');
         strip.appendChild(llm);
       }
 
-      const vs = d.video_stats || {};
       const elChV = document.getElementById('kpi-channel-val');
       const elChS = document.getElementById('kpi-channel-sub');
       if (elChV && elChS) {
-        elChV.textContent = (d.channel && d.channel.connected) ? (d.channel.views + ' views') : 'Offline';
-        elChS.textContent = (d.channel && d.channel.connected) ? (d.channel.title + ' • ' + d.channel.videos + ' publicados') : 'Verifique YouTube OAuth';
+        elChV.textContent = (keys.tiktok ? 'TikTok ATIVO' : 'TikTok Pend') + ' • ' + ((d.channel && d.channel.connected) ? (d.channel.videos + ' YT') : 'YT Off');
+        elChS.textContent = (vs.tiktok_sent || 0) + ' TikTok env • ' + ((d.channel && d.channel.connected) ? (d.channel.views + ' views YT') : 'Conecte YouTube');
       }
       const elQV = document.getElementById('kpi-queue-val');
       const elQS = document.getElementById('kpi-queue-sub');
       if (elQV && elQS) {
         elQV.textContent = (vs.approved || 0) + ' aprovados';
-        elQS.textContent = (vs.queued || 0) + ' na fila YouTube • ' + (vs.rejected || 0) + ' reprovados';
+        elQS.textContent = (vs.tiktok_ready || 0) + ' p/ TikTok • ' + (vs.queued || 0) + ' fila YT';
       }
       const evo = d.background_evolution || [];
       const elBgV = document.getElementById('kpi-bg-val');
@@ -262,15 +392,16 @@
         elBgV.textContent = (d.gameplay_count || 0) + ' fundos UCB1';
         const topScore = evo.length ? Number(evo[0].avg_quality ?? evo[0].avg_score ?? 0) : 0;
         elBgS.textContent = evo.length
-          ? ('Top UCB1: ' + evo[0].style + (topScore > 0 ? (' (' + Math.round(topScore) + '/100)') : ' (ativo)'))
-          : 'Rotacao multi-cena 4.2s';
+          ? ('Top: ' + evo[0].style + (topScore > 0 ? (' (' + Math.round(topScore) + '/100)') : ''))
+          : 'Troca multi-cena 4.2s';
       }
       const elAiV = document.getElementById('kpi-ai-val');
       const elAiS = document.getElementById('kpi-ai-sub');
       if (elAiV && elAiS) {
         elAiV.textContent = (d.tts_engine || 'Kokoro PT-BR').split('(')[0].trim();
-        elAiS.textContent = (d.keys && (d.keys.openrouter || d.keys.gemini)) ? 'IA Nuvem + Opus Scorecard' : 'Heuristica Offline';
+        elAiS.textContent = (keys.openrouter || keys.gemini) ? 'IA Nuvem + Opus 5D' : 'Heuristica Offline';
       }
+      updateCopilotInsight();
     } catch (e) {}
   }
 
@@ -279,28 +410,33 @@
     if (!info) return;
     try {
       const s = await (await fetch('/api/scheduler')).json();
-      info.textContent = (s.enabled ? 'Ativo' : 'Pausado') + ' | Nicho: ' + s.niche + ' | A cada ' + s.interval_hours + 'h | Ciclos: ' + s.runs_completed;
+      _lastSchedulerData = s;
+      info.textContent = (s.enabled ? 'Ativo' : 'Pausado') + ' | ' + (s.platform || 'tiktok_rewards') + ' | ' + s.interval_hours + 'h | Ciclos: ' + s.runs_completed;
+      updateCopilotInsight();
     } catch (e) {}
   }
 
   document.getElementById('btn-toggle-scheduler').addEventListener('click', () => withBusyBtn(document.getElementById('btn-toggle-scheduler'), 'Salvando...', async () => {
     const cur = await (await fetch('/api/scheduler')).json();
-    await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !cur.enabled }) });
+    const selPlat = document.getElementById('cut-platform') ? document.getElementById('cut-platform').value : 'tiktok_rewards';
+    await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !cur.enabled, platform: selPlat, auto_publish: true }) });
     await loadScheduler();
     showToast(!cur.enabled ? 'Piloto 24/7 ativado!' : 'Piloto 24/7 pausado.', 'ok');
   }));
 
   document.getElementById('btn-trigger-autopilot').addEventListener('click', () => withBusyBtn(document.getElementById('btn-trigger-autopilot'), 'Enfileirando...', async () => {
-    startOptimisticRender('1/5 Iniciando lote automatico multi-nicho...');
-    const resp = await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run_now: true, niche: 'all' }) });
+    const selPlat = document.getElementById('cut-platform') ? document.getElementById('cut-platform').value : 'tiktok_rewards';
+    startOptimisticRender('1/5 Iniciando lote automatico (' + selPlat + ')...');
+    const resp = await fetch('/api/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run_now: true, niche: 'all', platform: selPlat, auto_publish: true }) });
     const data = await resp.json();
     showToast(data.message || 'Lote multi-nicho iniciado!', 'ok');
     refreshStatus();
   }));
 
-  /* Live Interactive 9:16 Studio Preview, Layout Tiles & YouTube Thumb Detection */
+  /* Segmented Platform Pills <-> Select & Live 9:16 Stage Preview */
   const cutSourceEl = document.getElementById('cut-source');
   const cutNicheEl = document.getElementById('cut-niche');
+  const cutPlatformEl = document.getElementById('cut-platform');
   const cutLayoutEl = document.getElementById('cut-layout');
   const voiceScriptEl = document.getElementById('voice-script');
   const voiceHookEl = document.getElementById('voice-hook');
@@ -310,8 +446,34 @@
   const previewHookBox = document.getElementById('preview-hook-title');
   const previewSubsBox = document.getElementById('preview-subs-line');
   const hookMeterLabel = document.getElementById('hook-meter-label');
+  const previewPlatTag = document.getElementById('preview-platform-tag');
   const voicePaceMeta = document.getElementById('voice-pace-meta');
   const layoutTiles = Array.from(document.querySelectorAll('.layout-tile'));
+  const platformPills = Array.from(document.querySelectorAll('.platform-pill'));
+
+  const PLATFORM_TAGS = {
+    tiktok_rewards: 'TikTok 61–75s',
+    youtube_shorts: 'YouTube 15–45s',
+    instagram_reels: 'Reels 15–58s',
+  };
+
+  function syncPlatformSelection(plat) {
+    const val = plat || 'tiktok_rewards';
+    if (cutPlatformEl) {
+      const opt = Array.from(cutPlatformEl.options).find((o) => o.value === val);
+      if (opt) cutPlatformEl.value = val;
+    }
+    platformPills.forEach((p) => p.setAttribute('aria-pressed', String(p.getAttribute('data-platform') === val)));
+    if (previewPlatTag) previewPlatTag.textContent = PLATFORM_TAGS[val] || val;
+  }
+
+  platformPills.forEach((p) => {
+    p.addEventListener('click', () => syncPlatformSelection(p.getAttribute('data-platform')));
+  });
+  if (cutPlatformEl) {
+    syncPlatformSelection('tiktok_rewards');
+    cutPlatformEl.addEventListener('change', () => syncPlatformSelection(cutPlatformEl.value));
+  }
 
   function extractYouTubeId(rawUrl) {
     const s = String(rawUrl || '').trim();
@@ -330,14 +492,14 @@
       topZ.textContent = 'Topo: Video / Podcast Principal';
       const botZ = document.createElement('div');
       botZ.className = 'phone-zone-card';
-      botZ.textContent = 'Base: Gameplay Parkour 9:16';
+      botZ.textContent = 'Base: Gameplay Multi-Cena 9:16';
       phoneStage.appendChild(topZ);
       phoneStage.appendChild(botZ);
     } else if (lay === 'center_crop') {
       const faceZ = document.createElement('div');
       faceZ.className = 'phone-zone-card';
       faceZ.style.borderStyle = 'solid';
-      faceZ.style.borderColor = 'rgba(96, 165, 250, 0.75)';
+      faceZ.style.borderColor = 'rgba(96, 165, 250, 0.85)';
       faceZ.textContent = 'Enquadramento 9:16 com Rastreio Facial';
       phoneStage.appendChild(faceZ);
     } else {
@@ -424,7 +586,7 @@
       startOptimisticRender('1/5 Preparando coleta e cortes 9:16...');
       const body = {
         niche: cutNicheEl.value,
-        platform: document.getElementById('cut-platform').value,
+        platform: cutPlatformEl.value,
         layout: cutLayoutEl.value,
         clips: Number(document.getElementById('cut-clips').value || 1),
         source: cutSourceEl.value.trim(),
@@ -502,9 +664,10 @@
     });
   });
 
-  /* Inspector Modal / Bottom Sheet (<dialog>) */
-  function openShortInspector(v) {
+  /* Accessible Inspector Modal (<dialog>) with Focus Management */
+  function openShortInspector(v, triggerEl) {
     if (!dlg) return;
+    _inspectorTriggerEl = triggerEl || document.activeElement;
     document.getElementById('dlg-title').textContent = v.title || v.filename;
     const body = document.getElementById('dlg-body');
     body.innerHTML = '';
@@ -512,7 +675,7 @@
     const player = document.createElement('video');
     player.controls = true;
     player.preload = 'metadata';
-    player.style.maxHeight = '360px';
+    player.style.maxHeight = '340px';
     player.style.margin = '0 auto';
     player.src = '/media/' + encodeURIComponent(v.filename);
     body.appendChild(player);
@@ -551,6 +714,21 @@
       body.appendChild(box);
     }
 
+    if (v.tiktok_algo) {
+      const ta = v.tiktok_algo;
+      const tbox = document.createElement('div');
+      tbox.className = 'diag-box';
+      const thd = document.createElement('strong');
+      thd.textContent = 'TikTok FYP Cohort: ' + ta.tiktok_score + '/100 — ' + ta.cohort_forecast + (ta.monetization_eligible_60s ? ' (60s+ Creator Rewards)' : '');
+      tbox.appendChild(thd);
+      const tsub = document.createElement('div');
+      tsub.className = 'topic-meta';
+      tsub.style.marginTop = '4px';
+      tsub.textContent = 'Gatilho do nicho: ' + (ta.playbook ? ta.playbook.brain_trigger : ta.niche);
+      tbox.appendChild(tsub);
+      body.appendChild(tbox);
+    }
+
     if (v.thumb_16x9) {
       const img = document.createElement('img');
       img.className = 'thumb';
@@ -567,6 +745,19 @@
 
     const acts = document.createElement('div');
     acts.className = 'actions';
+
+    const btnTt = document.createElement('button');
+    btnTt.type = 'button';
+    btnTt.className = 'btn btn-tiktok btn-sm';
+    btnTt.textContent = (v.tiktok && v.tiktok.publish_id) ? 'Reenviar TikTok (Inbox)' : 'Publicar TikTok (Inbox)';
+    btnTt.addEventListener('click', () => withBusyBtn(btnTt, 'Enviando TT...', async () => {
+      const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
+      const d = await r.json();
+      showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+      if (d.publish_id) { await loadVideos(); await loadChannelTelemetry(); }
+    }));
+    acts.appendChild(btnTt);
+
     const btnYt = document.createElement('button');
     btnYt.type = 'button';
     btnYt.className = 'btn btn-success btn-sm';
@@ -576,6 +767,7 @@
       const d = await r.json();
       showToast(r.ok ? ('Publicado no YouTube: ' + (d.url || 'OK')) : (d.message || 'Salvo na fila'), r.ok ? 'ok' : 'info');
       await loadVideos();
+      await loadChannelTelemetry();
     }));
     acts.appendChild(btnYt);
 
@@ -590,17 +782,19 @@
     }));
     acts.appendChild(btnIg);
 
-    const btnTt = document.createElement('button');
-    btnTt.type = 'button';
-    btnTt.className = 'btn btn-secondary btn-sm';
-    btnTt.textContent = (v.tiktok && v.tiktok.publish_id) ? 'Reenviar TikTok' : 'TikTok (Inbox/API)';
-    btnTt.addEventListener('click', () => withBusyBtn(btnTt, 'Enviando TT...', async () => {
-      const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename }) });
-      const d = await r.json();
-      showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
-      if (d.publish_id) await loadVideos();
-    }));
-    acts.appendChild(btnTt);
+    if (v.caption && navigator.clipboard) {
+      const btnCopy = document.createElement('button');
+      btnCopy.type = 'button';
+      btnCopy.className = 'btn btn-secondary btn-sm';
+      btnCopy.textContent = 'Copiar SEO';
+      btnCopy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(v.caption);
+          showToast('Legenda e hashtags copiadas!', 'ok');
+        } catch (e) {}
+      });
+      acts.appendChild(btnCopy);
+    }
 
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
@@ -616,14 +810,22 @@
     acts.appendChild(btnDel);
     body.appendChild(acts);
     dlg.showModal();
+    const closeBtn = document.getElementById('dlg-close');
+    if (closeBtn) closeBtn.focus();
   }
 
   if (dlg) {
     document.getElementById('dlg-close').addEventListener('click', () => dlg.close());
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('close', () => {
+      if (_inspectorTriggerEl && typeof _inspectorTriggerEl.focus === 'function') {
+        _inspectorTriggerEl.focus();
+      }
+      _inspectorTriggerEl = null;
+    });
   }
 
-  /* Clean Minimalist Acervo Cards + Instant Filter Pills */
+  /* Clean Acervo Cards + Fast TikTok/YouTube Delivery & Filter Pills */
   function renderVideosGrid() {
     const box = document.getElementById('videos-list');
     if (!box) return;
@@ -631,6 +833,9 @@
     const filtered = _videosCache.filter((v) => {
       if (filterTxt && !(v.title + ' ' + v.caption + ' ' + v.filename).toLowerCase().includes(filterTxt)) return false;
       const visOk = v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
+      const ttSent = !!(v.tiktok && v.tiktok.publish_id);
+      if (_acervoFilter === 'tiktok_ready') return visOk && !ttSent;
+      if (_acervoFilter === 'tiktok_sent') return ttSent;
       if (_acervoFilter === 'approved') return visOk;
       if (_acervoFilter === 'queued') return !!v.queued_for_auto_publish;
       if (_acervoFilter === 'published') return !!(v.youtube && v.youtube.url);
@@ -654,13 +859,31 @@
 
       const badges = document.createElement('div');
       badges.className = 'telemetry-strip';
-      const statusPill = document.createElement('span');
       const visOk = v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
+      const statusPill = document.createElement('span');
       statusPill.className = visOk ? 'pill pill-ok' : 'pill pill-err';
       statusPill.textContent = visOk
-        ? ('Pronto' + (v.validation && v.validation.duration ? (' • ' + v.validation.duration + 's') : '') + (v.queued_for_auto_publish ? ' • Fila YT' : ''))
+        ? ('Pronto' + (v.validation && v.validation.duration ? (' • ' + v.validation.duration + 's') : ''))
         : ('Reprovado: ' + ((v.visual_audit && v.visual_audit.reject_reasons && v.visual_audit.reject_reasons[0]) || 'verificar'));
       badges.appendChild(statusPill);
+
+      const ttPill = document.createElement('span');
+      if (v.tiktok && v.tiktok.publish_id) {
+        ttPill.className = 'pill pill-tt';
+        ttPill.textContent = 'TikTok: ' + (v.tiktok.mode || 'inbox').toUpperCase();
+        badges.appendChild(ttPill);
+      } else if (visOk) {
+        ttPill.className = 'pill';
+        ttPill.textContent = 'TikTok: Pronto';
+        badges.appendChild(ttPill);
+      }
+
+      if (v.youtube && v.youtube.url) {
+        const ytPill = document.createElement('span');
+        ytPill.className = 'pill pill-yt';
+        ytPill.textContent = 'YouTube: OK';
+        badges.appendChild(ytPill);
+      }
 
       const opus = v.opus_scorecard;
       if (opus) {
@@ -668,12 +891,6 @@
         opPill.className = opus.opus_score >= 70 ? 'pill pill-info' : 'pill';
         opPill.textContent = 'Opus ' + opus.opus_score + '/100';
         badges.appendChild(opPill);
-      }
-      if (v.background_style) {
-        const bgP = document.createElement('span');
-        bgP.className = 'pill';
-        bgP.textContent = v.background_style;
-        badges.appendChild(bgP);
       }
       card.appendChild(badges);
 
@@ -711,12 +928,26 @@
 
       const acts = document.createElement('div');
       acts.className = 'actions';
+      if (visOk && !(v.tiktok && v.tiktok.publish_id)) {
+        const btnFastTt = document.createElement('button');
+        btnFastTt.type = 'button';
+        btnFastTt.className = 'btn btn-tiktok btn-sm';
+        btnFastTt.textContent = 'Postar TikTok';
+        btnFastTt.addEventListener('click', () => withBusyBtn(btnFastTt, 'Enviando TT...', async () => {
+          const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
+          const d = await r.json();
+          showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+          if (d.publish_id) { await loadVideos(); await loadChannelTelemetry(); }
+        }));
+        acts.appendChild(btnFastTt);
+      }
+
       const btnInspect = document.createElement('button');
       btnInspect.type = 'button';
       btnInspect.className = 'btn btn-primary btn-sm';
       btnInspect.style.flex = '1';
-      btnInspect.textContent = (v.youtube && v.youtube.url) ? 'Ver Detalhes (Publicado)' : 'Inspecionar & Publicar';
-      btnInspect.addEventListener('click', () => openShortInspector(v));
+      btnInspect.textContent = 'Inspecionar & Publicar';
+      btnInspect.addEventListener('click', () => openShortInspector(v, btnInspect));
       acts.appendChild(btnInspect);
       card.appendChild(acts);
       box.appendChild(card);
@@ -725,13 +956,14 @@
 
   async function loadVideos() {
     const box = document.getElementById('videos-list');
-    renderSkeletons(box, 3);
+    if (box && !_videosCache.length) renderSkeletons(box, 3);
     try {
       const data = await (await fetch('/api/videos')).json();
       _videosCache = data.videos || [];
       renderVideosGrid();
+      updateCopilotInsight();
     } catch (e) {
-      box.textContent = 'Erro ao carregar acervo: ' + e.message;
+      if (box) box.textContent = 'Erro ao carregar acervo: ' + e.message;
     }
   }
   document.querySelectorAll('.acervo-chip').forEach((chip) => {
@@ -758,7 +990,7 @@
     await loadVideos();
   }));
 
-  /* Rich Editorial Topic Media Builder (Gradient + Crisp SVG fallback instead of flat colors) */
+  /* Editorial Topic Media Builder */
   const KIND_ART = {
     noticia: { bg: 'linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%)', label: 'Jornalismo ao vivo', sub: 'Manchete pronta para roteiro' },
     ciencia: { bg: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)', label: 'Ciencia & Mundo', sub: 'Fato viral validado' },
@@ -882,7 +1114,7 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             niche: item.niche || 'podcast',
-            platform: document.getElementById('cut-platform').value,
+            platform: cutPlatformEl.value,
             layout: cutLayoutEl.value,
             clips: Number(document.getElementById('cut-clips').value || 1),
             query: item.youtube_query || item.title_pt,
@@ -978,7 +1210,7 @@
         startOptimisticRender('1/5 Coletando corte de anime: ' + (a.title || '').slice(0, 26));
         const r = await fetch('/api/run', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ niche: 'entretenimento_animes', platform: document.getElementById('cut-platform').value, layout: cutLayoutEl.value, clips: 1, query: a.youtube_query, playlist: 'Animes e Teorias - Shorts', auto_publish: true }),
+          body: JSON.stringify({ niche: 'entretenimento_animes', platform: cutPlatformEl.value, layout: cutLayoutEl.value, clips: 1, query: a.youtube_query, playlist: 'Animes e Teorias - Shorts', auto_publish: true }),
         });
         const d = await r.json();
         showToast(d.message || 'Corte de anime na fila!', 'ok');
@@ -1138,11 +1370,17 @@
 
   document.getElementById('brief-form').addEventListener('submit', (e) => {
     e.preventDefault();
+    const topicEl = document.getElementById('brief-topic');
+    const errEl = document.getElementById('brief-topic-err');
+    const ok = !!(topicEl && topicEl.value.trim());
+    if (errEl) errEl.hidden = ok;
+    if (topicEl) topicEl.setAttribute('aria-invalid', String(!ok));
+    if (!ok) return;
     withBusyBtn(document.getElementById('btn-generate-brief'), 'Gerando roteiro...', async () => {
       const r = await fetch('/api/team/brief', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: document.getElementById('brief-topic').value.trim() || 'Tendencia',
+          topic: topicEl.value.trim(),
           niche: document.getElementById('brief-niche').value,
           platform: document.getElementById('brief-platform').value,
         }),
@@ -1150,7 +1388,12 @@
       const b = await r.json();
       const box = document.getElementById('brief-output');
       box.hidden = false;
-      box.textContent = 'GANCHO: ' + (b.acts && b.acts['0_a_3s_gancho'] ? b.acts['0_a_3s_gancho'].line : '') + '\nCONFLITO: ' + (b.acts && b.acts['3_a_20s_conflito'] ? b.acts['3_a_20s_conflito'].line : '') + '\nPAYOFF: ' + (b.acts && b.acts['payoff_final'] ? b.acts['payoff_final'].line : '');
+      const a = b.acts || {};
+      const g = typeof a['0_a_3s_gancho'] === 'string' ? a['0_a_3s_gancho'] : ((a['0_a_3s_gancho'] || {}).line || '');
+      const d = typeof a['3_a_35s_desenvolvimento'] === 'string' ? a['3_a_35s_desenvolvimento'] : ((a['3_a_20s_conflito'] || {}).line || '');
+      const f = typeof a['final_climax_cta'] === 'string' ? a['final_climax_cta'] : ((a['payoff_final'] || {}).line || '');
+      const pb = b.mentalism_playbook ? ('\n[GATILHO MENTALISTA]: ' + b.mentalism_playbook.brain_trigger) : '';
+      box.textContent = 'GANCHO: ' + g + '\nDESENVOLVIMENTO: ' + d + '\nFECHAMENTO & LOOP: ' + f + pb;
       showToast('Roteiro em 3 atos pronto!', 'ok');
     });
   });
@@ -1205,11 +1448,73 @@
       card.appendChild(p1);
       box.appendChild(card);
     });
+
+    const ttGrid = document.getElementById('tiktok-algo-weights');
+    const pbBox = document.getElementById('tt-playbook-card');
+    if (ttGrid) {
+      try {
+        const ti = await (await fetch('/api/tiktok/intelligence')).json();
+        ttGrid.innerHTML = '';
+        (ti.signal_weights || []).forEach((w) => {
+          const el = document.createElement('div');
+          el.className = 'diag-box';
+          el.innerHTML = '<strong></strong><span></span><div class="topic-meta"></div>';
+          el.querySelector('strong').textContent = w.signal + ' (' + w.weight_pct + '%)';
+          el.querySelector('span').textContent = w.target;
+          ttGrid.appendChild(el);
+        });
+        window._ttPlaybooks = ti.playbooks || {};
+        renderSelectedMentalismPlaybook();
+      } catch (e) {}
+    }
+  }
+
+  function renderSelectedMentalismPlaybook() {
+    const sel = document.getElementById('tt-ment-niche');
+    const box = document.getElementById('tt-playbook-card');
+    const map = window._ttPlaybooks || {};
+    if (!sel || !box) return;
+    const pb = map[sel.value] || map.geral;
+    if (!pb) return;
+    box.hidden = false;
+    box.innerHTML = '<strong></strong><span></span><div class="topic-meta" style="margin-top:6px;"></div>';
+    box.querySelector('strong').textContent = 'Gatilho Cerebral: ' + pb.brain_trigger;
+    box.querySelector('span').textContent = pb.mentalism_technique;
+    box.querySelector('.topic-meta').textContent = 'Visual (' + pb.ideal_bpm_cuts_sec + 's/corte • ' + pb.recommended_layout + '): ' + pb.visual_blueprint + ' | Trigger Comentario: ' + pb.comment_trigger;
+  }
+
+  const ttNicheSel = document.getElementById('tt-ment-niche');
+  if (ttNicheSel) ttNicheSel.addEventListener('change', renderSelectedMentalismPlaybook);
+
+  const ttMentForm = document.getElementById('tiktok-mentalist-form');
+  if (ttMentForm) {
+    ttMentForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const topicEl = document.getElementById('tt-ment-topic');
+      const topic = (topicEl ? topicEl.value : '').trim();
+      if (!topic) return;
+      withBusyBtn(document.getElementById('btn-tt-mentalist'), 'Gerando...', async () => {
+        const niche = ttNicheSel ? ttNicheSel.value : 'geral';
+        const d = await (await fetch('/api/tiktok/mentalist-brief', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, niche, duration_sec: 64 }),
+        })).json();
+        if (voiceScriptEl) voiceScriptEl.value = d.full_narration_script || '';
+        if (voiceHookEl) voiceHookEl.value = String(topic).toUpperCase().slice(0, 34);
+        syncWorkstationPreview();
+        activateTab(2);
+        showToast('Roteiro Mentalista 64s carregado em Roteiro & Voz!', 'ok');
+      });
+    });
   }
 
   document.getElementById('synapse-innertube-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const urlVal = document.getElementById('innertube-url').value.trim();
+    const urlEl = document.getElementById('innertube-url');
+    const errEl = document.getElementById('innertube-err');
+    const urlVal = urlEl.value.trim();
+    if (errEl) errEl.hidden = !!urlVal;
+    urlEl.setAttribute('aria-invalid', String(!urlVal));
     const box = document.getElementById('innertube-result');
     if (!urlVal) return;
     withBusyBtn(document.getElementById('btn-innertube-scan'), 'Extraindo...', async () => {
@@ -1244,6 +1549,7 @@
     e.preventDefault();
     const q = document.getElementById('rea-trace-query').value.trim();
     const out = document.getElementById('rea-trace-result');
+    if (!q) return;
     withBusyBtn(document.getElementById('btn-rea-trace'), 'Rastreando...', async () => {
       out.hidden = false;
       const d = await (await fetch('/api/synapse/trace?q=' + encodeURIComponent(q))).json();
@@ -1263,6 +1569,7 @@
     [
       ['Disco Livre', d.disk_free_gb + ' GB (' + (d.output_used_mb || 0) + ' MB em output/)'],
       ['Endereco Rede Local', d.lan_url || 'http://127.0.0.1:8787/'],
+      ['Canais API', (d.keys && d.keys.tiktok ? 'TikTok ATIVO' : 'TikTok Pend.') + ' • ' + (d.keys && d.keys.youtube ? 'YouTube OK' : 'YouTube Pend.')],
       ['Persistencia Boot/SSH', d.tools.boot_ready ? 'Termux:Boot + Watchdog' : 'Watchdog C11'],
       ['FFmpeg / Whisper', (d.tools.ffmpeg ? 'FFmpeg OK' : 'Sem FFmpeg') + ' • ' + (d.tools.whisper ? 'Whisper OK' : 'Sem Whisper')],
       ['Voz TTS', d.tts_engine || 'Kokoro PT-BR'],
@@ -1343,6 +1650,7 @@
   syncWorkstationPreview();
   loadChannelTelemetry();
   loadScheduler();
+  loadVideos();
   refreshStatus();
   loadHorizonRadar();
 })();

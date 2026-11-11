@@ -10,6 +10,7 @@ from .anime_trends import get_releasing_anime_radar
 from .config import NICHES
 from .highlights import _parse_json_loose, call_gemini_or_openai
 from .narrator import humanize_ptbr_script
+from .tiktok_algorithm import build_mentalist_script_blueprint, get_niche_mentalism_playbook
 
 
 @dataclass(frozen=True)
@@ -141,18 +142,16 @@ def build_persona_script_brief(
     """Assemble a 3-act PT-BR script + timing plan reviewed by Screenwriter, Showrunner & SEO."""
     clean_topic = humanize_ptbr_script(topic or "o detalhe escondido que quase ninguém percebeu")
     profile = NICHES.get(niche, NICHES["geral"])
+    playbook = get_niche_mentalism_playbook(profile.key)
+    bp = build_mentalist_script_blueprint(clean_topic, niche=profile.key, target_duration_sec=65 if platform == "tiktok_rewards" else 44)
     is_long_short = platform == "tiktok_rewards"
     target_sec = 65 if is_long_short else 44
 
-    hook_line = humanize_ptbr_script(f"Presta atenção nisso sobre {clean_topic}: quase todo mundo deixou passar esse detalhe!")
+    hook_line = humanize_ptbr_script(bp["beats"]["0_a_2s_pattern_interrupt"])
     body_line = humanize_ptbr_script(
-        f"Nos primeiros segundos já dá pra ver por que {clean_topic} virou assunto no Brasil inteiro. "
-        "Quando você analisa o contexto real sem enrolação, a virada faz sentido na hora."
+        f"{bp['beats']['2_a_18s_zeigarnik_open_loop']} {bp['beats']['18_a_52s_mentalist_reframe']}"
     )
-    climax_line = humanize_ptbr_script(
-        "E é exatamente esse ponto final que muda tudo na história. "
-        "Comenta aqui sua opinião e já salva pra acompanhar os próximos cortes!"
-    )
+    climax_line = humanize_ptbr_script(bp["beats"]["52s_end_loop_bridge_cta"])
     hook_banner = clean_topic.upper()[:34]
     title = f"{clean_topic[:74]} — O Detalhe Que Ninguém Notou"[:90]
     engine_used = "heuristic_team"
@@ -161,10 +160,12 @@ def build_persona_script_brief(
         prompt = (
             f"Você é a equipe de criação do canal ({profile.label}) no formato {platform} ({target_sec}s).\n"
             f"Tema: {clean_topic}\n"
-            "Escreva em português do Brasil falado e natural (sem clichê robótico).\n"
+            f"Gatilho neuro-mentalista obrigatorio: {playbook['brain_trigger']} ({playbook['mentalism_technique']}).\n"
+            f"Regra de retencao: prenda nos primeiros 2s sem saudacao robotica, use loop aberto (Zeigarnik) e termine conectando com o inicio para gerar rewatch.\n"
+            "Escreva em português do Brasil falado e natural.\n"
             "Responda SOMENTE JSON válido:\n"
             '{"seo_title":"string max 80 chars","hook_banner":"MAX 5 PALAVRAS MAIUSCULAS",'
-            '"gancho":"frase forte 0-3s","desenvolvimento":"2 frases diretas","climax_cta":"fechamento impactante"}'
+            '"gancho":"frase forte 0-3s","desenvolvimento":"2 frases diretas","climax_cta":"fechamento impactante com loop e CTA"}'
         )
         try:
             raw = call_gemini_or_openai(prompt)
@@ -195,6 +196,7 @@ def build_persona_script_brief(
         "playlist": f"{profile.label.split(',')[0].strip()} - Shorts",
         "script": full_script,
         "engine_used": engine_used,
+        "mentalism_playbook": playbook,
         "acts": {
             "0_a_3s_gancho": hook_line,
             "3_a_35s_desenvolvimento": body_line,
