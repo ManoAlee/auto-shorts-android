@@ -67,6 +67,33 @@
     }, 3600);
   }
 
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {}
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    ta.setAttribute('readonly', '');
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (e) {
+      ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
   function withBusyBtn(btn, labelWhile, fn) {
     if (!btn) return fn();
     const orig = btn.innerHTML;
@@ -732,10 +759,38 @@
       body.appendChild(img);
     }
     if (v.caption) {
-      const pre = document.createElement('pre');
-      pre.className = 'meta-pre';
-      pre.textContent = v.caption;
-      body.appendChild(pre);
+      const capWrap = document.createElement('div');
+      capWrap.style.margin = '12px 0';
+      const capHead = document.createElement('div');
+      capHead.style.display = 'flex';
+      capHead.style.justifyContent = 'space-between';
+      capHead.style.alignItems = 'center';
+      capHead.style.marginBottom = '6px';
+      const capTitle = document.createElement('strong');
+      capTitle.textContent = 'Legenda & Hashtags para TikTok / Shorts:';
+      capHead.appendChild(capTitle);
+
+      const btnCopyTop = document.createElement('button');
+      btnCopyTop.type = 'button';
+      btnCopyTop.className = 'btn btn-secondary btn-sm';
+      btnCopyTop.textContent = '📋 Copiar Legenda';
+      btnCopyTop.addEventListener('click', async () => {
+        const ok = await copyTextToClipboard(v.caption);
+        showToast(ok ? 'Legenda copiada! Abra o TikTok e cole em "Adicionar descrição".' : 'Selecione e copie o texto abaixo.', ok ? 'ok' : 'info');
+      });
+      capHead.appendChild(btnCopyTop);
+      capWrap.appendChild(capHead);
+
+      const ta = document.createElement('textarea');
+      ta.className = 'form-input';
+      ta.rows = 4;
+      ta.style.width = '100%';
+      ta.style.fontFamily = 'monospace';
+      ta.style.fontSize = '12px';
+      ta.value = v.caption;
+      ta.addEventListener('click', () => ta.select());
+      capWrap.appendChild(ta);
+      body.appendChild(capWrap);
     }
 
     const acts = document.createElement('div');
@@ -748,8 +803,8 @@
     btnTt.addEventListener('click', () => withBusyBtn(btnTt, 'Enviando TT...', async () => {
       const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
       const d = await r.json();
-      if (d.publish_id && v.caption && navigator.clipboard) {
-        try { await navigator.clipboard.writeText(v.caption); } catch (e) {}
+      if (d.publish_id && v.caption) {
+        await copyTextToClipboard(v.caption);
         showToast('Enviado ao TikTok! Legenda copiada — basta colar em "Adicionar descrição" no app.', 'ok');
       } else {
         showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
@@ -781,20 +836,6 @@
       showToast(d.url ? ('Publicado no IG: ' + d.url) : (d.reason || d.status), d.url ? 'ok' : 'info');
     }));
     acts.appendChild(btnIg);
-
-    if (v.caption && navigator.clipboard) {
-      const btnCopy = document.createElement('button');
-      btnCopy.type = 'button';
-      btnCopy.className = 'btn btn-secondary btn-sm';
-      btnCopy.textContent = 'Copiar SEO';
-      btnCopy.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(v.caption);
-          showToast('Legenda e hashtags copiadas!', 'ok');
-        } catch (e) {}
-      });
-      acts.appendChild(btnCopy);
-    }
 
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
@@ -936,8 +977,8 @@
         btnFastTt.addEventListener('click', () => withBusyBtn(btnFastTt, 'Enviando TT...', async () => {
           const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
           const d = await r.json();
-          if (d.publish_id && v.caption && navigator.clipboard) {
-            try { await navigator.clipboard.writeText(v.caption); } catch (e) {}
+          if (d.publish_id && v.caption) {
+            await copyTextToClipboard(v.caption);
             showToast('Enviado ao TikTok! Legenda copiada — basta colar em "Adicionar descrição" no app.', 'ok');
           } else {
             showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
@@ -947,19 +988,15 @@
         acts.appendChild(btnFastTt);
       }
 
-      if (v.caption && navigator.clipboard) {
+      if (v.caption) {
         const btnCopyCap = document.createElement('button');
         btnCopyCap.type = 'button';
         btnCopyCap.className = 'btn btn-secondary btn-sm';
         btnCopyCap.title = 'Copiar título e hashtags para colar no TikTok';
         btnCopyCap.textContent = '📋 Legenda';
         btnCopyCap.addEventListener('click', async () => {
-          try {
-            await navigator.clipboard.writeText(v.caption);
-            showToast('Legenda e hashtags copiadas! Abra o TikTok e cole no campo "Adicionar descrição".', 'ok');
-          } catch (e) {
-            showToast('Erro ao copiar legenda: ' + e.message, 'err');
-          }
+          const ok = await copyTextToClipboard(v.caption);
+          showToast(ok ? 'Legenda e hashtags copiadas! Abra o TikTok e cole no campo "Adicionar descrição".' : 'Erro ao copiar legenda.', ok ? 'ok' : 'err');
         });
         acts.appendChild(btnCopyCap);
       }
