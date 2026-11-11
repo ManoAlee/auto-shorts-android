@@ -2031,6 +2031,17 @@ def test_smart_autopublish_priority_and_cadence(tmp_path: Path, monkeypatch) -> 
     assert plan["channels"]["tiktok"]["daily_used"] == 1
     assert plan["channels"]["youtube"]["gate_reason"] == "quota_cooldown"
 
+    # Simulate TikTok spam_risk_too_many_pending_share setting automatic 2h cooldown cleanly
+    tt_cd_res = run_smart_publish_cycle(
+        tmp_path,
+        youtube_ready=False,
+        tiktok_ready=True,
+        force=True,
+        tt_publisher=lambda p: (_ for _ in ()).throw(RuntimeError("spam_risk_too_many_pending_share")),
+    )
+    assert tt_cd_res["results"]["tiktok"]["status"] == "inbox_pending_cooldown_2h"
+    assert can_publish_channel(load_publish_ledger(tmp_path), "tiktok")[1] == "quota_cooldown"
+
 
 
 

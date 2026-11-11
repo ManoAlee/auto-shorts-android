@@ -24,6 +24,7 @@ DEFAULT_MIN_SPACING_SEC = {
     "youtube": max(60, int(os.getenv("YT_MIN_SPACING_MIN", "120") or "120") * 60),
 }
 YOUTUBE_QUOTA_COOLDOWN_SEC = 4 * 3600
+TIKTOK_INBOX_COOLDOWN_SEC = 2 * 3600
 
 
 def _ledger_path(out_dir: Path) -> Path:
@@ -284,9 +285,16 @@ def run_smart_publish_cycle(
             results[ch] = {"status": "published", "filename": picked["filename"], "score": picked["composite_score"], **pub_res}
         except Exception as exc:
             msg = str(exc)
-            if ch == "youtube" and "uploadLimitExceeded" in msg:
+            low = msg.lower()
+            if ch == "youtube" and ("uploadlimitexceeded" in low or "exceeded the number of videos" in low):
                 ledger[ch]["cooldown_until"] = ts + YOUTUBE_QUOTA_COOLDOWN_SEC
                 results[ch] = {"status": "quota_cooldown_4h", "error": msg[:160]}
+            elif ch == "tiktok" and ("spam_risk" in low or "rate_limit" in low or "too_many" in low):
+                ledger[ch]["cooldown_until"] = ts + TIKTOK_INBOX_COOLDOWN_SEC
+                results[ch] = {
+                    "status": "inbox_pending_cooldown_2h",
+                    "error": "Caixa de Entrada do TikTok atingiu limite de rascunhos pendentes. Publique/limpe no app TikTok no celular.",
+                }
             else:
                 results[ch] = {"status": "error", "error": msg[:200]}
 
