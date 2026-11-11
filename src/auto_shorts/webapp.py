@@ -56,6 +56,7 @@ from .offline_llm import (
     detect_android_llm_capabilities,
 )
 from .retention import _dir_bytes, prune_storage
+from .smart_autopublish import get_autopublish_plan, run_smart_publish_cycle
 from .team import build_persona_script_brief, generate_channel_planner, is_llm_configured, list_channel_personas
 from .tiktok_algorithm import build_mentalist_script_blueprint, get_tiktok_algorithm_blueprint
 from .validator import audit_short_end_to_end, validate_generated_short
@@ -372,6 +373,10 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
         _JOB_STATE.update({"running": False, "last_status": "Falha no piloto automatico", "last_error": str(exc)})
 
 
+def _is_youtube_configured() -> bool:
+    return bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+
+
 def _is_tiktok_configured() -> bool:
     return bool(
         os.getenv("TIKTOK_ACCESS_TOKEN", "").strip()
@@ -383,7 +388,7 @@ def _auto_crosspost_channels(result: Dict) -> None:
     """Publish validated pipeline output(s) to both TikTok and YouTube when configured."""
     if not isinstance(result, dict):
         return
-    yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    yt_ready = _is_youtube_configured()
     tt_ready = _is_tiktok_configured()
     if not (yt_ready or tt_ready):
         return
@@ -411,63 +416,30 @@ def _auto_crosspost_channels(result: Dict) -> None:
                 pass
 
 
-def _flush_pending_publishes(out_dir: Path) -> bool:
-    """Retry uploading validated local Shorts waiting for YouTube or TikTok delivery.
-
-    Sends at most one Short per pass per platform so cadence stays organic.
-    """
-    yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+def _flush_pending_publishes(out_dir: Path, force: bool = False) -> bool:
+    """Run intelligent priority-ranked auto-publishing across TikTok and YouTube."""
+    yt_ready = _is_youtube_configured()
     tt_ready = _is_tiktok_configured()
     if not (yt_ready or tt_ready) or not out_dir.exists():
         return False
 
-    sent_any = False
-    for mp4 in sorted(out_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
-        pack_file = mp4.with_suffix(".publish.json")
-        if not pack_file.is_file():
-            continue
-        try:
-            pack = json.loads(pack_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        val = pack.get("validation") or {}
-        if not val.get("valid"):
-            continue
-        vis = pack.get("visual_audit")
-        if not isinstance(vis, dict):
-            ass_cand = mp4.parent / f"_narrate_{mp4.stem}" / f"{mp4.stem}.ass"
-            vis = audit_short_end_to_end(mp4, pack=pack, ass_path=ass_cand if ass_cand.is_file() else None, vision_check=False)
-            pack["visual_audit"] = vis
-            pack["queued_for_auto_publish"] = bool(vis.get("approved"))
-            pack_file.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
-        if not vis.get("approved") or pack.get("queued_for_auto_publish") is False:
-            continue
-
-        yt = pack.get("youtube") or {}
-        if yt_ready and not (isinstance(yt, dict) and yt.get("video_id")):
-            try:
-                res = publish_pack_to_youtube(mp4)
-                _JOB_STATE["last_status"] = f"Fila automatica publicada no YouTube: {res.get('video_id')}"
-                yt_ready = False
-                sent_any = True
-            except Exception as exc:
-                if "uploadLimitExceeded" in str(exc):
-                    yt_ready = False
-
-        tt = pack.get("tiktok") or {}
-        if tt_ready and not (isinstance(tt, dict) and tt.get("publish_id")):
-            try:
-                tt_res = publish_pack_to_tiktok(mp4)
-                if tt_res.get("publish_id"):
-                    _JOB_STATE["last_status"] = f"Fila automatica enviada ao TikTok ({tt_res.get('mode')}): {tt_res.get('publish_id')}"
-                    tt_ready = False
-                    sent_any = True
-            except Exception:
-                tt_ready = False
-
-        if sent_any and not yt_ready and not tt_ready:
-            return True
-    return sent_any
+    cycle = run_smart_publish_cycle(
+        out_dir,
+        youtube_ready=yt_ready,
+        tiktok_ready=tt_ready,
+        force=force,
+        yt_publisher=publish_pack_to_youtube,
+        tt_publisher=publish_pack_to_tiktok,
+    )
+    res = cycle.get("results") or {}
+    msgs = []
+    for ch in ("tiktok", "youtube"):
+        r = res.get(ch) or {}
+        if r.get("status") == "published":
+            msgs.append(f"{ch.title()}: {r.get('filename')}")
+    if msgs:
+        _JOB_STATE["last_status"] = "Publicacao inteligente: " + " | ".join(msgs)
+    return bool(cycle.get("dispatched"))
 
 
 def _trigger_autonomous_cycle(out_dir: Path, cfg: Dict) -> None:
@@ -586,7 +558,7 @@ def _autonomous_loop(out_dir: Path) -> None:
             if not cfg.get("enabled") or _JOB_STATE["running"]:
                 continue
             now = time.time()
-            if cfg.get("auto_publish", True) and (now - last_flush_ts) >= 1800 and _has_internet():
+            if cfg.get("auto_publish", True) and (now - last_flush_ts) >= 300 and _has_internet():
                 last_flush_ts = now
                 if _JOB_LOCK.acquire(blocking=False):
                     try:
@@ -820,6 +792,13 @@ def make_handler(out_dir: Path):
                 if st.get("running") and st.get("started_at"):
                     st["elapsed_sec"] = round(max(0.0, time.time() - float(st["started_at"])), 1)
                 self._send_json(200, st)
+                return
+
+            if parsed.path == "/api/autopublish/plan":
+                self._send_json(
+                    200,
+                    get_autopublish_plan(out_dir, youtube_ready=_is_youtube_configured(), tiktok_ready=_is_tiktok_configured()),
+                )
                 return
 
             if parsed.path == "/api/videos":
@@ -1153,6 +1132,18 @@ def make_handler(out_dir: Path):
                     self._send_json(200, publish_pack_to_tiktok(target, mode=mode))
                 except Exception as exc:
                     self._send_json(500, {"message": str(exc)})
+                return
+
+            if parsed.path == "/api/autopublish/run":
+                cycle = run_smart_publish_cycle(
+                    out_dir,
+                    youtube_ready=_is_youtube_configured(),
+                    tiktok_ready=_is_tiktok_configured(),
+                    force=bool(body.get("force", False)),
+                    yt_publisher=publish_pack_to_youtube,
+                    tt_publisher=publish_pack_to_tiktok,
+                )
+                self._send_json(200, cycle)
                 return
 
             if parsed.path == "/api/optimize":

@@ -1958,6 +1958,80 @@ def test_tiktok_algorithm_and_mentalism_engine(tmp_path: Path) -> None:
         srv.server_close()
 
 
+def test_smart_autopublish_priority_and_cadence(tmp_path: Path, monkeypatch) -> None:
+    import os
+    from auto_shorts.smart_autopublish import (
+        can_publish_channel,
+        get_autopublish_plan,
+        load_publish_ledger,
+        rank_publish_candidates,
+        run_smart_publish_cycle,
+    )
+
+    # Video A: weak score, old, already posted niche "financas"
+    v_weak = tmp_path / "weak_short.mp4"
+    v_weak.write_bytes(b"MP4" * 20000)
+    v_weak.with_suffix(".publish.json").write_text(
+        json.dumps({
+            "title": ">> Corte qualquer",
+            "niche": "financas",
+            "caption": "curta",
+            "hashtags": ["#geral"],
+            "validation": {"valid": True, "duration": 22.0, "subtitle_cues": 2, "subtitle_overlaps": 0},
+            "visual_audit": {"approved": True, "quality_score": 70},
+            "queued_for_auto_publish": True,
+        }),
+        encoding="utf-8",
+    )
+
+    # Video B: high opus + 64s Creator Rewards + distinct niche "ia_tech"
+    v_top = tmp_path / "top_ia_64s.mp4"
+    v_top.write_bytes(b"MP4" * 20000)
+    v_top.with_suffix(".publish.json").write_text(
+        json.dumps({
+            "title": "Por que IAs offline rodam no Android sem nuvem",
+            "hook_title": "IA OFFLINE NO CELULAR",
+            "niche": "ia_tech",
+            "caption": "Descubra como rodar modelos GGUF no Android sem internet. Comenta TESTAR!",
+            "hashtags": ["#inteligenciaartificial", "#tecnologia", "#ia", "#produtividade"],
+            "background_style": "minecraft+urban_rain",
+            "validation": {"valid": True, "duration": 64.0, "subtitle_cues": 18, "subtitle_overlaps": 0},
+            "visual_audit": {"approved": True, "quality_score": 94, "visual": {"motion_delta": 22.0, "luma_std": 42.0}},
+            "queued_for_auto_publish": True,
+        }),
+        encoding="utf-8",
+    )
+
+    ledger = load_publish_ledger(tmp_path)
+    ledger["tiktok"]["last_niche"] = "financas"
+    cands = rank_publish_candidates(tmp_path, "tiktok", ledger=ledger)
+    assert len(cands) == 2 and cands[0]["filename"] == "top_ia_64s.mp4"
+
+    # Run smart cycle dispatching to mocked TikTok & mocking YouTube uploadLimitExceeded cooldown
+    sent_tt = []
+    res = run_smart_publish_cycle(
+        tmp_path,
+        youtube_ready=True,
+        tiktok_ready=True,
+        yt_publisher=lambda p: (_ for _ in ()).throw(RuntimeError("uploadLimitExceeded")),
+        tt_publisher=lambda p: sent_tt.append(p.name) or {"publish_id": "v_smart_1", "mode": "inbox"},
+    )
+    assert res["dispatched"] is True
+    assert sent_tt == ["top_ia_64s.mp4"]
+    assert res["results"]["youtube"]["status"] == "quota_cooldown_4h"
+
+    # Immediately afterwards, TikTok hits organic_spacing and YouTube hits quota_cooldown
+    lg_after = load_publish_ledger(tmp_path)
+    ok_tt, r_tt, _ = can_publish_channel(lg_after, "tiktok")
+    ok_yt, r_yt, _ = can_publish_channel(lg_after, "youtube")
+    assert ok_tt is False and "organic_spacing" in r_tt
+    assert ok_yt is False and r_yt == "quota_cooldown"
+
+    plan = get_autopublish_plan(tmp_path, youtube_ready=True, tiktok_ready=True)
+    assert plan["channels"]["tiktok"]["daily_used"] == 1
+    assert plan["channels"]["youtube"]["gate_reason"] == "quota_cooldown"
+
+
 
 
 

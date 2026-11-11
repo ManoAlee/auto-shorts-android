@@ -252,14 +252,17 @@
     if (keys.tiktok && ttReadyList.length > 0) {
       const top = ttReadyList[0];
       const sc = top.opus_scorecard ? top.opus_scorecard.opus_score : '--';
-      insightEl.textContent = ttReadyList.length + ' Short(s) aprovados aguardando TikTok • Top: "' + String(top.title || top.filename).slice(0, 46) + '" (Opus ' + sc + '/100)';
-      actBtn.textContent = 'Enviar Top p/ TikTok';
-      _copilotFn = () => withBusyBtn(actBtn, 'Enviando TT...', async () => {
-        const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: top.filename }) });
+      insightEl.textContent = ttReadyList.length + ' Short(s) aprovados aguardando TikTok • Melhor: "' + String(top.title || top.filename).slice(0, 44) + '" (Opus ' + sc + '/100)';
+      actBtn.textContent = 'Disparar Proximo Inteligente';
+      _copilotFn = () => withBusyBtn(actBtn, 'Publicando...', async () => {
+        const r = await fetch('/api/autopublish/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) });
         const d = await r.json();
-        showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+        const ttR = (d.results && d.results.tiktok) || {};
+        const ytR = (d.results && d.results.youtube) || {};
+        showToast(ttR.publish_id ? ('TikTok OK: ' + ttR.filename) : (ytR.video_id ? ('YouTube OK: ' + ytR.filename) : (ttR.reason || ytR.reason || 'Ciclo concluido')), (ttR.publish_id || ytR.video_id) ? 'ok' : 'info');
         await loadVideos();
         await loadChannelTelemetry();
+        await loadScheduler();
       });
       return;
     }
@@ -409,9 +412,16 @@
     const info = document.getElementById('scheduler-info');
     if (!info) return;
     try {
-      const s = await (await fetch('/api/scheduler')).json();
+      const [s, pl] = await Promise.all([
+        fetch('/api/scheduler').then((r) => r.json()),
+        fetch('/api/autopublish/plan').then((r) => r.json()).catch(() => null),
+      ]);
       _lastSchedulerData = s;
-      info.textContent = (s.enabled ? 'Ativo' : 'Pausado') + ' | ' + (s.platform || 'tiktok_rewards') + ' | ' + s.interval_hours + 'h | Ciclos: ' + s.runs_completed;
+      const ch = (pl && pl.channels) || {};
+      const ttTxt = ch.tiktok ? ('TT ' + ch.tiktok.daily_used + '/' + ch.tiktok.daily_cap) : '';
+      const ytTxt = ch.youtube ? ('YT ' + ch.youtube.daily_used + '/' + ch.youtube.daily_cap) : '';
+      const budget = [ttTxt, ytTxt].filter(Boolean).join(' • ');
+      info.textContent = (s.enabled ? 'Ativo' : 'Pausado') + ' | ' + (budget || (s.platform || 'tiktok_rewards')) + ' | ' + s.interval_hours + 'h | Ciclos: ' + s.runs_completed;
       updateCopilotInsight();
     } catch (e) {}
   }
@@ -712,21 +722,6 @@
         box.appendChild(fl);
       }
       body.appendChild(box);
-    }
-
-    if (v.tiktok_algo) {
-      const ta = v.tiktok_algo;
-      const tbox = document.createElement('div');
-      tbox.className = 'diag-box';
-      const thd = document.createElement('strong');
-      thd.textContent = 'TikTok FYP Cohort: ' + ta.tiktok_score + '/100 — ' + ta.cohort_forecast + (ta.monetization_eligible_60s ? ' (60s+ Creator Rewards)' : '');
-      tbox.appendChild(thd);
-      const tsub = document.createElement('div');
-      tsub.className = 'topic-meta';
-      tsub.style.marginTop = '4px';
-      tsub.textContent = 'Gatilho do nicho: ' + (ta.playbook ? ta.playbook.brain_trigger : ta.niche);
-      tbox.appendChild(tsub);
-      body.appendChild(tbox);
     }
 
     if (v.thumb_16x9) {
@@ -1388,12 +1383,7 @@
       const b = await r.json();
       const box = document.getElementById('brief-output');
       box.hidden = false;
-      const a = b.acts || {};
-      const g = typeof a['0_a_3s_gancho'] === 'string' ? a['0_a_3s_gancho'] : ((a['0_a_3s_gancho'] || {}).line || '');
-      const d = typeof a['3_a_35s_desenvolvimento'] === 'string' ? a['3_a_35s_desenvolvimento'] : ((a['3_a_20s_conflito'] || {}).line || '');
-      const f = typeof a['final_climax_cta'] === 'string' ? a['final_climax_cta'] : ((a['payoff_final'] || {}).line || '');
-      const pb = b.mentalism_playbook ? ('\n[GATILHO MENTALISTA]: ' + b.mentalism_playbook.brain_trigger) : '';
-      box.textContent = 'GANCHO: ' + g + '\nDESENVOLVIMENTO: ' + d + '\nFECHAMENTO & LOOP: ' + f + pb;
+      box.textContent = 'GANCHO: ' + (b.acts && b.acts['0_a_3s_gancho'] ? b.acts['0_a_3s_gancho'].line : '') + '\nCONFLITO: ' + (b.acts && b.acts['3_a_20s_conflito'] ? b.acts['3_a_20s_conflito'].line : '') + '\nPAYOFF: ' + (b.acts && b.acts['payoff_final'] ? b.acts['payoff_final'].line : '');
       showToast('Roteiro em 3 atos pronto!', 'ok');
     });
   });
@@ -1447,64 +1437,6 @@
       card.appendChild(h3);
       card.appendChild(p1);
       box.appendChild(card);
-    });
-
-    const ttGrid = document.getElementById('tiktok-algo-weights');
-    const pbBox = document.getElementById('tt-playbook-card');
-    if (ttGrid) {
-      try {
-        const ti = await (await fetch('/api/tiktok/intelligence')).json();
-        ttGrid.innerHTML = '';
-        (ti.signal_weights || []).forEach((w) => {
-          const el = document.createElement('div');
-          el.className = 'diag-box';
-          el.innerHTML = '<strong></strong><span></span><div class="topic-meta"></div>';
-          el.querySelector('strong').textContent = w.signal + ' (' + w.weight_pct + '%)';
-          el.querySelector('span').textContent = w.target;
-          ttGrid.appendChild(el);
-        });
-        window._ttPlaybooks = ti.playbooks || {};
-        renderSelectedMentalismPlaybook();
-      } catch (e) {}
-    }
-  }
-
-  function renderSelectedMentalismPlaybook() {
-    const sel = document.getElementById('tt-ment-niche');
-    const box = document.getElementById('tt-playbook-card');
-    const map = window._ttPlaybooks || {};
-    if (!sel || !box) return;
-    const pb = map[sel.value] || map.geral;
-    if (!pb) return;
-    box.hidden = false;
-    box.innerHTML = '<strong></strong><span></span><div class="topic-meta" style="margin-top:6px;"></div>';
-    box.querySelector('strong').textContent = 'Gatilho Cerebral: ' + pb.brain_trigger;
-    box.querySelector('span').textContent = pb.mentalism_technique;
-    box.querySelector('.topic-meta').textContent = 'Visual (' + pb.ideal_bpm_cuts_sec + 's/corte • ' + pb.recommended_layout + '): ' + pb.visual_blueprint + ' | Trigger Comentario: ' + pb.comment_trigger;
-  }
-
-  const ttNicheSel = document.getElementById('tt-ment-niche');
-  if (ttNicheSel) ttNicheSel.addEventListener('change', renderSelectedMentalismPlaybook);
-
-  const ttMentForm = document.getElementById('tiktok-mentalist-form');
-  if (ttMentForm) {
-    ttMentForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const topicEl = document.getElementById('tt-ment-topic');
-      const topic = (topicEl ? topicEl.value : '').trim();
-      if (!topic) return;
-      withBusyBtn(document.getElementById('btn-tt-mentalist'), 'Gerando...', async () => {
-        const niche = ttNicheSel ? ttNicheSel.value : 'geral';
-        const d = await (await fetch('/api/tiktok/mentalist-brief', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, niche, duration_sec: 64 }),
-        })).json();
-        if (voiceScriptEl) voiceScriptEl.value = d.full_narration_script || '';
-        if (voiceHookEl) voiceHookEl.value = String(topic).toUpperCase().slice(0, 34);
-        syncWorkstationPreview();
-        activateTab(2);
-        showToast('Roteiro Mentalista 64s carregado em Roteiro & Voz!', 'ok');
-      });
     });
   }
 
