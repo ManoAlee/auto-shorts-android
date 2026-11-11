@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .config import NICHES
 from .retention import get_retention_profile
@@ -735,4 +735,182 @@ def publish_pack_to_instagram_reels(
     pack["instagram"] = ig_info
     pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"status": "published_instagram", **ig_info}
+
+
+TIKTOK_SINGLE_CHUNK_MAX_BYTES = 64 * 1024 * 1024
+TIKTOK_DEFAULT_CHUNK_BYTES = 10 * 1024 * 1024
+TIKTOK_INBOX_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
+TIKTOK_DIRECT_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
+TIKTOK_OAUTH_TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
+
+
+def compute_tiktok_chunk_plan(video_size: int) -> Tuple[int, int]:
+    """Compute TikTok Content Posting API v2 (chunk_size, total_chunk_count) using floor semantics."""
+    if video_size <= 0:
+        raise ValueError("Video file is empty.")
+    if video_size <= TIKTOK_SINGLE_CHUNK_MAX_BYTES:
+        return video_size, 1
+    chunk_size = TIKTOK_DEFAULT_CHUNK_BYTES
+    # TikTok v2 requires floor(video_size / chunk_size); trailing bytes merge into the final chunk.
+    return chunk_size, video_size // chunk_size
+
+
+def refresh_tiktok_access_token(client_key: str, client_secret: str, refresh_token: str) -> Dict:
+    """Exchange a TikTok OAuth2 refresh_token for a fresh access_token."""
+    form = urllib.parse.urlencode({
+        "client_key": client_key.strip(),
+        "client_secret": client_secret.strip(),
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token.strip(),
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        TIKTOK_OAUTH_TOKEN_URL,
+        data=form,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    if not data.get("access_token"):
+        raise RuntimeError(f"TikTok token refresh failed: {data}")
+    return data
+
+
+def _tiktok_json_post(url: str, access_token: str, payload: Dict) -> Dict:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _tiktok_upload_chunks(upload_url: str, mp4_path: Path, video_size: int, chunk_size: int, total_chunks: int) -> None:
+    """Stream video slices sequentially to TikTok upload_url with Content-Range headers."""
+    with mp4_path.open("rb") as fh:
+        for idx in range(total_chunks):
+            start = idx * chunk_size
+            end = (video_size - 1) if idx == total_chunks - 1 else ((idx + 1) * chunk_size - 1)
+            fh.seek(start)
+            data = fh.read(end - start + 1)
+            req = urllib.request.Request(
+                upload_url,
+                data=data,
+                headers={
+                    "Content-Type": "video/mp4",
+                    "Content-Length": str(len(data)),
+                    "Content-Range": f"bytes {start}-{end}/{video_size}",
+                },
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                if getattr(resp, "status", 200) not in (200, 201, 206):
+                    raise RuntimeError(f"TikTok chunk {idx + 1}/{total_chunks} failed with HTTP {resp.status}")
+
+
+def _resolve_tiktok_access_token(explicit_token: Optional[str]) -> str:
+    token = (explicit_token or os.getenv("TIKTOK_ACCESS_TOKEN", "")).strip()
+    if token:
+        return token
+    ckey = os.getenv("TIKTOK_CLIENT_KEY", "").strip()
+    csec = os.getenv("TIKTOK_CLIENT_SECRET", "").strip()
+    rtok = os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()
+    if ckey and csec and rtok:
+        refreshed = refresh_tiktok_access_token(ckey, csec, rtok)
+        return str(refreshed.get("access_token") or "").strip()
+    return ""
+
+
+def publish_pack_to_tiktok(
+    video_path: Path,
+    mode: Optional[str] = None,
+    access_token: Optional[str] = None,
+    privacy_level: Optional[str] = None,
+) -> Dict:
+    """Upload a generated MP4 to TikTok via Content Posting API v2 (inbox draft or direct post)."""
+    mp4 = Path(video_path)
+    if not mp4.is_file():
+        raise FileNotFoundError(f"Video not found: {mp4}")
+
+    token = _resolve_tiktok_access_token(access_token)
+    if not token:
+        return {
+            "status": "skipped_unconfigured",
+            "reason": "Defina TIKTOK_ACCESS_TOKEN ou rode scripts/tiktok_auth.py para publicar no TikTok.",
+        }
+
+    pack_path = mp4.with_suffix(".publish.json")
+    pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
+    target_mode = (mode or os.getenv("TIKTOK_PUBLISH_MODE", "inbox") or "inbox").strip().lower()
+    if target_mode not in ("inbox", "direct"):
+        target_mode = "inbox"
+
+    video_size = mp4.stat().st_size
+    chunk_size, total_chunks = compute_tiktok_chunk_plan(video_size)
+    source_info = {
+        "source": "FILE_UPLOAD",
+        "video_size": video_size,
+        "chunk_size": chunk_size,
+        "total_chunk_count": total_chunks,
+    }
+
+    if target_mode == "direct":
+        endpoint = TIKTOK_DIRECT_INIT_URL
+        caption = (pack.get("caption") or pack.get("title") or mp4.stem).strip()[:2200]
+        priv = (privacy_level or os.getenv("TIKTOK_PRIVACY_LEVEL", "SELF_ONLY") or "SELF_ONLY").strip()
+        payload = {
+            "post_info": {
+                "title": caption,
+                "privacy_level": priv,
+                "disable_duet": False,
+                "disable_comment": False,
+                "disable_stitch": False,
+            },
+            "source_info": source_info,
+        }
+    else:
+        endpoint = TIKTOK_INBOX_INIT_URL
+        payload = {"source_info": source_info}
+
+    try:
+        init_res = _tiktok_json_post(endpoint, token, payload)
+    except urllib.error.HTTPError as exc:
+        ckey = os.getenv("TIKTOK_CLIENT_KEY", "").strip()
+        csec = os.getenv("TIKTOK_CLIENT_SECRET", "").strip()
+        rtok = os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()
+        if exc.code == 401 and ckey and csec and rtok:
+            refreshed = refresh_tiktok_access_token(ckey, csec, rtok)
+            token = str(refreshed["access_token"])
+            init_res = _tiktok_json_post(endpoint, token, payload)
+        else:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"TikTok API init error ({exc.code}): {detail or exc.reason}") from exc
+
+    err = init_res.get("error") or {}
+    if err.get("code") and err.get("code") != "ok":
+        raise RuntimeError(f"TikTok API rejected upload ({err.get('code')}): {err.get('message', '')}")
+
+    data = init_res.get("data") or {}
+    publish_id = str(data.get("publish_id") or "").strip()
+    upload_url = str(data.get("upload_url") or "").strip()
+    if not publish_id or not upload_url:
+        raise RuntimeError(f"Unexpected TikTok init response: {init_res}")
+
+    _tiktok_upload_chunks(upload_url, mp4, video_size, chunk_size, total_chunks)
+    tt_info = {
+        "publish_id": publish_id,
+        "mode": target_mode,
+        "chunks": total_chunks,
+        "size_bytes": video_size,
+    }
+    pack["tiktok"] = tt_info
+    pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"status": f"published_tiktok_{target_mode}", **tt_info}
+
 

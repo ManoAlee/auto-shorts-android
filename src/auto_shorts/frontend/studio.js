@@ -590,6 +590,18 @@
     }));
     acts.appendChild(btnIg);
 
+    const btnTt = document.createElement('button');
+    btnTt.type = 'button';
+    btnTt.className = 'btn btn-secondary btn-sm';
+    btnTt.textContent = (v.tiktok && v.tiktok.publish_id) ? 'Reenviar TikTok' : 'TikTok (Inbox/API)';
+    btnTt.addEventListener('click', () => withBusyBtn(btnTt, 'Enviando TT...', async () => {
+      const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename }) });
+      const d = await r.json();
+      showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+      if (d.publish_id) await loadVideos();
+    }));
+    acts.appendChild(btnTt);
+
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
     btnDel.className = 'btn btn-danger btn-sm';

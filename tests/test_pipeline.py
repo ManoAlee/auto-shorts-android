@@ -1756,6 +1756,115 @@ def test_offline_llm_title_hygiene_and_v1_endpoints(tmp_path):
     assert q1.exists() and pr["freed_mb"] > 0.1
 
 
+def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
+    import io
+    import threading
+    import urllib.request
+    from auto_shorts.publisher import (
+        TIKTOK_DEFAULT_CHUNK_BYTES,
+        TIKTOK_DIRECT_INIT_URL,
+        TIKTOK_INBOX_INIT_URL,
+        compute_tiktok_chunk_plan,
+        publish_pack_to_tiktok,
+    )
+    from auto_shorts.webapp import _StudioHTTPServer, make_handler
+
+    # 1. Chunk planning: <=64 MB single chunk, >64 MB floor division (trailing bytes merge into final chunk)
+    assert compute_tiktok_chunk_plan(3_000_000) == (3_000_000, 1)
+    assert compute_tiktok_chunk_plan(64 * 1024 * 1024) == (64 * 1024 * 1024, 1)
+    assert compute_tiktok_chunk_plan(75_000_123) == (TIKTOK_DEFAULT_CHUNK_BYTES, 7)
+
+    # 2. Unconfigured env returns safe skipped_unconfigured status without network I/O
+    for key in ("TIKTOK_ACCESS_TOKEN", "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_REFRESH_TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+
+    mp4 = tmp_path / "tiktok_sample.mp4"
+    mp4.write_bytes(b"FTYPMP4DATA" * 8000)
+    mp4.with_suffix(".publish.json").write_text(
+        json.dumps({"title": "Teste TikTok", "caption": "Legenda #ia"}),
+        encoding="utf-8",
+    )
+    skipped = publish_pack_to_tiktok(mp4)
+    assert skipped["status"] == "skipped_unconfigured"
+
+    # 3. Mocked Inbox + Direct API init and sequential Content-Range PUT upload
+    seen_calls = []
+    orig_urlopen = urllib.request.urlopen
+
+    class _FakeHTTPResp:
+        def __init__(self, body_bytes: bytes, status: int = 200):
+            self._buf = io.BytesIO(body_bytes)
+            self.status = status
+
+        def read(self) -> bytes:
+            return self._buf.read()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def _fake_urlopen(req, timeout=30):
+        headers = {k.lower(): v for k, v in req.header_items()}
+        seen_calls.append({
+            "method": req.get_method(),
+            "url": req.full_url,
+            "headers": headers,
+            "data": req.data,
+        })
+        if req.full_url in (TIKTOK_INBOX_INIT_URL, TIKTOK_DIRECT_INIT_URL):
+            return _FakeHTTPResp(json.dumps({
+                "data": {"publish_id": "v_inbox_123", "upload_url": "https://upload.tiktokapis.com/chunk/abc"},
+                "error": {"code": "ok", "message": ""},
+            }).encode("utf-8"))
+        return _FakeHTTPResp(b"", status=201)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
+    monkeypatch.setenv("TIKTOK_ACCESS_TOKEN", "tt_tok_test")
+
+    inbox_res = publish_pack_to_tiktok(mp4, mode="inbox")
+    assert inbox_res["status"] == "published_tiktok_inbox"
+    assert inbox_res["publish_id"] == "v_inbox_123"
+    assert seen_calls[0]["url"] == TIKTOK_INBOX_INIT_URL
+    assert seen_calls[1]["method"] == "PUT"
+    assert seen_calls[1]["headers"]["content-range"] == f"bytes 0-{mp4.stat().st_size - 1}/{mp4.stat().st_size}"
+
+    seen_calls.clear()
+    direct_res = publish_pack_to_tiktok(mp4, mode="direct", privacy_level="PUBLIC_TO_EVERYONE")
+    assert direct_res["status"] == "published_tiktok_direct"
+    init_payload = json.loads(seen_calls[0]["data"].decode("utf-8"))
+    assert init_payload["post_info"]["privacy_level"] == "PUBLIC_TO_EVERYONE"
+    assert "Teste TikTok" in init_payload["post_info"]["title"] or "Legenda" in init_payload["post_info"]["title"]
+    saved_pack = json.loads(mp4.with_suffix(".publish.json").read_text(encoding="utf-8"))
+    assert saved_pack["tiktok"]["mode"] == "direct"
+
+    # 4. Webapp POST /api/publish-tiktok route + /api/system keys check
+    monkeypatch.setattr(urllib.request, "urlopen", orig_urlopen)
+    monkeypatch.delenv("TIKTOK_ACCESS_TOKEN", raising=False)
+    srv = _StudioHTTPServer(("127.0.0.1", 0), make_handler(tmp_path))
+    port = srv.server_address[1]
+    th = threading.Thread(target=srv.serve_forever, daemon=True)
+    th.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/system", timeout=5) as r:
+            sys_data = json.loads(r.read().decode("utf-8"))
+        assert "tiktok" in sys_data["keys"] and sys_data["keys"]["tiktok"] is False
+
+        req_tt = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/publish-tiktok",
+            data=json.dumps({"filename": "tiktok_sample.mp4"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_tt, timeout=5) as r:
+            tt_api = json.loads(r.read().decode("utf-8"))
+        assert tt_api["status"] == "skipped_unconfigured"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 
 
 

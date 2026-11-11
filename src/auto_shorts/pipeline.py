@@ -19,6 +19,7 @@ from .publisher import (
     ensure_youtube_playlist,
     export_to_android_gallery,
     publish_instagram_reel,
+    publish_pack_to_tiktok,
     publish_youtube_short,
     set_youtube_thumbnail,
 )
@@ -344,6 +345,9 @@ def run_pipeline(
                     pub_url = f"{os.getenv('REELS_PUBLIC_BASE_URL').rstrip('/')}/{out_mp4.name}"
                     publish_instagram_reel(pub_url, pack["caption"])
                     delivery_status = "published_instagram_api"
+                elif platform == "tiktok_rewards" and (os.getenv("TIKTOK_ACCESS_TOKEN") or (os.getenv("TIKTOK_CLIENT_KEY") and os.getenv("TIKTOK_CLIENT_SECRET") and os.getenv("TIKTOK_REFRESH_TOKEN"))):
+                    tt_res = publish_pack_to_tiktok(out_mp4)
+                    delivery_status = f"published_tiktok_api:{tt_res.get('publish_id', '')}"
                 elif platform == "youtube_shorts" and os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"):
                     yt_res = publish_youtube_short(out_mp4, pack["title"], pack["caption"], tags=pack["hashtags"])
                     vid = yt_res.get("video_id")

@@ -39,6 +39,7 @@ from .publisher import (
     get_youtube_channel_summary,
     optimize_existing_publish_pack,
     publish_pack_to_instagram_reels,
+    publish_pack_to_tiktok,
     publish_pack_to_youtube,
 )
 from .re_engine import (
@@ -254,6 +255,7 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
             "algorithm": algo,
             "opus_scorecard": score_short_opus_runbook(pack, validation=validation),
             "youtube": pack.get("youtube"),
+            "tiktok": pack.get("tiktok"),
         })
     return rank_feed_for_channel(items)
 
@@ -565,6 +567,7 @@ def build_system_diagnostics(out_dir: Path) -> Dict:
         },
         "keys": {
             "youtube": bool(os.getenv("YT_REFRESH_TOKEN", "").strip()),
+            "tiktok": bool(os.getenv("TIKTOK_ACCESS_TOKEN", "").strip() or os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()),
             "openrouter": bool(os.getenv("OPENROUTER_API_KEY", "").strip()),
             "gemini": bool(os.getenv("GEMINI_API_KEY", "").strip()),
             "huggingface": bool(os.getenv("HF_TOKEN", "").strip()),
@@ -1041,6 +1044,18 @@ def make_handler(out_dir: Path):
                     return
                 try:
                     self._send_json(200, publish_pack_to_instagram_reels(target))
+                except Exception as exc:
+                    self._send_json(500, {"message": str(exc)})
+                return
+
+            if parsed.path == "/api/publish-tiktok":
+                target = _safe_child_path(out_dir, str(body.get("filename") or ""))
+                if not target or not target.is_file():
+                    self._send_json(404, {"message": "Arquivo MP4 nao encontrado"})
+                    return
+                try:
+                    mode = str(body.get("mode") or "").strip() or None
+                    self._send_json(200, publish_pack_to_tiktok(target, mode=mode))
                 except Exception as exc:
                     self._send_json(500, {"message": str(exc)})
                 return
