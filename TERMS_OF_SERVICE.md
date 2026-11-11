@@ -18,3 +18,4 @@ You may disconnect your TikTok account at any time by revoking access in your Ti
 
 ## 5. Contact
 Repository & issues: https://github.com/ManoAlee/auto-shorts-android/issues
+

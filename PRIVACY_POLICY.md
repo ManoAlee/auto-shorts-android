@@ -17,3 +17,4 @@ When you authorize AutoShorts Studio via TikTok Login Kit (`user.info.basic`, `v
 
 ## 4. Contact
 Questions or privacy requests: https://github.com/ManoAlee/auto-shorts-android/issues
+
