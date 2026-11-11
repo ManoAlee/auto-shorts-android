@@ -2,6 +2,7 @@
 """One-time TikTok Content Posting API v2 OAuth2 helper (Login Kit v2 -> .env)."""
 
 import argparse
+import hashlib
 import http.server
 import json
 import os
@@ -11,13 +12,32 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 
 REDIRECT_URI = "http://localhost:8766/callback"
 AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/"
 TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
 DEFAULT_SCOPES = "user.info.basic,video.upload,video.publish"
+_PKCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+
+
+def _load_dotenv_defaults(env_path: Path) -> None:
+    if not env_path.is_file():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip())
+
+
+def generate_pkce_pair() -> Tuple[str, str]:
+    """Generate TikTok Login Kit Desktop PKCE (code_verifier, sha256_hex_challenge)."""
+    verifier = "".join(secrets.choice(_PKCE_CHARS) for _ in range(64))
+    challenge = hashlib.sha256(verifier.encode("utf-8")).hexdigest()
+    return verifier, challenge
 
 
 def build_tiktok_authorize_url(
@@ -25,15 +45,20 @@ def build_tiktok_authorize_url(
     redirect_uri: str = REDIRECT_URI,
     scopes: str = DEFAULT_SCOPES,
     state: str = "",
+    code_challenge: str = "",
 ) -> str:
     """Build the TikTok OAuth2 v2 authorization URL."""
-    return AUTHORIZE_URL + "?" + urllib.parse.urlencode({
+    params = {
         "client_key": client_key.strip(),
         "scope": scopes,
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "state": state or secrets.token_urlsafe(12),
-    })
+    }
+    if code_challenge:
+        params["code_challenge"] = code_challenge
+        params["code_challenge_method"] = "S256"
+    return AUTHORIZE_URL + "?" + urllib.parse.urlencode(params)
 
 
 def exchange_tiktok_code(
@@ -41,15 +66,19 @@ def exchange_tiktok_code(
     client_secret: str,
     code: str,
     redirect_uri: str = REDIRECT_URI,
+    code_verifier: str = "",
 ) -> Dict:
     """Exchange an authorization code for TikTok access_token + refresh_token."""
-    form = urllib.parse.urlencode({
+    body_params = {
         "client_key": client_key.strip(),
         "client_secret": client_secret.strip(),
         "code": code.strip(),
         "grant_type": "authorization_code",
         "redirect_uri": redirect_uri,
-    }).encode("utf-8")
+    }
+    if code_verifier:
+        body_params["code_verifier"] = code_verifier
+    form = urllib.parse.urlencode(body_params).encode("utf-8")
     req = urllib.request.Request(
         TOKEN_URL,
         data=form,
@@ -84,11 +113,15 @@ def save_tiktok_credentials(env_path: Path, client_key: str, client_secret: str,
 
 
 def main(argv=None) -> int:
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    _load_dotenv_defaults(env_path)
+
     parser = argparse.ArgumentParser(description="Authorize TikTok Content Posting API v2 and save tokens to .env")
     parser.add_argument("--client-key", default=os.getenv("TIKTOK_CLIENT_KEY", ""))
     parser.add_argument("--client-secret", default=os.getenv("TIKTOK_CLIENT_SECRET", ""))
     parser.add_argument("--redirect-uri", default=REDIRECT_URI)
     parser.add_argument("--scopes", default=DEFAULT_SCOPES)
+    parser.add_argument("--no-pkce", action="store_true", help="Disable Desktop PKCE hex challenge (Web HTTPS redirect)")
     parser.add_argument("--no-browser", action="store_true", help="Do not auto-open browser")
     args = parser.parse_args(argv)
 
@@ -98,11 +131,13 @@ def main(argv=None) -> int:
         raise ValueError("TIKTOK_CLIENT_KEY e TIKTOK_CLIENT_SECRET sao obrigatorios.")
 
     csrf_state = secrets.token_urlsafe(12)
+    code_verifier, code_challenge = ("", "") if args.no_pkce else generate_pkce_pair()
     auth_url = build_tiktok_authorize_url(
         client_key=client_key,
         redirect_uri=args.redirect_uri,
         scopes=args.scopes,
         state=csrf_state,
+        code_challenge=code_challenge,
     )
     print("\nAbra http://localhost:8766/go no navegador para autorizar o TikTok:\n", flush=True)
     if not args.no_browser:
@@ -147,12 +182,17 @@ def main(argv=None) -> int:
         print("Nenhum codigo OAuth TikTok recebido.", flush=True)
         return 1
 
-    tokens = exchange_tiktok_code(client_key, client_secret, code, redirect_uri=args.redirect_uri)
+    tokens = exchange_tiktok_code(
+        client_key,
+        client_secret,
+        code,
+        redirect_uri=args.redirect_uri,
+        code_verifier=code_verifier,
+    )
     if not tokens.get("access_token"):
         print(f"Falha ao trocar codigo por token TikTok: {tokens.get('error_description') or tokens.get('error') or 'unknown'}", flush=True)
         return 1
 
-    env_path = Path(__file__).resolve().parents[1] / ".env"
     save_tiktok_credentials(env_path, client_key, client_secret, tokens)
     print(f"\nCredenciais TikTok salvas com seguranca em {env_path}!", flush=True)
     return 0

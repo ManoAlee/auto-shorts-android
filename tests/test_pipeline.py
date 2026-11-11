@@ -1864,6 +1864,21 @@ def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
         srv.shutdown()
         srv.server_close()
 
+    # 5. TikTok Desktop OAuth2 PKCE hexdigest helper validation
+    import hashlib
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "tiktok_auth", Path(__file__).resolve().parents[1] / "scripts" / "tiktok_auth.py"
+    )
+    tt_auth = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(tt_auth)
+    verifier, challenge = tt_auth.generate_pkce_pair()
+    assert len(verifier) == 64
+    assert challenge == hashlib.sha256(verifier.encode("utf-8")).hexdigest()
+    auth_u = tt_auth.build_tiktok_authorize_url("ck_demo", code_challenge=challenge)
+    assert f"code_challenge={challenge}" in auth_u and "code_challenge_method=S256" in auth_u
+
 
 
 
