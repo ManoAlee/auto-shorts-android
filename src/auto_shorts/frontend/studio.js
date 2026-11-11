@@ -748,7 +748,12 @@
     btnTt.addEventListener('click', () => withBusyBtn(btnTt, 'Enviando TT...', async () => {
       const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
       const d = await r.json();
-      showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+      if (d.publish_id && v.caption && navigator.clipboard) {
+        try { await navigator.clipboard.writeText(v.caption); } catch (e) {}
+        showToast('Enviado ao TikTok! Legenda copiada — basta colar em "Adicionar descrição" no app.', 'ok');
+      } else {
+        showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+      }
       if (d.publish_id) { await loadVideos(); await loadChannelTelemetry(); }
     }));
     acts.appendChild(btnTt);
@@ -931,10 +936,32 @@
         btnFastTt.addEventListener('click', () => withBusyBtn(btnFastTt, 'Enviando TT...', async () => {
           const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
           const d = await r.json();
-          showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+          if (d.publish_id && v.caption && navigator.clipboard) {
+            try { await navigator.clipboard.writeText(v.caption); } catch (e) {}
+            showToast('Enviado ao TikTok! Legenda copiada — basta colar em "Adicionar descrição" no app.', 'ok');
+          } else {
+            showToast(d.publish_id ? ('Enviado ao TikTok (' + d.mode + '): ' + d.publish_id) : (d.reason || d.message || d.status), d.publish_id ? 'ok' : 'info');
+          }
           if (d.publish_id) { await loadVideos(); await loadChannelTelemetry(); }
         }));
         acts.appendChild(btnFastTt);
+      }
+
+      if (v.caption && navigator.clipboard) {
+        const btnCopyCap = document.createElement('button');
+        btnCopyCap.type = 'button';
+        btnCopyCap.className = 'btn btn-secondary btn-sm';
+        btnCopyCap.title = 'Copiar título e hashtags para colar no TikTok';
+        btnCopyCap.textContent = '📋 Legenda';
+        btnCopyCap.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(v.caption);
+            showToast('Legenda e hashtags copiadas! Abra o TikTok e cole no campo "Adicionar descrição".', 'ok');
+          } catch (e) {
+            showToast('Erro ao copiar legenda: ' + e.message, 'err');
+          }
+        });
+        acts.appendChild(btnCopyCap);
       }
 
       const btnInspect = document.createElement('button');
