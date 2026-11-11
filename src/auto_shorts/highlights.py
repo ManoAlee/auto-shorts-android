@@ -252,10 +252,10 @@ def call_gemini_or_openai(prompt: str) -> str:
         cfg_model = os.getenv("OPENROUTER_MODEL", os.getenv("OPENAI_MODEL", "")).strip()
         free_candidates = [
             *( [cfg_model] if cfg_model and (cfg_model == "openrouter/free" or cfg_model.endswith(":free")) else [] ),
+            "openrouter/free",
             "google/gemma-4-26b-a4b-it:free",
             "nvidia/nemotron-3.5-lightning:free",
             "liquid/lfm-2.5-2.6b:free",
-            "openrouter/free",
         ]
         seen = set()
         for m in free_candidates:
