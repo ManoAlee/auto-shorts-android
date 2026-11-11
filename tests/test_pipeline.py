@@ -1879,6 +1879,27 @@ def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
     auth_u = tt_auth.build_tiktok_authorize_url("ck_demo", code_challenge=challenge)
     assert f"code_challenge={challenge}" in auth_u and "code_challenge_method=S256" in auth_u
 
+    # 6. Autonomous pending flush dispatches queued validated Short to TikTok
+    from auto_shorts import webapp as wa_mod
+    q_dir = tmp_path / "flush_tt"
+    q_dir.mkdir()
+    q_mp4 = q_dir / "ready_tiktok.mp4"
+    q_mp4.write_bytes(b"MP4" * 20000)
+    q_mp4.with_suffix(".publish.json").write_text(
+        json.dumps({
+            "title": "Short Pronto",
+            "validation": {"valid": True},
+            "visual_audit": {"approved": True},
+            "queued_for_auto_publish": True,
+        }),
+        encoding="utf-8",
+    )
+    flushed = []
+    monkeypatch.setenv("TIKTOK_ACCESS_TOKEN", "tt_flush_tok")
+    monkeypatch.setattr(wa_mod, "publish_pack_to_tiktok", lambda p, **kw: flushed.append(p.name) or {"publish_id": "v_flush_1", "mode": "inbox"})
+    assert wa_mod._flush_pending_publishes(q_dir) is True
+    assert flushed == ["ready_tiktok.mp4"]
+
 
 
 

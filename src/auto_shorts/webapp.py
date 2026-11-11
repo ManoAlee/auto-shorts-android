@@ -339,11 +339,13 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 auto_publish=bool(cfg.get("auto_publish", True)),
                 use_llm=is_llm_configured(),
             )
+            if bool(cfg.get("auto_publish", True)):
+                _auto_crosspost_tiktok(res)
         else:
             _set_job_progress(3, 5, f"3/5 Renderizando corte 9:16 + Karaokê ({active_niche})...", 58)
             res = run_autopilot(
                 out_dir=out_dir,
-                platform=cfg.get("platform", "youtube_shorts"),
+                platform=cfg.get("platform", "tiktok_rewards" if _is_tiktok_configured() else "youtube_shorts"),
                 niche=active_niche,
                 num_clips=1,
                 layout="blur_bg",
@@ -351,6 +353,8 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 auto_layout=True,
                 auto_publish=bool(cfg.get("auto_publish", True)),
             )
+            if bool(cfg.get("auto_publish", True)):
+                _auto_crosspost_tiktok(res)
         _set_job_progress(5, 5, f"5/5 Ciclo ({active_niche}) validado na fila!", 100)
         cfg["runs_completed"] = int(cfg.get("runs_completed", 0)) + 1
         cfg["last_run_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -367,25 +371,53 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
         _JOB_STATE.update({"running": False, "last_status": "Falha no piloto automatico", "last_error": str(exc)})
 
 
-def _flush_pending_publishes(out_dir: Path) -> bool:
-    """Retry uploading validated local Shorts waiting without a YouTube video_id.
+def _is_tiktok_configured() -> bool:
+    return bool(
+        os.getenv("TIKTOK_ACCESS_TOKEN", "").strip()
+        or (os.getenv("TIKTOK_CLIENT_KEY", "").strip() and os.getenv("TIKTOK_CLIENT_SECRET", "").strip() and os.getenv("TIKTOK_REFRESH_TOKEN", "").strip())
+    )
 
-    Returns True if a queued upload succeeded, False otherwise.
+
+def _auto_crosspost_tiktok(result: Dict) -> None:
+    """Publish validated pipeline output(s) to TikTok when configured and not yet posted."""
+    if not _is_tiktok_configured() or not isinstance(result, dict):
+        return
+    candidates: List[Dict] = list(result.get("clips") or []) or [result]
+    for item in candidates:
+        out_p = Path(str(item.get("output_path") or ""))
+        if not out_p.is_file():
+            continue
+        pack_f = out_p.with_suffix(".publish.json")
+        pack = json.loads(pack_f.read_text(encoding="utf-8")) if pack_f.is_file() else {}
+        vis = pack.get("visual_audit") or item.get("visual_audit") or {}
+        if pack.get("tiktok") or (vis and not vis.get("approved")):
+            continue
+        if not (pack.get("validation") or item.get("validation") or {}).get("valid", True):
+            continue
+        try:
+            publish_pack_to_tiktok(out_p)
+        except Exception:
+            pass
+
+
+def _flush_pending_publishes(out_dir: Path) -> bool:
+    """Retry uploading validated local Shorts waiting for YouTube or TikTok delivery.
+
+    Sends at most one Short per pass per platform so cadence stays organic.
     """
-    if not (os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN")):
+    yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    tt_ready = _is_tiktok_configured()
+    if not (yt_ready or tt_ready) or not out_dir.exists():
         return False
-    if not out_dir.exists():
-        return False
-    for mp4 in sorted(out_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime):
+
+    sent_any = False
+    for mp4 in sorted(out_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
         pack_file = mp4.with_suffix(".publish.json")
         if not pack_file.is_file():
             continue
         try:
             pack = json.loads(pack_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            continue
-        yt = pack.get("youtube") or {}
-        if isinstance(yt, dict) and yt.get("video_id"):
             continue
         val = pack.get("validation") or {}
         if not val.get("valid"):
@@ -399,14 +431,32 @@ def _flush_pending_publishes(out_dir: Path) -> bool:
             pack_file.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
         if not vis.get("approved") or pack.get("queued_for_auto_publish") is False:
             continue
-        try:
-            res = publish_pack_to_youtube(mp4)
-            _JOB_STATE["last_status"] = f"Fila automatica publicada no YouTube: {res.get('video_id')}"
+
+        yt = pack.get("youtube") or {}
+        if yt_ready and not (isinstance(yt, dict) and yt.get("video_id")):
+            try:
+                res = publish_pack_to_youtube(mp4)
+                _JOB_STATE["last_status"] = f"Fila automatica publicada no YouTube: {res.get('video_id')}"
+                yt_ready = False
+                sent_any = True
+            except Exception as exc:
+                if "uploadLimitExceeded" in str(exc):
+                    yt_ready = False
+
+        tt = pack.get("tiktok") or {}
+        if tt_ready and not (isinstance(tt, dict) and tt.get("publish_id")):
+            try:
+                tt_res = publish_pack_to_tiktok(mp4)
+                if tt_res.get("publish_id"):
+                    _JOB_STATE["last_status"] = f"Fila automatica enviada ao TikTok ({tt_res.get('mode')}): {tt_res.get('publish_id')}"
+                    tt_ready = False
+                    sent_any = True
+            except Exception:
+                tt_ready = False
+
+        if sent_any and not yt_ready and not tt_ready:
             return True
-        except Exception as exc:
-            if "uploadLimitExceeded" in str(exc):
-                return False
-    return False
+    return sent_any
 
 
 def _trigger_autonomous_cycle(out_dir: Path, cfg: Dict) -> None:
@@ -1170,6 +1220,8 @@ def make_handler(out_dir: Path):
                     cfg["interval_hours"] = max(1, int(body["interval_hours"]))
                 if body.get("niche"):
                     cfg["niche"] = str(body["niche"])
+                if body.get("platform"):
+                    cfg["platform"] = str(body["platform"])
                 if "auto_publish" in body:
                     cfg["auto_publish"] = bool(body["auto_publish"])
                 _save_scheduler_cfg(out_dir, cfg)
