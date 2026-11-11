@@ -51,3 +51,4 @@ jobs:
         run: |
           test ! -f .env
           echo "Verified clean repository without .env secrets."
+

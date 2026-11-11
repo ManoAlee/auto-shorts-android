@@ -1249,7 +1249,7 @@
     const isa = (oa.isa_features && oa.isa_features.length) ? oa.isa_features.join(', ') : (oa.arch || 'CPU');
     box.innerHTML = '';
     [
-      ['Disco Livre', d.disk_free_gb + ' GB'],
+      ['Disco Livre', d.disk_free_gb + ' GB (' + (d.output_used_mb || 0) + ' MB em output/)'],
       ['Endereco Rede Local', d.lan_url || 'http://127.0.0.1:8787/'],
       ['Persistencia Boot/SSH', d.tools.boot_ready ? 'Termux:Boot + Watchdog' : 'Watchdog C11'],
       ['FFmpeg / Whisper', (d.tools.ffmpeg ? 'FFmpeg OK' : 'Sem FFmpeg') + ' • ' + (d.tools.whisper ? 'Whisper OK' : 'Sem Whisper')],
@@ -1273,6 +1273,16 @@
       const info = document.getElementById('tunnel-info');
       info.textContent = 'Benchmark (' + r.mode + '): ' + r.latency_ms + ' ms' + (r.tokens_per_sec ? (' • ' + r.tokens_per_sec + ' tok/s') : '') + ' | ISA: ' + ((r.isa_features || []).join(', ') || 'baseline');
       showToast('Benchmark IA concluido!', 'ok');
+    }));
+  }
+  const pruneBtn = document.getElementById('btn-prune-storage');
+  if (pruneBtn) {
+    pruneBtn.addEventListener('click', () => withBusyBtn(pruneBtn, 'Limpando...', async () => {
+      const r = await (await fetch('/api/system/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+      document.getElementById('tunnel-info').textContent = 'Retencao: ' + r.freed_mb + ' MB liberados (' + r.removed_dirs + ' pastas temp, ' + (r.removed_videos || []).length + ' videos antigos). Restam ' + r.remaining_videos + ' MP4 (' + r.total_mb + ' MB).';
+      showToast('Espaco liberado: ' + r.freed_mb + ' MB!', 'ok');
+      loadSystemDiag();
+      loadChannelTelemetry();
     }));
   }
   const aiChatForm = document.getElementById('ai-chat-form');

@@ -1311,6 +1311,17 @@ def build_narrated_short(
     out_path.with_suffix(".publish.json").write_text(
         json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    # Persist .ass alongside out_path and prune heavy intermediate _scene_*/broll MP4s immediately
+    if ass_path.is_file():
+        try:
+            shutil.copy2(ass_path, out_path.with_suffix(".ass"))
+        except OSError:
+            pass
+    for heavy_tmp in list(work_dir.glob("*.mp4")) + list(work_dir.glob("*.wav")):
+        try:
+            heavy_tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     return {
         "output": str(out_path),

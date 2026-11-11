@@ -1725,6 +1725,36 @@ def test_offline_llm_title_hygiene_and_v1_endpoints(tmp_path):
 
     assert _build_narrated_title("IA OFFLINE NO CELULAR", "") == "IA Offline no Celular"
 
+    # 7. Smart storage retention (cleans stale temp dirs, duplicates & oldest published while keeping unpublished queue)
+    import os
+    from auto_shorts.retention import prune_storage
+
+    s_dir = tmp_path / "storage_test"
+    s_dir.mkdir()
+    stale_work = s_dir / "_work_old"
+    stale_work.mkdir()
+    (stale_work / "raw.mp4").write_bytes(b"0" * 50000)
+    os.utime(stale_work, (1000.0, 1000.0))
+
+    pub1 = s_dir / "pub_old.mp4"
+    pub1.write_bytes(b"0" * 40000)
+    pub1.with_suffix(".publish.json").write_text(json.dumps({"youtube": {"video_id": "YT123"}, "validation": {"valid": True}}))
+    os.utime(pub1, (1000.0, 1000.0))
+
+    dup1 = s_dir / "dup.mp4"
+    dup1.write_bytes(b"0" * 40000)
+    dup1.with_suffix(".publish.json").write_text(json.dumps({"duplicate_of": "queued.mp4", "validation": {"valid": True}}))
+
+    q1 = s_dir / "queued.mp4"
+    q1.write_bytes(b"0" * 40000)
+    q1.with_suffix(".publish.json").write_text(json.dumps({"queued_for_auto_publish": True, "validation": {"valid": True}}))
+
+    pr = prune_storage(s_dir, max_videos=1, max_output_mb=50.0, keep_recent_work_hours=0.1)
+    assert not stale_work.exists()
+    assert not dup1.exists()
+    assert not pub1.exists()
+    assert q1.exists() and pr["freed_mb"] > 0.1
+
 
 
 

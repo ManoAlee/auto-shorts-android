@@ -15,3 +15,4 @@ All notable changes to **auto-shorts-android** are documented in this file.
 - Upgraded `llama-cli` fallback flag from deprecated `-no-cnv` to `--single-turn` with clean ChatML assistant parsing.
 - Fixed semantic topic routing in `build_horizon_spoken_script()` so AI/Tech topics never receive personal-finance boilerplate.
 - Fixed English title detection (`_looks_english_title`), `>>` / greeting sanitization in `_polish_hook_phrase`, and `.ass` persistence on clipped YouTube Shorts.
+

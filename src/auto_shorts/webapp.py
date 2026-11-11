@@ -54,6 +54,7 @@ from .offline_llm import (
     benchmark_local_llm,
     detect_android_llm_capabilities,
 )
+from .retention import _dir_bytes, prune_storage
 from .team import build_persona_script_brief, generate_channel_planner, is_llm_configured, list_channel_personas
 from .validator import audit_short_end_to_end, validate_generated_short
 from .world_news import fetch_world_news_headlines, produce_world_news_short
@@ -535,6 +536,7 @@ def _autonomous_loop(out_dir: Path) -> None:
                 _JOB_STATE.update({"last_status": "Aguardando rede Wi-Fi/internet para postar automaticamente..."})
                 continue
             _trigger_autonomous_cycle(out_dir, cfg)
+            prune_storage(out_dir)
         except Exception:
             pass
 
@@ -550,6 +552,7 @@ def build_system_diagnostics(out_dir: Path) -> Dict:
     boot_script = Path.home() / ".termux" / "boot" / "start-autoshorts.sh"
     return {
         "disk_free_gb": round(usage.free / (1024 ** 3), 2),
+        "output_used_mb": round(_dir_bytes(out_dir) / (1024 * 1024), 1) if out_dir.exists() else 0.0,
         "lan_url": f"http://{cur_ip}:8787/",
         "tools": {
             "ffmpeg": shutil.which("ffmpeg") is not None,
@@ -1062,6 +1065,15 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/ai/benchmark":
                 self._send_json(200, benchmark_local_llm())
+                return
+
+            if parsed.path == "/api/system/prune":
+                res = prune_storage(
+                    out_dir,
+                    max_videos=int(body.get("max_videos") or os.getenv("STORAGE_MAX_VIDEOS", "20")),
+                    max_output_mb=float(body.get("max_output_mb") or os.getenv("STORAGE_MAX_MB", "1200")),
+                )
+                self._send_json(200, res)
                 return
 
             if parsed.path == "/api/ai/chat":

@@ -19,3 +19,4 @@ Mapeamento técnico dos presets de plataforma e perfis de nicho em `src/auto_sho
 - **`desenvolvimento_pessoal`** — *Desenvolvimento Pessoal e Mentalidade*: hábitos, disciplina, foco e salvamentos em WhatsApp/Instagram.
 - **`saude_fitness`** — *Saúde, Fitness e Emagrecimento*: sono, proteína, metabolismo e treino.
 - **`concursos`** — *Carreira, Concursos e Educação*: edital, método de estudo e resumo rápido.
+

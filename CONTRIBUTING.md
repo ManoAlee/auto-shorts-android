@@ -19,3 +19,4 @@ Thank you for helping improve `auto-shorts-android`!
    python -m pytest tests -q
    node --check src/auto_shorts/frontend/studio.js
    ```
+
