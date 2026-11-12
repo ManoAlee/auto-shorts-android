@@ -2,6 +2,20 @@
 
 All notable changes to **auto-shorts-android** are documented in this file.
 
+## [2.7.0] - 2026-11-12
+
+### Added
+- **Full Anime Episode Engine (`src/auto_shorts/anime_archive_downloader.py`):** Zero-auth, pure-Python scraper for Archive.org and AnimesDigital without requiring Selenium or heavy browser runtimes on mobile. Fetches 1080p/720p direct MP4 streams for complete sagas (*Yu Yu Hakusho*, *Dragon Ball Z*, *Naruto*, *Cavaleiros do Zodíaco*, *Death Note*).
+- **Intelligent Long-Episode Slicing Pipeline (`pipeline.py`, `highlights.py`):** Automatic skipping of opening (OP) and ending (ED) sequences (90s windowing), energetic dialogue/climax detection, authentic Brazilian dubbing preservation (zero synthetic voice overlay), and ITU-R BS.1770-4 loudness normalization (-14 LUFS).
+- **Dual-Cycle Autonomous Sentinel (`sentinel.py`, `world_news.py`):** When Google Drive has no pending raw files, the engine autonomously alternates 50/50 between slicing dubbed anime episodes from the web and generating investigative tech incident Shorts with verified Root Cause Analysis (RCA).
+- **Web Studio Episode Search UI (`src/auto_shorts/frontend/`):** Added `🎬 Buscar Episódios Dublados` action button, interactive search modal (`#modal-anime-search`), and REST API `GET /api/animes/search?q={query}`.
+- **Breaking News RCA Integration:** Live incident feeds (Google News Cloud Outage, Tecnoblog, BleepingComputer) and automated root-cause extraction. Successfully rendered and published global Microsoft 365 outage Short (`EX1550543` / `MO1550821`) live to YouTube Shorts ([p3Vya4M49a4](https://youtube.com/shorts/p3Vya4M49a4)).
+- **Comprehensive Documentation (`docs/MOTOR_AUTONOMO_EPISODIOS_E_INCIDENTES.md`):** Complete guide detailing the 24/7 autonomous loop, episode slicing mechanics, audio safeguards, and operational commands.
+
+### Fixed
+- **Ephemeral Storage Auto-Purge:** Automatic cleanup of large raw episode source files in `_work_*` directories after slicing to prevent storage exhaustion on Android.
+- **YouTube Token Environment Loading (`publisher.py`):** Loaded `.env` at module level to guarantee client credentials are valid across standalone scripts.
+
 ## [2.6.0] - 2026-11-12
 
 ### Added

@@ -80,6 +80,7 @@ flowchart LR
 | **Humanized PT-BR Voice** | PT-BR spoken normalization (`R$`, `%`, `IA`, `EUA`, `STF`, `km/h`), broadcast warmth EQ + de-esser, Kokoro-82M offline + CosyVoice/F5-TTS/GPT-SoVITS failover with CC-BY-SA Open-Swara Portuguese reference WAVs | [`narrator.py`](src/auto_shorts/narrator.py), [`assets/voices/`](assets/voices/) |
 | **9:16 Video & B-Roll** | `blur_bg`, `split_top_bottom`, facial-tracked `center_crop`, dynamic ~4.2s multi-scene B-roll + UCB1 evolution bandit, `-16 LUFS` loudnorm & sidechain ducking | [`renderer.py`](src/auto_shorts/renderer.py), [`gameplay.py`](src/auto_shorts/gameplay.py), [`evolution.py`](src/auto_shorts/evolution.py) |
 | **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, duplicate queue guard | [`validator.py`](src/auto_shorts/validator.py), [`re_engine.py`](src/auto_shorts/re_engine.py), [`publisher.py`](src/auto_shorts/publisher.py) |
+| **Autonomous 24/7 & Episode Slicer** | Zero-auth full anime episode scraper (Archive.org/AnimesDigital), automatic OP/ED 90s skipping, clímax detection with authentic BR dubbing preservation (-14 LUFS), real-time Tech Outage RCA sentinel | [`sentinel.py`](src/auto_shorts/sentinel.py), [`anime_archive_downloader.py`](src/auto_shorts/anime_archive_downloader.py), [`world_news.py`](src/auto_shorts/world_news.py) |
 | **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion (`IDisposable` safe HTTP/FFmpeg + Opus inspector) | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
 
 ---
@@ -155,6 +156,7 @@ auto-shorts-android/
 
 ## Documentation
 
+- [Motor Autônomo 24/7: Episódios Longos & Radar de Incidentes Críticos](docs/MOTOR_AUTONOMO_EPISODIOS_E_INCIDENTES.md)
 - [Mahoraga 8-Spoke Adaptive Intelligence Engine](docs/MAHORAGA_ADAPTIVE_ENGINE.md)
 - [Arquitetura Completa e Guia de Produção](docs/ARQUITETURA_E_PRODUCAO.md)
 - [Estudo de Engenharia Reversa](docs/ESTUDO_ENGENHARIA_REVERSA.md)
