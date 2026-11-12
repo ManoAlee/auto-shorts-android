@@ -97,6 +97,7 @@ def search_animesdigital_episodes(query: str, limit: int = 5) -> List[Dict]:
             results.append({
                 "title": clean_title,
                 "url": link,
+                "size_mb": 0.0,
                 "source": "animesdigital",
             })
     except Exception as exc:
@@ -142,3 +143,4 @@ def download_episode_direct(
     temp_path.rename(dest_path)
     logger.info("Download completed successfully: %s (%d MB)", dest_path, dest_path.stat().st_size // (1024 * 1024))
     return dest_path
+

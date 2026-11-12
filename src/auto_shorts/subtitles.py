@@ -1,7 +1,23 @@
 """ASS animated/highlighted subtitle generator safe for FFmpeg filtergraphs."""
 
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+
+_NON_SPEECH_RE = re.compile(
+    r"\[[^\]]*(?:m[úu]sica|abertura|encerramento|aplausos|risos|som|ru[íi]do|sil[êe]ncio|trilha|efeito)[^\]]*\]"
+    r"|\([^\)]*(?:m[úu]sica|abertura|encerramento|aplausos|risos|som)[^\)]*\)"
+    r"|\[[^\]]*\]"
+    r"|[♪♫]+",
+    re.IGNORECASE,
+)
+
+
+def strip_non_speech_cues(text: str) -> str:
+    """Remove Whisper music/sound-effect annotations so only real character speech remains."""
+    cleaned = _NON_SPEECH_RE.sub("", str(text or ""))
+    return " ".join(cleaned.split()).strip()
 
 
 ASS_HEADER = """[Script Info]
@@ -149,15 +165,21 @@ def generate_ass_subtitles(
     cues: List[Tuple[float, float, str, str]] = []
     clip_dur = max(0.05, clip_end - clip_start)
     for seg in segments:
+        raw_seg_txt = strip_non_speech_cues(str(seg.get("text", "")))
+        if not raw_seg_txt:
+            continue
+
         words_meta = seg.get("words")
         if isinstance(words_meta, list) and words_meta:
             in_window = [
                 w for w in words_meta
-                if float(w["end"]) > clip_start and float(w["start"]) < clip_end
+                if float(w["end"]) > clip_start
+                and float(w["start"]) < clip_end
+                and strip_non_speech_cues(str(w.get("word") or ""))
             ]
             for i in range(0, len(in_window), max(1, max_words)):
                 group = in_window[i:i + max(1, max_words)]
-                phrase = " ".join(str(w["word"]).strip() for w in group if str(w["word"]).strip()).upper()
+                phrase = strip_non_speech_cues(" ".join(str(w["word"]).strip() for w in group if str(w["word"]).strip())).upper()
                 if not phrase:
                     continue
                 c_start = max(0.0, float(group[0]["start"]) - clip_start) if relative_to_clip else float(group[0]["start"])
@@ -177,7 +199,7 @@ def generate_ass_subtitles(
         if rel_end <= rel_start:
             continue
 
-        all_words = str(seg.get("text", "")).upper().split()
+        all_words = raw_seg_txt.upper().split()
         if not all_words:
             continue
         # If segment starts well before clip_start, trim leading words proportionally to stay synced.

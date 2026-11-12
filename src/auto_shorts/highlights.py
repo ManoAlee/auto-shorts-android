@@ -413,6 +413,13 @@ _ASR_AND_TRANSLATION_HEAL_RULES: Tuple[Tuple[re.Pattern, str], ...] = (
     (re.compile(r"\barpan[áa]lise\b|\bbora\s+pran[áa]lise\b", re.IGNORECASE), "bora pra análise"),
     (re.compile(r"\bhak[íi]\b", re.IGNORECASE), "Haki"),
     (re.compile(r"\bimu\s+sama\b", re.IGNORECASE), "Imu-sama"),
+    (re.compile(r"\bsidente\b|\bcidente\b", re.IGNORECASE), "acidente"),
+    (re.compile(r"\bsukuna\b|\bsucuna\b", re.IGNORECASE), "Sukuna"),
+    (re.compile(r"\bgoj[oô]\b|\bgoujo\b", re.IGNORECASE), "Gojo"),
+    (re.compile(r"\btanjir[oô]\b", re.IGNORECASE), "Tanjiro"),
+    (re.compile(r"\bjutsu\b", re.IGNORECASE), "Jujutsu"),
+    (re.compile(r"\byusuk[ei]\b", re.IGNORECASE), "Yusuke"),
+    (re.compile(r"\bjin\s*woo\b|\bgin\s*wu\b", re.IGNORECASE), "Jin-woo"),
 )
 
 _INTRO_BOILERPLATE_PHRASES: Tuple[str, ...] = (
@@ -445,6 +452,12 @@ def heal_proper_nouns_and_asr(text: str) -> str:
 def _clean_source_title(raw_title: str) -> str:
     cleaned = (raw_title or "").replace("&gt;", ">").replace("&quot;", '"')
     cleaned = re.sub(r"\[[^\]]*\]", "", cleaned)
+    cleaned = re.sub(
+        r"\b(?:assistir|ep\.?\s*\d+|epis[óo]dio\s*\d+|dublado|legendado|full\s*hd|1080p|720p|480p|hd|mp4|x264|animesonline\w*|animesdigital\w*)\b",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
     cleaned = re.sub(r"[>»]{1,3}", " ", cleaned)
     cleaned = re.sub(r"!{2,}", "!", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:\"'“”")
@@ -654,15 +667,23 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
 
 def _build_clip_title(source_title: str, hook_title: str, part_num: int, niche: NicheProfile) -> str:
     clean_src = _clean_source_title(source_title)
+    is_anime = "anime" in niche.label.lower() or "entretenimento_animes" in str(getattr(niche, "key", "")).lower()
+    suffix = f" (Parte {part_num})" if part_num > 1 else ""
+    if is_anime and clean_src and not _looks_english_title(clean_src):
+        if hook_title and hook_title != "PRESTA ATENCAO NISSO" and len(hook_title) >= 6:
+            hook_pretty = hook_title.title()
+            if hook_pretty.lower() not in clean_src.lower():
+                combo = f"{clean_src}: {hook_pretty}!{suffix}"
+                return combo[:90]
+        return f"{clean_src} — Cena Épica Dublada!{suffix}"[:90]
+
     if clean_src and not _looks_english_title(clean_src):
-        suffix = f" (Parte {part_num})" if part_num > 1 else ""
         base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
         return f"{base}{suffix}"
     pt_translated = _translate_title_to_ptbr(clean_src)
     if pt_translated:
         if pt_translated.isupper():
             pt_translated = pt_translated.title()
-        suffix = f" (Parte {part_num})" if part_num > 1 else ""
         base = pt_translated[: 90 - len(suffix)].rstrip(" -|:")
         return f"{base}{suffix}"
     if hook_title and hook_title != "PRESTA ATENCAO NISSO":

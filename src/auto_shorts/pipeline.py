@@ -417,14 +417,25 @@ def run_pipeline(
 
         # Auto-backup rendered shorts to Google Drive 5TB (if configured)
         from .downloader import upload_to_rclone
+        uploaded_ok = False
         try:
-            upload_to_rclone(out_mp4, "gdrive:Shorts_Finalizados")
+            uploaded_ok = upload_to_rclone(out_mp4, "gdrive:Shorts_Finalizados")
             if thumb_16x9 and thumb_16x9.is_file():
                 upload_to_rclone(thumb_16x9, "gdrive:Shorts_Finalizados")
             if cover_9x16 and cover_9x16.is_file():
                 upload_to_rclone(cover_9x16, "gdrive:Shorts_Finalizados")
         except Exception:
             pass
+
+        if uploaded_ok and os.getenv("AUTO_PURGE_LOCAL_AFTER_DRIVE", "1") == "1":
+            try:
+                keep_n = max(1, int(os.getenv("MAX_LOCAL_MP4_KEEP", "3")))
+                mp4s = sorted(out_root.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for old_mp4 in mp4s[keep_n:]:
+                    if old_mp4 != out_mp4 and old_mp4.is_file():
+                        old_mp4.unlink(missing_ok=True)
+            except Exception:
+                pass
 
         rendered.append({
             **clip,
