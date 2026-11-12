@@ -57,6 +57,7 @@ from .offline_llm import (
 )
 from .retention import _dir_bytes, prune_storage
 from .smart_autopublish import get_autopublish_plan, run_smart_publish_cycle
+from .story_engine import NarrativeContinuityStore, STORY_GENRES, StoryEngine
 from .team import build_persona_script_brief, generate_channel_planner, is_llm_configured, list_channel_personas
 from .tiktok_algorithm import build_mentalist_script_blueprint, get_tiktok_algorithm_blueprint
 from .validator import audit_short_end_to_end, validate_generated_short
@@ -905,6 +906,18 @@ def make_handler(out_dir: Path):
                 self._send_json(200, generate_channel_planner(days=7, include_live_anime=True))
                 return
 
+            if parsed.path == "/api/story/genres":
+                self._send_json(200, {"genres": STORY_GENRES})
+                return
+
+            if parsed.path == "/api/story/characters":
+                qs = urllib.parse.parse_qs(parsed.query)
+                sid = (qs.get("story_id") or [""])[0]
+                c_store = NarrativeContinuityStore(out_dir / "narrative_continuity.db")
+                chars = c_store.list_characters(sid) if sid else []
+                self._send_json(200, {"characters": [c.to_dict() for c in chars], "story_id": sid})
+                return
+
             if parsed.path.startswith("/media-preview/"):
                 fname = urllib.parse.unquote(parsed.path[len("/media-preview/"):])
                 preview_dir = out_dir / "_preview"
@@ -994,6 +1007,26 @@ def make_handler(out_dir: Path):
                     platform=str(body.get("platform") or "youtube_shorts"),
                 )
                 self._send_json(200, brief)
+                return
+
+            if parsed.path == "/api/story/generate":
+                try:
+                    c_store = NarrativeContinuityStore(out_dir / "narrative_continuity.db")
+                    engine = StoryEngine(continuity_store=c_store)
+                    script = engine.generate_story_script(
+                        prompt=str(body.get("prompt") or "O Segredo Proibido"),
+                        genre=str(body.get("genre") or "dark_shonen"),
+                        season=int(body.get("season") or 1),
+                        episode=int(body.get("episode")) if body.get("episode") else None,
+                        target_duration_sec=float(body.get("duration") or 45.0),
+                    )
+                    self._send_json(200, {
+                        "ok": True,
+                        "script": script.to_dict(),
+                        "message": f"Roteiro cinematografico '{script.title}' gerado com sucesso!",
+                    })
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "message": f"Erro na geracao narrativa: {exc}"})
                 return
 
             if parsed.path == "/api/voice-preview":
@@ -1267,49 +1300,6 @@ def make_handler(out_dir: Path):
                 return
 
             if parsed.path == "/api/delete":
-                if body.get("all"):
-                    deleted = []
-                    for mp4 in list(out_dir.glob("*.mp4")):
-                        fname = mp4.name
-                        for sidecar in (
-                            mp4,
-                            mp4.with_suffix(".publish.json"),
-                            mp4.with_name(f"{mp4.stem}_thumb_16x9.jpg"),
-                            mp4.with_name(f"{mp4.stem}_cover_9x16.jpg"),
-                            mp4.with_suffix(".ass"),
-                        ):
-                            if sidecar.is_file():
-                                sidecar.unlink(missing_ok=True)
-                        narr_dir = out_dir / f"_narrate_{mp4.stem}"
-                        if narr_dir.is_dir():
-                            shutil.rmtree(narr_dir, ignore_errors=True)
-                        deleted.append(fname)
-                    self._send_json(200, {"deleted": deleted, "count": len(deleted), "message": f"{len(deleted)} video(s) excluido(s) com sucesso."})
-                    return
-
-                filenames = body.get("filenames")
-                if isinstance(filenames, list) and filenames:
-                    deleted = []
-                    for fn in filenames:
-                        target = _safe_child_path(out_dir, str(fn or ""))
-                        if target and target.is_file():
-                            fname = target.name
-                            for sidecar in (
-                                target,
-                                target.with_suffix(".publish.json"),
-                                target.with_name(f"{target.stem}_thumb_16x9.jpg"),
-                                target.with_name(f"{target.stem}_cover_9x16.jpg"),
-                                target.with_suffix(".ass"),
-                            ):
-                                if sidecar.is_file():
-                                    sidecar.unlink(missing_ok=True)
-                            narr_dir = out_dir / f"_narrate_{target.stem}"
-                            if narr_dir.is_dir():
-                                shutil.rmtree(narr_dir, ignore_errors=True)
-                            deleted.append(fname)
-                    self._send_json(200, {"deleted": deleted, "count": len(deleted), "message": f"{len(deleted)} video(s) excluido(s)."})
-                    return
-
                 target = _safe_child_path(out_dir, str(body.get("filename") or ""))
                 if not target or not target.is_file():
                     self._send_json(404, {"message": "Arquivo nao encontrado"})
@@ -1320,14 +1310,10 @@ def make_handler(out_dir: Path):
                     target.with_suffix(".publish.json"),
                     target.with_name(f"{target.stem}_thumb_16x9.jpg"),
                     target.with_name(f"{target.stem}_cover_9x16.jpg"),
-                    target.with_suffix(".ass"),
                 ):
                     if sidecar.is_file():
                         sidecar.unlink(missing_ok=True)
-                narr_dir = out_dir / f"_narrate_{target.stem}"
-                if narr_dir.is_dir():
-                    shutil.rmtree(narr_dir, ignore_errors=True)
-                self._send_json(200, {"deleted": fname, "count": 1, "message": f"{fname} excluido com sucesso."})
+                self._send_json(200, {"deleted": fname})
                 return
 
             if parsed.path == "/api/run":
