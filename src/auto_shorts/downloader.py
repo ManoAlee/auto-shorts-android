@@ -113,6 +113,34 @@ def upload_to_rclone(local_path: Path, remote_folder: str) -> bool:
     return proc.returncode == 0
 
 
+def refresh_gdrive_token() -> bool:
+    """Automatically refresh Google Drive OAuth2 token so it never expires."""
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin:
+        return False
+    # rclone about or lsd triggers internal automatic OAuth refresh & saves renewed token to rclone.conf
+    proc = subprocess.run([rclone_bin, "about", "gdrive:"], capture_output=True, text=True, check=False)
+    return proc.returncode == 0
+
+
+def list_gdrive_episodes(folder: str = "gdrive:Animes_Para_Cortar") -> List[str]:
+    """List pending anime video files in Google Drive folder."""
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin:
+        return []
+    cmd = [rclone_bin, "lsf", folder]
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        return []
+    valid_exts = {".mp4", ".mkv", ".webm", ".avi", ".mov"}
+    files = []
+    for line in proc.stdout.splitlines():
+        fname = line.strip().rstrip("/")
+        if any(fname.lower().endswith(ext) for ext in valid_exts):
+            files.append(f"{folder.rstrip('/')}/{fname}")
+    return files
+
+
 def download_video_and_subs(
     url: str,
     work_dir: Path,

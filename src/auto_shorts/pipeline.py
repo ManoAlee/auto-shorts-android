@@ -415,6 +415,17 @@ def run_pipeline(
                 else:
                     delivery_status = f"delivery_error: {msg}"
 
+        # Auto-backup rendered shorts to Google Drive 5TB (if configured)
+        from .downloader import upload_to_rclone
+        try:
+            upload_to_rclone(out_mp4, "gdrive:Shorts_Finalizados")
+            if thumb_16x9 and thumb_16x9.is_file():
+                upload_to_rclone(thumb_16x9, "gdrive:Shorts_Finalizados")
+            if cover_9x16 and cover_9x16.is_file():
+                upload_to_rclone(cover_9x16, "gdrive:Shorts_Finalizados")
+        except Exception:
+            pass
+
         rendered.append({
             **clip,
             "clip_id": clip_id,
