@@ -307,7 +307,8 @@ def run_pipeline(
             except OSError:
                 pass
 
-        validation = validate_generated_short(out_mp4, ass_path=ass_file)
+        max_dur = 180.0 if "tiktok" in platform.lower() else 60.0
+        validation = validate_generated_short(out_mp4, ass_path=ass_file, max_duration=max_dur)
         pack = build_publish_pack(
             {**clip, "output_path": str(out_mp4), "clip_id": clip_id},
             platform,

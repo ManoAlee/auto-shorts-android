@@ -599,16 +599,17 @@ def audit_short_end_to_end(
         except (OSError, json.JSONDecodeError):
             meta = {}
 
+    platform_name = str((pack or {}).get("platform") or meta.get("platform") or "")
+    if "tiktok" in platform_name.lower():
+        max_duration = max(max_duration, 180.0)
+
     if ass_path is None:
         cand_ass = p.parent / f"_narrate_{p.stem}" / f"{p.stem}.ass"
         if cand_ass.is_file():
             ass_path = cand_ass
 
     if media_val is None:
-        if srt_path is None and max_duration == 60.0:
-            media_val = validate_generated_short(p, ass_path=ass_path)
-        else:
-            media_val = validate_generated_short(p, srt_path=srt_path, ass_path=ass_path, max_duration=max_duration)
+        media_val = validate_generated_short(p, srt_path=srt_path, ass_path=ass_path, max_duration=max_duration)
     reject_reasons: List[str] = list(media_val.get("errors") or [])
 
     sub_text = ""
