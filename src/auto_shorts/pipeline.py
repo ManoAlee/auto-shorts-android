@@ -490,7 +490,26 @@ def run_autopilot(
         else [niche]
     )
 
-    all_candidates: List[Dict] = []
+    # Prioridade 1: Se houver vídeos pendentes no Google Drive na pasta Animes_Para_Cortar
+    from .downloader import list_gdrive_episodes
+    gdrive_items = []
+    if niche in {"entretenimento_animes", "all"}:
+        try:
+            gdrive_files = list_gdrive_episodes("gdrive:Animes_Para_Cortar")
+            for gf in gdrive_files:
+                gf_name = Path(gf).name
+                if gf_name not in seen_ids:
+                    gdrive_items.append({
+                        "id": gf_name,
+                        "url": gf,
+                        "title": Path(gf_name).stem.replace("_", " ").title(),
+                        "channel": "Google Drive 5TB",
+                        "_niche": "entretenimento_animes",
+                    })
+        except Exception:
+            pass
+
+    all_candidates: List[Dict] = list(gdrive_items)
     for active_niche in target_niches:
         found = discover_videos(
             niche=active_niche,
