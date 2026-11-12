@@ -152,21 +152,28 @@ def test_webapp_anime_lab_endpoints(tmp_path):
 
     # 2. Test POST /api/anime-lab/analyze-panel
     img_path = out_dir / "sample_manga_page.png"
-    img_path.write_bytes(
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
-        + struct.pack(">II", 1200, 800)
-        + b"\x08\x02\x00\x00\x00"
-        + b"\x00" * 500
-    )
+    if shutil.which("ffmpeg"):
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "color=c=0x0F172A:s=1200x800:d=1",
+            "-frames:v", "1", str(img_path),
+        ], check=True)
+    else:
+        img_path.write_bytes(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+            + struct.pack(">II", 1200, 800)
+            + b"\x08\x02\x00\x00\x00"
+            + b"\x00" * 500
+        )
 
-    handler_analyze = MagicMock(spec=HandlerClass)
-    handler_analyze.path = "/api/anime-lab/analyze-panel"
-    handler_analyze.headers = {"Content-Length": "120"}
     analyze_body = json.dumps({
         "image_filename": "sample_manga_page.png",
         "name": "Pagina Analisada",
         "tags": "manga,shonen",
     }).encode("utf-8")
+    handler_analyze = MagicMock(spec=HandlerClass)
+    handler_analyze.path = "/api/anime-lab/analyze-panel"
+    handler_analyze.headers = {"Content-Length": str(len(analyze_body))}
     handler_analyze.rfile = MagicMock()
     handler_analyze.rfile.read = lambda n: analyze_body
     analyze_res = []
@@ -195,9 +202,6 @@ def test_webapp_anime_lab_endpoints(tmp_path):
     assert r_payload["total"] >= 1
 
     # 4. Test POST /api/anime-lab/render-panel
-    handler_post = MagicMock(spec=HandlerClass)
-    handler_post.path = "/api/anime-lab/render-panel"
-    handler_post.headers = {"Content-Length": "120"}
     post_body = json.dumps({
         "image_filename": "sample_manga_page.png",
         "duration": 1.0,
@@ -205,6 +209,9 @@ def test_webapp_anime_lab_endpoints(tmp_path):
         "add_speed_lines": True,
         "quality": "mobile",
     }).encode("utf-8")
+    handler_post = MagicMock(spec=HandlerClass)
+    handler_post.path = "/api/anime-lab/render-panel"
+    handler_post.headers = {"Content-Length": str(len(post_body))}
     handler_post.rfile = MagicMock()
     handler_post.rfile.read = lambda n: post_body
     post_res = []

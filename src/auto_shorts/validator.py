@@ -94,19 +94,50 @@ def inspect_media_metrics(mp4_path: str | Path) -> Dict:
     if not p.is_file():
         raise FileNotFoundError(f"Video file not found: {p}")
 
-    probe = subprocess.run(
-        [
-            "ffprobe", "-v", "error",
-            "-show_entries", "format=duration,size",
-            "-show_entries", "stream=codec_type,codec_name,width,height,sample_rate,channels,r_frame_rate",
-            "-of", "json",
-            str(p),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    info = json.loads(probe.stdout or "{}")
+    info: Dict[str, Any] = {}
+    if shutil.which("ffprobe"):
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration,size",
+                "-show_entries", "stream=codec_type,codec_name,width,height,sample_rate,channels,r_frame_rate",
+                "-of", "json",
+                str(p),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        info = json.loads(probe.stdout or "{}")
+    else:
+        res = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(p)], capture_output=True, text=True, check=False)
+        stderr = res.stderr or ""
+        dur_m = re.search(r"Duration:\s*(\d+):(\d+):([\d\.]+)", stderr)
+        dur_val = 0.0
+        if dur_m:
+            dur_val = int(dur_m.group(1)) * 3600 + int(dur_m.group(2)) * 60 + float(dur_m.group(3))
+        v_m = re.search(r"Stream.*?Video:\s*([a-zA-Z0-9_\-]+)", stderr)
+        res_m = re.search(r",\s*(\d{3,4})x(\d{3,4})", stderr)
+        a_m = re.search(r"Stream.*?Audio:\s*([a-zA-Z0-9_\-]+)", stderr)
+        fps_m = re.search(r"(\d+(?:\.\d+)?)\s*fps", stderr)
+        streams = []
+        if v_m and res_m:
+            streams.append({
+                "codec_type": "video",
+                "codec_name": v_m.group(1).lower(),
+                "width": int(res_m.group(1)),
+                "height": int(res_m.group(2)),
+                "r_frame_rate": f"{fps_m.group(1)}/1" if fps_m else "30/1",
+            })
+        if a_m:
+            streams.append({
+                "codec_type": "audio",
+                "codec_name": a_m.group(1).lower(),
+            })
+        info = {
+            "format": {"duration": dur_val, "size": p.stat().st_size},
+            "streams": streams,
+        }
     fmt = info.get("format", {})
     streams = info.get("streams", [])
 
