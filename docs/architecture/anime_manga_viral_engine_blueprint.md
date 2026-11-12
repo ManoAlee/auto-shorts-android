@@ -97,3 +97,4 @@ Integrando com as ferramentas do ecossistema:
   - Integração do parser de leitura da direita para a esquerda.
 - [ ] **Fase 3: Radar Cultural Automático**
   - Conector com AniList e TMDB para sugerir pautas virais diárias no painel do Copiloto IA.
+

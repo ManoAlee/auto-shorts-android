@@ -399,3 +399,4 @@ class CharacterVisualAuditor:
                 else f"Alerta de desvio de personagem: paleta {palette_res['match_percentage']}% e continuidade {continuity_res.get('continuity_score')}/100."
             ),
         }
+

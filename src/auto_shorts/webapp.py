@@ -57,6 +57,7 @@ from .offline_llm import (
 )
 from .retention import _dir_bytes, prune_storage
 from .smart_autopublish import get_autopublish_plan, run_smart_publish_cycle
+from .anime_lab import MangaAnimeLab
 from .character_engine import (
     CharacterBibleEntry,
     CharacterDatabase,
@@ -942,6 +943,22 @@ def make_handler(out_dir: Path):
                 self._send_json(200, entry.to_dict())
                 return
 
+            if parsed.path == "/api/anime-lab/techniques":
+                qs = urllib.parse.parse_qs(parsed.query)
+                genre = (qs.get("genre") or [""])[0]
+                lab = MangaAnimeLab(out_dir / "narrative_continuity.db")
+                techs = lab.list_techniques(genre=genre if genre else None)
+                self._send_json(200, {"techniques": techs, "total": len(techs)})
+                return
+
+            if parsed.path == "/api/anime-lab/references":
+                qs = urllib.parse.parse_qs(parsed.query)
+                tag = (qs.get("tag") or [""])[0]
+                lab = MangaAnimeLab(out_dir / "narrative_continuity.db")
+                refs = lab.list_references(tag=tag if tag else None)
+                self._send_json(200, {"references": refs, "total": len(refs)})
+                return
+
             if parsed.path.startswith("/media-preview/"):
                 fname = urllib.parse.unquote(parsed.path[len("/media-preview/"):])
                 preview_dir = out_dir / "_preview"
@@ -1117,6 +1134,50 @@ def make_handler(out_dir: Path):
                     self._send_json(200, info)
                 except Exception as exc:
                     self._send_json(500, {"message": str(exc)})
+                return
+
+            if parsed.path == "/api/anime-lab/analyze-panel":
+                try:
+                    raw_img = str(body.get("image_filename") or "")
+                    img_path = _safe_child_path(out_dir, raw_img) or (Path(raw_img) if Path(raw_img).is_file() else None)
+                    if not img_path or not img_path.is_file():
+                        self._send_error(404, "IMAGE_NOT_FOUND", "Imagem do manga nao encontrada")
+                        return
+                    name = str(body.get("name") or "")
+                    tags = str(body.get("tags") or "anime,manga")
+                    license_type = str(body.get("license_type") or "PRIVATE_STUDY")
+                    lab = MangaAnimeLab(out_dir / "narrative_continuity.db")
+                    analysis = lab.analyze_panel(img_path, name=name, tags=tags, license_type=license_type)
+                    self._send_json(200, {"ok": True, "analysis": analysis.to_dict()})
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/anime-lab/render-panel":
+                try:
+                    raw_img = str(body.get("image_filename") or "")
+                    img_path = _safe_child_path(out_dir, raw_img) or (Path(raw_img) if Path(raw_img).is_file() else None)
+                    if not img_path or not img_path.is_file():
+                        self._send_error(404, "IMAGE_NOT_FOUND", "Imagem do manga nao encontrada")
+                        return
+                    dur = float(body.get("duration") or 4.0)
+                    mode = str(body.get("mode") or "TRI_LAYER")
+                    speed_lines = bool(body.get("add_speed_lines", False))
+                    quality = str(body.get("quality") or "mobile")
+                    stem = f"manga_{int(time.time())}"
+                    target_mp4 = out_dir / f"{stem}.mp4"
+                    res = MangaAnimeLab.render_manga_panel_video(
+                        image_path=img_path,
+                        out_mp4=target_mp4,
+                        duration_sec=dur,
+                        mode=mode,
+                        add_speed_lines=speed_lines,
+                        quality=quality,
+                    )
+                    code = 200 if res.get("ok") else 500
+                    self._send_json(code, res)
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "error": str(exc)})
                 return
 
             if parsed.path == "/api/validate":

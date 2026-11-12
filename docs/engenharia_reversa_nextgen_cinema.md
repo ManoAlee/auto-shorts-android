@@ -206,3 +206,4 @@ Fila de Publicação Autônoma / Acervo
        ▼
 [FASE 12: VALIDAÇÃO & SUÍTE] ──> Bateria de 50+ Testes e Benchmark de RAM/Tempo
 ```
+

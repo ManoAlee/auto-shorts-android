@@ -195,3 +195,4 @@ def test_webapp_character_endpoints(tmp_path):
     assert pr_code == 200
     assert "Yuki" in pr_payload["compiled_prompt"]
     assert "Branco" in pr_payload["compiled_prompt"]
+

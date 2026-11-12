@@ -1,40 +1,40 @@
 <mxfile host="Electron" modified="2026-11-12T11:00:00.000Z" agent="Antigravity/2.0" version="21.0.0" type="device">
-  <diagram id="anime_engine_arch" name="AutoShorts Anime and Pop-Culture Engine">
+  <diagram id="anime_engine_arch" name="AutoShorts Anime &amp; Pop-Culture Engine">
     <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#0d1117" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         
         <!-- TITLE BLOCK -->
-        <mxCell id="title" value="AutoShorts Studio v2: Motor de Vídeos Virais de Anime, Mangá e Séries" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#58a6ff;" vertex="1" parent="1">
+        <mxCell id="title" value="AutoShorts Studio v2: Motor de Vídeos Virais de Anime, Mangá &amp; Séries" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#58a6ff;" vertex="1" parent="1">
           <mxGeometry x="180" y="20" width="800" height="40" as="geometry" />
         </mxCell>
         <mxCell id="subtitle" value="Arquitetura de Coleta Inteligente, Roteirização Neuro-Storytelling, Motor Gráfico 2.5D e Multi-Publicação" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#8b949e;" vertex="1" parent="1">
           <mxGeometry x="180" y="60" width="800" height="20" as="geometry" />
         </mxCell>
 
-        <!-- STAGE 1: INGESTÃO & RADAR -->
-        <mxCell id="g1" value="1. RADAR E COLETA CULTURAL" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
+        <!-- STAGE 1: INGESTÃO &amp; RADAR -->
+        <mxCell id="g1" value="1. RADAR &amp; COLETA CULTURAL" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
           <mxGeometry x="40" y="110" width="240" height="480" as="geometry" />
         </mxCell>
-        <mxCell id="c1_1" value="AniList e Kitsu API&#xa;• Lançamentos de Anime&#xa;• Rankings sazonais" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
+        <mxCell id="c1_1" value="AniList &amp; Kitsu API&#xa;• Lançamentos de Anime&#xa;• Rankings sazonais" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
           <mxGeometry x="20" y="50" width="200" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="c1_2" value="TMDB e Rotten Tomatoes&#xa;• Séries em alta (Netflix/HBO)&#xa;• Notas da crítica e polêmicas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
+        <mxCell id="c1_2" value="TMDB &amp; Rotten Tomatoes&#xa;• Séries em alta (Netflix/HBO)&#xa;• Notas da crítica e polêmicas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
           <mxGeometry x="20" y="130" width="200" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="c1_3" value="Agent-Reach e Jina Reader&#xa;• Fóruns (Reddit r/anime)&#xa;• X/Twitter trending topics&#xa;• Notícias e teorias de fãs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
+        <mxCell id="c1_3" value="Agent-Reach &amp; Jina Reader&#xa;• Fóruns (Reddit r/anime)&#xa;• X/Twitter trending topics&#xa;• Notícias e teorias de fãs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
           <mxGeometry x="20" y="210" width="200" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="c1_4" value="Manga Panels e Clips Scraper&#xa;• Extração de páginas em alta&#xa;• Clipes licenciados/fair-use" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
+        <mxCell id="c1_4" value="Manga Panels &amp; Clips Scraper&#xa;• Extração de páginas em alta&#xa;• Clipes licenciados/fair-use" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#388bfd;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g1">
           <mxGeometry x="20" y="300" width="200" height="60" as="geometry" />
         </mxCell>
 
-        <!-- STAGE 2: ROTEIRIZAÇÃO & IA -->
-        <mxCell id="g2" value="2. NEURO-STORYTELLING E VOZ" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
+        <!-- STAGE 2: ROTEIRIZAÇÃO &amp; IA -->
+        <mxCell id="g2" value="2. NEURO-STORYTELLING &amp; VOZ" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
           <mxGeometry x="320" y="110" width="240" height="480" as="geometry" />
         </mxCell>
-        <mxCell id="c2_1" value="Roteirista Hipnótico (LLM)&#xa;• Hook de 3 segundos&#xa;• Setup e Escalação&#xa;• Clímax e Loop Infinito" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#a371f7;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g2">
+        <mxCell id="c2_1" value="Roteirista Hipnótico (LLM)&#xa;• Hook de 3 segundos&#xa;• Setup &amp; Escalação&#xa;• Clímax &amp; Loop Infinito" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#a371f7;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g2">
           <mxGeometry x="20" y="50" width="200" height="70" as="geometry" />
         </mxCell>
         <mxCell id="c2_2" value="Anotador de Cenas&#xa;• Tags de direção [ZOOM_IN]&#xa;• [SHOCK_LINES], [MANGA_PAN]&#xa;• Sincronia de Beats" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#a371f7;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g2">
@@ -48,16 +48,16 @@
         </mxCell>
 
         <!-- STAGE 3: MOTOR GRÁFICO 2.5D -->
-        <mxCell id="g3" value="3. MOTOR GRÁFICO 2.5D E FX" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
+        <mxCell id="g3" value="3. MOTOR GRÁFICO 2.5D &amp; FX" style="swimlane;whiteSpace=wrap;html=1;fillColor=#161b22;strokeColor=#30363d;fontColor=#c9d1d9;fontStyle=1;startSize=30;" vertex="1" parent="1">
           <mxGeometry x="600" y="110" width="260" height="480" as="geometry" />
         </mxCell>
         <mxCell id="c3_1" value="Tri-Layer Composition (FFmpeg)&#xa;• Layer 0: Fundo Blur 9:16 (sem faixas)&#xa;• Layer 1: Quadro flutuante c/ sombra&#xa;• Layer 2: Efeitos e vinheta" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
           <mxGeometry x="20" y="50" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="c3_2" value="Manga Right-to-Left Pan e Scan&#xa;• Movimento natural de leitura oriental&#xa;• Zoom-in suave nos detalhes&#xa;• Transições de corte seco" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
+        <mxCell id="c3_2" value="Manga Right-to-Left Pan&amp;Scan&#xa;• Movimento natural de leitura oriental&#xa;• Zoom-in suave nos detalhes&#xa;• Transições de corte seco" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
           <mxGeometry x="20" y="140" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="c3_3" value="Anime Impact e Speed Lines&#xa;• Linhas de ação procedurais&#xa;• Flash de cor invertida / shake&#xa;• Impacto sonoro sincronizado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
+        <mxCell id="c3_3" value="Anime Impact &amp; Speed Lines&#xa;• Linhas de ação procedurais&#xa;• Flash de cor invertida / shake&#xa;• Impacto sonoro sincronizado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
           <mxGeometry x="20" y="230" width="220" height="70" as="geometry" />
         </mxCell>
         <mxCell id="c3_4" value="Sidechain Audio Ducking&#xa;• Trilha sonora Lo-Fi / Épica&#xa;• Compressão dinâmica (-18dB)&#xa;• Equalização cristalina de voz" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#f0883e;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g3">
@@ -77,7 +77,7 @@
         <mxCell id="c4_3" value="YouTube Shorts API&#xa;• Canal @AleplayTV&#xa;• Publicação agendada / fila&#xa;• Capa automática gerada" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#2ea043;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g4">
           <mxGeometry x="15" y="230" width="200" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="c4_4" value="AutoShorts Studio Dashboard&#xa;• Gestão em lote e 1-click delete&#xa;• Busca instantânea e filtros&#xa;• Estatísticas de retenção" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#2ea043;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g4">
+        <mxCell id="c4_4" value="AutoShorts Studio Dashboard&#xa;• Gestão em lote &amp; 1-click delete&#xa;• Busca instantânea &amp; filtros&#xa;• Estatísticas de retenção" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262d;strokeColor=#2ea043;fontColor=#ffffff;fontSize=11;" vertex="1" parent="g4">
           <mxGeometry x="15" y="320" width="200" height="70" as="geometry" />
         </mxCell>
 
@@ -96,3 +96,4 @@
     </mxGraphModel>
   </diagram>
 </mxfile>
+

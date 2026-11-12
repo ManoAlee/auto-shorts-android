@@ -202,3 +202,4 @@ def test_webapp_story_endpoints_api(tmp_path):
     assert "script" in p_payload
     assert p_payload["script"]["genre"] == "cyberpunk_br"
     assert len(p_payload["script"]["scenes"]) >= 5
+
