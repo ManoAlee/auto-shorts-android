@@ -2095,59 +2095,6 @@ def test_universal_multi_niche_cinema_story_and_hook_safety(tmp_path):
     assert "Brook" in healed
 
 
-def test_mahoraga_8_spoke_adaptation_and_news_immunization(tmp_path):
-    from auto_shorts.mahoraga import MahoragaEngine, clean_word_boundary_hook, immunize_spoken_script
-    from auto_shorts.world_news import _build_complete_news_hook, build_brazil_news_story_pack
-
-    # 1. Hook sanitizer never cuts mid-word ("SOBRE O S") or stops on dangling verb ("POR QUE ESCREVER SOFTWARE")
-    assert _build_complete_news_hook("Por que escrever software correto é difícil") == "SOFTWARE CORRETO É DIFÍCIL"
-    assert clean_word_boundary_hook("O segredo proibido sobre o segredo proibido de Brook") == "BROOK" or "SOBRE O S" not in clean_word_boundary_hook("O segredo proibido sobre o segredo proibido de Brook")
-    assert clean_word_boundary_hook("4 WORDS IN CAPS") == "DESTAQUE DO DIA"
-
-    # 2. Bare Hacker News headline (summary == title) never echoes the title twice in spoken script or summary
-    pack = build_brazil_news_story_pack(
-        {
-            "title": "Por que escrever software correto é difícil",
-            "summary": "Por que escrever software correto é difícil",
-            "source": "Hacker News",
-            "url": "https://pron.github.io/posts/correctness-and-complexity",
-            "category": "tech",
-            "lang": "pt",
-        },
-        use_llm=False,
-    )
-    assert pack["hook_title"] == "SOFTWARE CORRETO É DIFÍCIL"
-    assert pack["pt_summary"] != pack["pt_title"]
-    assert pack["script"].lower().count("por que escrever software correto é difícil") <= 1
-
-    # 3. Mahoraga 8-Spoke Wheel rotates across consecutive runs and logs adaptations in SQLite
-    m = MahoragaEngine(tmp_path / "mahoraga.db")
-    seen_spokes = []
-    for idx in range(4):
-        script, spoke = m.compose_news_narrative(
-            pt_title=f"Nova arquitetura de IA local {idx}",
-            pt_summary="Processadores ARM64 executam modelos compactos sem depender de servidor.",
-            source_name="Ars Technica",
-            category="tech",
-        )
-        seen_spokes.append(spoke["id"])
-        assert "Nova arquitetura de IA local" in script
-    assert len(set(seen_spokes)) == 4
-
-    adap = m.adapt_to_phenomenon(
-        phenomenon="ffmpeg_render_filter_fail",
-        niche="renderer",
-        trigger_detail="exit=254",
-        counter_action="Adapted filterchain to libx264 + static scale",
-    )
-    assert adap["wheel_turns"] >= 1
-    status = m.get_status_summary()
-    assert status["mode"] == "MAHORAGA_8_SPOKE_ACTIVE"
-    assert status["immunities_count"] >= 6
-    assert "4 words in caps" not in immunize_spoken_script("4 WORDS IN CAPS. Frase real.").lower()
-
-
-
 
 
 

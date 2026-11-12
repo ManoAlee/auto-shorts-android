@@ -156,7 +156,7 @@ def clean_word_boundary_hook(raw: str, max_chars: int = 32, fallback: str = "DES
             text,
             flags=re.IGNORECASE,
         ).strip()
-        if len(stripped) >= 4:
+        if len(stripped) >= 10:
             text = stripped
 
     words = text.split()
@@ -169,18 +169,11 @@ def clean_word_boundary_hook(raw: str, max_chars: int = 32, fallback: str = "DES
         if len(chosen) >= 6 and w.lower().strip(",.:;!?") not in _DANGLING_TOKENS:
             break
 
-    # If the last chosen word is a dangling preposition/article/verb or a 1-letter fragment, either extend by 1 short word or pop it
+    # Never end on a dangling preposition/article/verb or a 1-letter fragment
     while len(chosen) >= 2:
         last_clean = chosen[-1].lower().strip(",.:;!?")
         if last_clean not in _DANGLING_TOKENS and len(last_clean) > 1:
             break
-        next_idx = len(chosen)
-        if next_idx < len(words):
-            next_word = words[next_idx]
-            extended = " ".join(chosen + [next_word])
-            if len(extended) <= max_chars + 4 and next_word.lower().strip(",.:;!?") not in _DANGLING_TOKENS and len(next_word.strip(",.:;!?")) > 1:
-                chosen.append(next_word)
-                break
         chosen.pop()
 
     result = " ".join(chosen).strip(" .,:;!?-").upper()
