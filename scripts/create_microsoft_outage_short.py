@@ -13,7 +13,7 @@ from auto_shorts.config import load_dotenv_file
 load_dotenv_file(project_root / ".env")
 
 from auto_shorts.narrator import build_narrated_short
-from auto_shorts.covers import build_short_cover_image
+from auto_shorts.thumbnail import generate_advanced_thumbnail
 from auto_shorts.publisher import publish_youtube_short, ensure_youtube_playlist, add_video_to_playlist, set_youtube_thumbnail
 from auto_shorts.downloader import upload_to_rclone
 
@@ -64,19 +64,21 @@ def main():
     print(">>> [2/4] Gerando Thumbnails de alta conversão...")
     cover_9x16 = out_dir / "ex1550543_cover_9x16.jpg"
     thumb_16x9 = out_dir / "ex1550543_thumb_16x9.jpg"
-    build_short_cover_image(
+    generate_advanced_thumbnail(
         mp4_out,
         cover_9x16,
         hook_title=hook_title,
-        subtitle="INCIDENTE EX1550543",
-        orientation="vertical",
+        badge="ALERTA URGENTE",
+        timestamp_sec=2.5,
+        vertical_cover=True,
     )
-    build_short_cover_image(
+    generate_advanced_thumbnail(
         mp4_out,
         thumb_16x9,
         hook_title=hook_title,
-        subtitle="MICROSOFT 365 FORA DO AR",
-        orientation="horizontal",
+        badge="EX1550543 PANE",
+        timestamp_sec=2.5,
+        vertical_cover=False,
     )
     print(">>> Capas geradas:", cover_9x16, thumb_16x9)
 
