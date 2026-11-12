@@ -198,19 +198,10 @@
     if (renderBar) renderBar.classList.toggle('is-running', running);
     if (renderBadge) renderBadge.textContent = running ? 'AO VIVO' : 'Ocioso';
     if (statusEl) {
-      const errPreview = data.last_error ? (' — Erro: ' + String(data.last_error).slice(0, 140)) : '';
       const txt = running
         ? (data.stage_label || data.last_status || 'Renderizando...')
-        : ('Pronto: ' + (data.last_status || 'Operando normalmente') + errPreview);
+        : ('Pronto: ' + (data.last_status || 'Operando normalmente') + (data.last_error ? ' — Erro: ' + data.last_error : ''));
       statusEl.textContent = txt;
-    }
-    if (data.mahoraga) {
-      const aiSub = document.getElementById('kpi-ai-sub');
-      if (aiSub) {
-        const turns = Number(data.mahoraga.wheel_turns || 0);
-        const spoke = (data.mahoraga.active_spoke && data.mahoraga.active_spoke.roman) || 'I';
-        aiSub.textContent = 'Mahoraga (' + turns + ' giros • Raio ' + spoke + ')';
-      }
     }
     const barPct = running ? pct : (data.last_status && data.last_status !== 'Pronto para operar' ? 100 : 0);
     if (renderFill) renderFill.style.width = barPct + '%';

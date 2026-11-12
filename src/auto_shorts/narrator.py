@@ -104,6 +104,50 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pm_alex",
         direction="Interpretacao cinematografica de dublador de anime brasileiro, timbre encorpado e humano.",
     ),
+    "dublador_sukuna": VoiceStyle(
+        key="dublador_sukuna",
+        label="Dublador Sukuna (Jujutsu Kaisen) — Voz Grave, Imponente e Sombria PT-BR",
+        voice="pt-BR-AntonioNeural",
+        rate="+0%",
+        pitch="+0Hz",
+        openai_voice="onyx",
+        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
+        kokoro_voice="pm_santa",
+        direction="Voz extremamente imponente, grave, sombria e aterrorizante de vilão soberano de anime (Ryomen Sukuna).",
+    ),
+    "dublador_gojo": VoiceStyle(
+        key="dublador_gojo",
+        label="Dublador Satoru Gojo (Jujutsu Kaisen) — Voz Confiante, Sedutora e Poderosa PT-BR",
+        voice="en-US-BrianMultilingualNeural",
+        rate="+2%",
+        pitch="+0Hz",
+        openai_voice="ash",
+        elevenlabs_voice="ErXwobaYiN019PkySvjV",
+        kokoro_voice="pm_alex",
+        direction="Voz descontraída, carismática, sedutora e inabalavelmente confiante do feiticeiro mais forte (Satoru Gojo).",
+    ),
+    "dublador_goku": VoiceStyle(
+        key="dublador_goku",
+        label="Dublador Goku (Dragon Ball Z) — Voz Heróica, Enérgica e Amigável PT-BR (Wendel Bezerra)",
+        voice="pt-BR-AntonioNeural",
+        rate="+4%",
+        pitch="+0Hz",
+        openai_voice="echo",
+        elevenlabs_voice="ErXwobaYiN019PkySvjV",
+        kokoro_voice="pm_alex",
+        direction="Voz empolgada, pura, vibrante e heroica de protagonista guerreiro saiyajin (Goku dublado em português).",
+    ),
+    "dublador_naruto": VoiceStyle(
+        key="dublador_naruto",
+        label="Dublador Naruto Uzumaki — Voz Determinada, Rascante e Jovem PT-BR (Úrsula Bezerra)",
+        voice="pt-BR-ThalitaMultilingualNeural",
+        rate="+3%",
+        pitch="+0Hz",
+        openai_voice="nova",
+        elevenlabs_voice="EXAVITQu4vr4xnSDxMaL",
+        kokoro_voice="pf_dora",
+        direction="Voz jovem, enérgica, determinada, vibrante e cheia de garra de ninja protagonista (Naruto dublado em português).",
+    ),
     "anime_hype": VoiceStyle(
         key="anime_hype",
         label="Animes & Teorias — Dublador Studio PT-BR (Kokoro Blend / Brian Multilingual HD)",
@@ -547,11 +591,16 @@ def _ensure_native_espeak_for_kokoro() -> Optional[Tuple[str, str]]:
     data_path = next((p for p in cand_data if p and Path(p).is_dir()), "")
     if lib_path:
         os.environ.setdefault("PHONEMIZER_ESPEAK_LIBRARY", lib_path)
-    if importlib.util.find_spec("espeakng_loader") is None and lib_path and data_path:
-        shim = types.ModuleType("espeakng_loader")
-        shim.get_library_path = lambda: lib_path  # type: ignore[attr-defined]
-        shim.get_data_path = lambda: data_path  # type: ignore[attr-defined]
-        sys.modules.setdefault("espeakng_loader", shim)
+    if "espeakng_loader" not in sys.modules and lib_path and data_path:
+        try:
+            has_loader = importlib.util.find_spec("espeakng_loader") is not None
+        except Exception:
+            has_loader = False
+        if not has_loader:
+            shim = types.ModuleType("espeakng_loader")
+            shim.get_library_path = lambda: lib_path  # type: ignore[attr-defined]
+            shim.get_data_path = lambda: data_path  # type: ignore[attr-defined]
+            sys.modules["espeakng_loader"] = shim
     try:
         import dlinfo  # type: ignore  # noqa: F401
     except Exception:
@@ -651,19 +700,36 @@ def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool
     audio_parts: List[object] = []
     sample_rate = 24000
     voice_arg: object = style.kokoro_voice
-    if style.key in {"dublador_anime", "anime_hype", "narrador_pro", "authority", "storyteller"} and hasattr(kokoro, "get_voice_style"):
+    if hasattr(kokoro, "get_voice_style"):
         try:
             v_alex = np.asarray(kokoro.get_voice_style("pm_alex"), dtype=np.float32)
             v_santa = np.asarray(kokoro.get_voice_style("pm_santa"), dtype=np.float32)
-            weights = {
-                "dublador_anime": 0.72,
-                "anime_hype": 0.72,
-                "narrador_pro": 0.55,
-                "storyteller": 0.50,
-                "authority": 0.35,
-            }
-            w_alex = weights.get(style.key, 0.55)
-            voice_arg = (w_alex * v_alex + (1.0 - w_alex) * v_santa).astype(np.float32)
+            if style.key == "dublador_sukuna":
+                v_fenrir = np.asarray(kokoro.get_voice_style("am_fenrir"), dtype=np.float32)
+                v_onyx = np.asarray(kokoro.get_voice_style("am_onyx"), dtype=np.float32)
+                voice_arg = (0.45 * v_santa + 0.35 * v_fenrir + 0.20 * v_onyx).astype(np.float32)
+            elif style.key == "dublador_gojo":
+                v_nicola = np.asarray(kokoro.get_voice_style("im_nicola"), dtype=np.float32)
+                v_puck = np.asarray(kokoro.get_voice_style("am_puck"), dtype=np.float32)
+                voice_arg = (0.50 * v_alex + 0.35 * v_nicola + 0.15 * v_puck).astype(np.float32)
+            elif style.key == "dublador_goku":
+                v_adam = np.asarray(kokoro.get_voice_style("am_adam"), dtype=np.float32)
+                v_puck = np.asarray(kokoro.get_voice_style("am_puck"), dtype=np.float32)
+                voice_arg = (0.55 * v_alex + 0.30 * v_adam + 0.15 * v_puck).astype(np.float32)
+            elif style.key == "dublador_naruto":
+                v_dora = np.asarray(kokoro.get_voice_style("pf_dora"), dtype=np.float32)
+                v_puck = np.asarray(kokoro.get_voice_style("am_puck"), dtype=np.float32)
+                voice_arg = (0.40 * v_dora + 0.35 * v_puck + 0.25 * v_alex).astype(np.float32)
+            elif style.key in {"dublador_anime", "anime_hype", "narrador_pro", "authority", "storyteller"}:
+                weights = {
+                    "dublador_anime": 0.72,
+                    "anime_hype": 0.72,
+                    "narrador_pro": 0.55,
+                    "storyteller": 0.50,
+                    "authority": 0.35,
+                }
+                w_alex = weights.get(style.key, 0.55)
+                voice_arg = (w_alex * v_alex + (1.0 - w_alex) * v_santa).astype(np.float32)
         except Exception:
             voice_arg = style.kokoro_voice
     for idx, chunk in enumerate(chunks):
@@ -671,13 +737,15 @@ def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool
         if c_str.endswith(("!", "?")):
             dyn_speed = min(1.12, base_speed * 1.04)
         elif "..." in c_str or "—" in c_str:
-            dyn_speed = max(0.94, base_speed * 0.96)
+            dyn_speed = max(1.00, base_speed * 0.98)
         else:
             dyn_speed = base_speed
+        # Speed cannot drop below 1.0 on ARM64 Termux due to ONNXRuntime Expand_2 integer index overflow
+        dyn_speed = max(1.00, dyn_speed)
         try:
             part, sr = kokoro.create(chunk, voice=voice_arg, speed=dyn_speed, lang="pt-br")  # type: ignore[attr-defined]
         except Exception:
-            part, sr = kokoro.create(chunk, voice=style.kokoro_voice, speed=base_speed, lang="pt-br")  # type: ignore[attr-defined]
+            part, sr = kokoro.create(chunk, voice=style.kokoro_voice, speed=max(1.00, base_speed), lang="pt-br")  # type: ignore[attr-defined]
         sample_rate = int(sr)
         if len(part) > 0:
             audio_parts.append(np.asarray(part, dtype=np.float32))
@@ -1025,7 +1093,6 @@ def _build_multiscene_broll(
     work_dir: Path,
     width: int = 720,
     height: int = 1280,
-    niche: str = "geral",
 ) -> Tuple[Path, str]:
     """Assemble dynamic ~4.2s visual scene switches across distinct bright clips (MoneyPrinterTurbo style)."""
     try:
@@ -1033,13 +1100,12 @@ def _build_multiscene_broll(
             return primary_bg, primary_style
         if not primary_bg.is_file() or b"ftyp" not in primary_bg.read_bytes()[:64]:
             return primary_bg, primary_style
-        from .gameplay import _BRAINROT_GAMEPLAY_STYLES, _extract_style_tag, _is_segment_visually_bright, list_gameplay_clips, probe_video_duration
+        from .gameplay import _extract_style_tag, _is_segment_visually_bright, list_gameplay_clips, probe_video_duration
         import random
 
         clips = [
             c for c in sorted(list_gameplay_clips(out_root), key=lambda p: p.name)
             if c.is_file() and c.stat().st_size > 50_000 and b"ftyp" in c.read_bytes()[:64]
-            and (niche == "gameplay" or _extract_style_tag(c) not in _BRAINROT_GAMEPLAY_STYLES)
         ]
         others = [c for c in clips if c != primary_bg and _is_segment_visually_bright(c, 5.0)]
         if not others:
