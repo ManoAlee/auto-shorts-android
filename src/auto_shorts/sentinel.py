@@ -245,12 +245,15 @@ class DriveSentinelEngine:
                 self._state["last_error"] = ""
                 self._persist_state()
 
-            MahoragaEngine(self._db_path).record_adaptation_event(
-                phenomenon="sentinel_episode_sliced",
-                spoke="Raio VIII (Autonomous Slicer)",
-                action=f"Fatiado {ep_name} em {num_generated} cortes com audio nativo dos dubladores.",
-                success=True,
-            )
+            try:
+                MahoragaEngine(self._db_path).record_adaptation_event(
+                    phenomenon="sentinel_episode_sliced",
+                    spoke="Raio VIII (Autonomous Slicer)",
+                    action=f"Fatiado {ep_name} em {num_generated} cortes com audio nativo dos dubladores.",
+                    success=True,
+                )
+            except Exception:
+                pass
 
         except Exception as exc:
             logger.exception("Failed processing episode %s: %s", ep_name, exc)
@@ -259,12 +262,15 @@ class DriveSentinelEngine:
                 self._state["last_error"] = str(exc)[:220]
                 self._state["last_action"] = f"Falha ao fatiar {ep_name}. Tentando adaptação..."
                 self._persist_state()
-            MahoragaEngine(self._db_path).record_adaptation_event(
-                phenomenon="sentinel_episode_error",
-                spoke="Raio VIII (Autonomous Slicer)",
-                action=f"Erro em {ep_name}: {str(exc)[:160]}",
-                success=False,
-            )
+            try:
+                MahoragaEngine(self._db_path).record_adaptation_event(
+                    phenomenon="sentinel_episode_error",
+                    spoke="Raio VIII (Autonomous Slicer)",
+                    action=f"Erro em {ep_name}: {str(exc)[:160]}",
+                    success=False,
+                )
+            except Exception:
+                pass
 
     def _pull_web_anime_episode(self) -> None:
         """Autonomously discover and pull a trending Brazilian dubbed anime from the web and slice it."""
@@ -304,12 +310,15 @@ class DriveSentinelEngine:
                 self._state["last_error"] = ""
                 self._persist_state()
 
-            MahoragaEngine(self._db_path).record_adaptation_event(
-                phenomenon="sentinel_web_anime_pulled",
-                spoke="Raio VIII (Autonomous Slicer)",
-                action=f"Anime puxado automaticamente da web ('{query}'): {num_clips} cortes salvos.",
-                success=True,
-            )
+            try:
+                MahoragaEngine(self._db_path).record_adaptation_event(
+                    phenomenon="sentinel_web_anime_pulled",
+                    spoke="Raio VIII (Autonomous Slicer)",
+                    action=f"Anime puxado automaticamente da web ('{query}'): {num_clips} cortes salvos.",
+                    success=True,
+                )
+            except Exception:
+                pass
 
         except Exception as exc:
             logger.exception("Failed auto-pulling anime for query %s: %s", query, exc)

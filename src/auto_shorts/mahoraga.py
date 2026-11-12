@@ -357,6 +357,24 @@ class MahoragaEngine:
             "resolved": resolved,
         }
 
+    def record_adaptation_event(
+        self,
+        phenomenon: str,
+        spoke: str = "spoke_4_raio_x",
+        action: str = "",
+        success: bool = True,
+        niche: str = "animes",
+    ) -> Dict[str, Any]:
+        """Convenience bridge for sentinel and autonomous workers."""
+        return self.adapt_to_phenomenon(
+            phenomenon=phenomenon,
+            niche=niche,
+            trigger_detail=action,
+            counter_action=action,
+            spoke_id=spoke,
+            resolved=success,
+        )
+
     def compose_news_narrative(
         self,
         pt_title: str,
