@@ -38,20 +38,9 @@ class VoiceStyle:
 
 
 VOICE_STYLES: Dict[str, VoiceStyle] = {
-    "narrador_pro": VoiceStyle(
-        key="narrador_pro",
-        label="Narrador Natural PT-BR — Kokoro Alex / Antonio",
-        voice="pt-BR-AntonioNeural",
-        rate="+3%",
-        pitch="+0Hz",
-        openai_voice="onyx",
-        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
-        kokoro_voice="pm_alex",
-        direction="Voz masculina brasileira natural, conversa de estudio com pausas reais.",
-    ),
     "thalita_hd": VoiceStyle(
         key="thalita_hd",
-        label="Voz Mais Humana Gratuita — Thalita Multilingual HD PT-BR",
+        label="Thalita Multilingual HD (Apresentadora PT-BR Ultra Natural)",
         voice="pt-BR-ThalitaMultilingualNeural",
         rate="+2%",
         pitch="+0Hz",
@@ -60,9 +49,31 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pf_dora",
         direction="Apresentadora brasileira ultra-natural, expressiva e zero robotica.",
     ),
+    "narrador_pro": VoiceStyle(
+        key="narrador_pro",
+        label="Antonio Neural HD (Narrador PT-BR Documental — Sério & Firme)",
+        voice="pt-BR-AntonioNeural",
+        rate="+3%",
+        pitch="+0Hz",
+        openai_voice="onyx",
+        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
+        kokoro_voice="pm_alex",
+        direction="Voz masculina brasileira natural, conversa de estudio com pausas reais.",
+    ),
+    "francisca_hd": VoiceStyle(
+        key="francisca_hd",
+        label="Francisca Neural HD (Narradora PT-BR Expressiva & Clara)",
+        voice="pt-BR-FranciscaNeural",
+        rate="+2%",
+        pitch="+0Hz",
+        openai_voice="shimmer",
+        elevenlabs_voice="21m00Tcm4TlvDq8ikWAM",
+        kokoro_voice="pf_dora",
+        direction="Voz feminina brasileira clara, articulada e amigavel de narradora.",
+    ),
     "andrew_hd": VoiceStyle(
         key="andrew_hd",
-        label="Narrador HD Conversacional — Andrew Multilingual (Ultra Natural)",
+        label="Andrew Multilingual HD (Narrador Conversacional Tipo Podcast)",
         voice="en-US-AndrewMultilingualNeural",
         rate="+2%",
         pitch="+0Hz",
@@ -73,7 +84,7 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
     ),
     "brian_hd": VoiceStyle(
         key="brian_hd",
-        label="Documentario HD Profundo — Brian Multilingual",
+        label="Brian Multilingual HD (Cinematográfico Profundo)",
         voice="en-US-BrianMultilingualNeural",
         rate="+0%",
         pitch="+0Hz",
@@ -84,7 +95,7 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
     ),
     "kokoro_alex": VoiceStyle(
         key="kokoro_alex",
-        label="Kokoro-82M Offline PT-BR — Alex (StyleTTS 2 Humano)",
+        label="Kokoro-82M Offline PT-BR (Alex StyleTTS 2 Humano)",
         voice="pt-BR-AntonioNeural",
         rate="+2%",
         pitch="+0Hz",
@@ -93,86 +104,42 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pm_alex",
         direction="Sintese StyleTTS 2 local PT-BR natural sem robotizacao.",
     ),
-    "dublador_anime": VoiceStyle(
-        key="dublador_anime",
-        label="Dublador Anime Studio — Voz Humana Dramática PT-BR (Blend Alex+Santa / Brian HD)",
-        voice="en-US-BrianMultilingualNeural",
-        rate="+4%",
-        pitch="+0Hz",
-        openai_voice="ash",
-        elevenlabs_voice="ErXwobaYiN019PkySvjV",
-        kokoro_voice="pm_alex",
-        direction="Interpretacao cinematografica de dublador de anime brasileiro, timbre encorpado e humano.",
-    ),
-    "dublador_sukuna": VoiceStyle(
-        key="dublador_sukuna",
-        label="Dublador Sukuna (Jujutsu Kaisen) — Voz Grave, Imponente e Sombria PT-BR",
-        voice="pt-BR-AntonioNeural",
-        rate="+0%",
-        pitch="+0Hz",
-        openai_voice="onyx",
-        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
-        kokoro_voice="pm_santa",
-        direction="Voz extremamente imponente, grave, sombria e aterrorizante de vilão soberano de anime (Ryomen Sukuna).",
-    ),
-    "dublador_gojo": VoiceStyle(
-        key="dublador_gojo",
-        label="Dublador Satoru Gojo (Jujutsu Kaisen) — Voz Confiante, Sedutora e Poderosa PT-BR",
-        voice="en-US-BrianMultilingualNeural",
-        rate="+2%",
-        pitch="+0Hz",
-        openai_voice="ash",
-        elevenlabs_voice="ErXwobaYiN019PkySvjV",
-        kokoro_voice="pm_alex",
-        direction="Voz descontraída, carismática, sedutora e inabalavelmente confiante do feiticeiro mais forte (Satoru Gojo).",
-    ),
-    "dublador_goku": VoiceStyle(
-        key="dublador_goku",
-        label="Dublador Goku (Dragon Ball Z) — Voz Heróica, Enérgica e Amigável PT-BR (Wendel Bezerra)",
-        voice="pt-BR-AntonioNeural",
-        rate="+4%",
-        pitch="+0Hz",
-        openai_voice="echo",
-        elevenlabs_voice="ErXwobaYiN019PkySvjV",
-        kokoro_voice="pm_alex",
-        direction="Voz empolgada, pura, vibrante e heroica de protagonista guerreiro saiyajin (Goku dublado em português).",
-    ),
-    "dublador_naruto": VoiceStyle(
-        key="dublador_naruto",
-        label="Dublador Naruto Uzumaki — Voz Determinada, Rascante e Jovem PT-BR (Úrsula Bezerra)",
-        voice="pt-BR-ThalitaMultilingualNeural",
-        rate="+3%",
-        pitch="+0Hz",
-        openai_voice="nova",
-        elevenlabs_voice="EXAVITQu4vr4xnSDxMaL",
-        kokoro_voice="pf_dora",
-        direction="Voz jovem, enérgica, determinada, vibrante e cheia de garra de ninja protagonista (Naruto dublado em português).",
-    ),
     "anime_hype": VoiceStyle(
         key="anime_hype",
-        label="Animes & Teorias — Dublador Studio PT-BR (Kokoro Blend / Brian Multilingual HD)",
+        label="Narrador Geek Épico (Curiosidades & Teorias de Anime)",
         voice="en-US-BrianMultilingualNeural",
         rate="+5%",
         pitch="+0Hz",
         openai_voice="echo",
         elevenlabs_voice="ErXwobaYiN019PkySvjV",
         kokoro_voice="pm_alex",
-        direction="Voz masculina brasileira animada e envolvente de dublador para teorias de anime.",
+        direction="Voz masculina animada e envolvente para curiosidades e teorias de anime.",
     ),
     "authority": VoiceStyle(
         key="authority",
-        label="Autoridade / Financas & Tech — Kokoro / Antonio PT-BR",
+        label="Autoridade / Financas & Tech (Antonio PT-BR)",
         voice="pt-BR-AntonioNeural",
         rate="+2%",
         pitch="+0Hz",
         openai_voice="onyx",
         elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
         kokoro_voice="pm_santa",
-        direction="Voz masculina confiante de especialista.",
+        direction="Tom profissional, analitico e confiavel.",
+    ),
+    "curiosity": VoiceStyle(
+        key="curiosity",
+        label="Mistério & Fatos Curiosos (Thalita HD)",
+        voice="pt-BR-ThalitaMultilingualNeural",
+        rate="+1%",
+        pitch="+0Hz",
+        openai_voice="alloy",
+        elevenlabs_voice="ThT5KcBeYPX3keUQqHPh",
+        kokoro_voice="pf_dora",
+        direction="Tom intrigante que prende a atencao do primeiro segundo ao fim.",
     ),
     "storyteller": VoiceStyle(
         key="storyteller",
-        label="Historias & Curiosidades — Kokoro / Antonio PT-BR",
+        label="Historias & Curiosidades (Antonio PT-BR)",
         voice="pt-BR-AntonioNeural",
         rate="+2%",
         pitch="+0Hz",
@@ -183,7 +150,7 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
     ),
     "podcast_female": VoiceStyle(
         key="podcast_female",
-        label="Apresentadora Natural — Thalita Multilingual HD / Kokoro Dora",
+        label="Apresentadora Natural (Thalita Multilingual HD)",
         voice="pt-BR-ThalitaMultilingualNeural",
         rate="+2%",
         pitch="+0Hz",
@@ -591,16 +558,11 @@ def _ensure_native_espeak_for_kokoro() -> Optional[Tuple[str, str]]:
     data_path = next((p for p in cand_data if p and Path(p).is_dir()), "")
     if lib_path:
         os.environ.setdefault("PHONEMIZER_ESPEAK_LIBRARY", lib_path)
-    if "espeakng_loader" not in sys.modules and lib_path and data_path:
-        try:
-            has_loader = importlib.util.find_spec("espeakng_loader") is not None
-        except Exception:
-            has_loader = False
-        if not has_loader:
-            shim = types.ModuleType("espeakng_loader")
-            shim.get_library_path = lambda: lib_path  # type: ignore[attr-defined]
-            shim.get_data_path = lambda: data_path  # type: ignore[attr-defined]
-            sys.modules["espeakng_loader"] = shim
+    if importlib.util.find_spec("espeakng_loader") is None and lib_path and data_path:
+        shim = types.ModuleType("espeakng_loader")
+        shim.get_library_path = lambda: lib_path  # type: ignore[attr-defined]
+        shim.get_data_path = lambda: data_path  # type: ignore[attr-defined]
+        sys.modules.setdefault("espeakng_loader", shim)
     try:
         import dlinfo  # type: ignore  # noqa: F401
     except Exception:

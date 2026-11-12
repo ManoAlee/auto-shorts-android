@@ -637,6 +637,53 @@
     });
   });
 
+  const btnBrowseGdrive = document.getElementById('btn-browse-gdrive');
+  const gdrivePicker = document.getElementById('gdrive-episodes-picker');
+  if (btnBrowseGdrive && gdrivePicker) {
+    btnBrowseGdrive.addEventListener('click', async () => {
+      if (!gdrivePicker.hidden) {
+        gdrivePicker.hidden = true;
+        return;
+      }
+      gdrivePicker.hidden = false;
+      gdrivePicker.innerHTML = '<div style="color:var(--text-muted);"><span class="spinner"></span> Carregando pasta gdrive:Animes_Para_Cortar (Google Drive 5TB)...</div>';
+      try {
+        const res = await fetch('/api/gdrive/episodes');
+        const data = await res.json();
+        if (!data.ok || !data.episodes || data.episodes.length === 0) {
+          gdrivePicker.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <b>📁 Pasta gdrive:Animes_Para_Cortar (5TB)</b>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('gdrive-episodes-picker').hidden=true">Fechar</button>
+            </div>
+            <p style="margin:8px 0 0;color:var(--text-muted);">Nenhum anime encontrado na pasta ainda. Envie seus episódios (MP4/MKV) para o Google Drive em <b>Animes_Para_Cortar</b> ou cole um link do YouTube acima!</p>
+          `;
+          return;
+        }
+        let listHtml = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b>📁 Episódios Encontrados (${data.count}):</b>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('gdrive-episodes-picker').hidden=true">Fechar</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;">
+        `;
+        data.episodes.forEach(ep => {
+          const epName = ep.split('/').pop();
+          listHtml += `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;">
+              <span style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:10px;">${epName}</span>
+              <button type="button" class="btn btn-sm btn-primary" onclick="cutSourceEl.value='${ep}';document.getElementById('gdrive-episodes-picker').hidden=true;showToast('Episódio selecionado do Drive!','ok');">Selecionar</button>
+            </div>
+          `;
+        });
+        listHtml += '</div>';
+        gdrivePicker.innerHTML = listHtml;
+      } catch (err) {
+        gdrivePicker.innerHTML = `<span style="color:var(--err-color);">Erro ao consultar Drive: ${err.message}</span>`;
+      }
+    });
+  }
+
   document.getElementById('btn-sync-gameplay').addEventListener('click', () => withBusyBtn(document.getElementById('btn-sync-gameplay'), 'Baixando...', async () => {
     startOptimisticRender('1/5 Buscando novo fundo 9:16 sem copyright...');
     const res = await fetch('/api/gameplay/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ niche: cutNicheEl ? cutNicheEl.value : 'geral' }) });

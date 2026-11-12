@@ -957,6 +957,42 @@ def make_handler(out_dir: Path):
                 self._send_json(200, rea_trace_system(q))
                 return
 
+            if parsed.path == "/api/gdrive/episodes":
+                qs = urllib.parse.parse_qs(parsed.query)
+                folder = (qs.get("folder") or ["gdrive:Animes_Para_Cortar"])[0]
+                from .downloader import list_gdrive_episodes, refresh_gdrive_token
+                try:
+                    refresh_gdrive_token()
+                    episodes = list_gdrive_episodes(folder)
+                    self._send_json(200, {
+                        "ok": True,
+                        "folder": folder,
+                        "episodes": episodes,
+                        "count": len(episodes),
+                    })
+                except Exception as exc:
+                    self._send_json(200, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
+                return
+
+            if parsed.path == "/api/gdrive/status":
+                import shutil, subprocess
+                rclone_bin = shutil.which("rclone")
+                if not rclone_bin:
+                    self._send_json(200, {"configured": False, "status": "rclone_missing"})
+                    return
+                try:
+                    proc = subprocess.run([rclone_bin, "about", "gdrive:"], capture_output=True, text=True, check=False)
+                    info = {"configured": proc.returncode == 0, "raw": proc.stdout}
+                    for line in proc.stdout.splitlines():
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            info[k.strip().lower()] = v.strip()
+                    info["folders"] = ["gdrive:Animes_Para_Cortar", "gdrive:Shorts_Finalizados"]
+                    self._send_json(200, info)
+                except Exception as exc:
+                    self._send_json(200, {"configured": False, "error": str(exc)})
+                return
+
             if parsed.path == "/api/world-news":
                 try:
                     headlines = fetch_world_news_headlines(topic="world", limit=12)
@@ -1080,6 +1116,42 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/tunnel":
                 self._send_json(200, _start_cloudflare_tunnel(8787))
+                return
+
+            if parsed.path == "/api/gdrive/episodes":
+                qs = urllib.parse.parse_qs(parsed.query)
+                folder = (qs.get("folder") or ["gdrive:Animes_Para_Cortar"])[0]
+                from .downloader import list_gdrive_episodes, refresh_gdrive_token
+                try:
+                    refresh_gdrive_token()
+                    episodes = list_gdrive_episodes(folder)
+                    self._send_json(200, {
+                        "ok": True,
+                        "folder": folder,
+                        "episodes": episodes,
+                        "count": len(episodes),
+                    })
+                except Exception as exc:
+                    self._send_json(200, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
+                return
+
+            if parsed.path == "/api/gdrive/status":
+                import shutil, subprocess
+                rclone_bin = shutil.which("rclone")
+                if not rclone_bin:
+                    self._send_json(200, {"configured": False, "status": "rclone_missing"})
+                    return
+                try:
+                    proc = subprocess.run([rclone_bin, "about", "gdrive:"], capture_output=True, text=True, check=False)
+                    info = {"configured": proc.returncode == 0, "raw": proc.stdout}
+                    for line in proc.stdout.splitlines():
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            info[k.strip().lower()] = v.strip()
+                    info["folders"] = ["gdrive:Animes_Para_Cortar", "gdrive:Shorts_Finalizados"]
+                    self._send_json(200, info)
+                except Exception as exc:
+                    self._send_json(200, {"configured": False, "error": str(exc)})
                 return
 
             if parsed.path == "/api/world-news":
@@ -1609,8 +1681,9 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/run":
                 src_check = str(body.get("source") or "").strip()
-                if src_check and not _is_safe_public_http_url(src_check):
-                    self._send_json(400, {"message": "URL de origem invalida ou bloqueada por seguranca (use https://)."})
+                from .downloader import is_rclone_target
+                if src_check and not (is_rclone_target(src_check) or _is_safe_public_http_url(src_check) or Path(src_check).is_file()):
+                    self._send_json(400, {"message": "Origem invalida ou bloqueada (use https://, gdrive:Pasta/video.mp4 ou caminho local)."})
                     return
 
                 def worker():

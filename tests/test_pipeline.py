@@ -2095,6 +2095,36 @@ def test_universal_multi_niche_cinema_story_and_hook_safety(tmp_path):
     assert "Brook" in healed
 
 
+def test_action_climax_highlights_for_full_anime_episodes():
+    """Verify multi-clip slicing engine extracts non-overlapping climax cuts from full anime episodes without subtitles."""
+    from auto_shorts.highlights import detect_highlights, generate_action_climax_highlights
+    from auto_shorts.config import PLATFORMS, NICHES
+
+    # Episode of 23 minutes (1380 seconds) with empty transcript
+    empty_tr = {"segments": [], "duration": 1380.0}
+    cuts = detect_highlights(
+        transcript=empty_tr,
+        platform_key="youtube_shorts",
+        niche_key="entretenimento_animes",
+        num_clips=3,
+        source_title="Jujutsu Kaisen Episodio 24 - Batalha de Shibuya",
+    )
+
+    assert len(cuts) == 3
+    for c in cuts:
+        dur = c["end_time"] - c["start_time"]
+        assert 35.0 <= dur <= 57.0
+        assert c["start_time"] >= 90.0  # skips opening
+        assert c["end_time"] <= 1380.0 - 10.0  # inside episode boundary
+        assert "Jujutsu Kaisen" in c["title"]
+        assert len(c["hook_title"]) > 0
+
+    # Ensure no overlaps
+    assert cuts[0]["start_time"] != cuts[1]["start_time"]
+    assert cuts[1]["start_time"] != cuts[2]["start_time"]
+
+
+
 
 
 

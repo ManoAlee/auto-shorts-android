@@ -62,3 +62,4 @@ To prevent consecutive Shorts from sounding robotic or sharing the same opening 
 - `GET /api/mahoraga` — Returns live `mode`, `wheel_turns`, `adaptation_events`, `speech_rotations`, `active_spoke`, `immunities`, and `recent_adaptations`.
 - `GET /api/status` — Includes embedded `mahoraga` telemetry so the Studio UI (`#kpi-ai-sub`) displays live wheel turns and active Roman spoke (`Mahoraga (4 giros • Raio II)`).
 - Autopilot (`webapp.py`): On any cycle exception, `MahoragaEngine` records the phenomenon, advances `runs_completed` so the scheduler never gets stuck on a failing source, and counter-adapts via `produce_world_news_short()` fallback.
+

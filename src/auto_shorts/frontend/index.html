@@ -177,18 +177,23 @@ __INLINE_CSS__
                   </div>
                 </div>
                 <div>
-                  <label for="cut-clips">Quantidade de cortes</label>
-                  <input id="cut-clips" name="clips" type="number" min="1" max="5" value="1" />
+                  <label for="cut-clips">Quantidade de cortes do episódio</label>
+                  <input id="cut-clips" name="clips" type="number" min="1" max="10" value="3" />
                 </div>
               </div>
               <div class="grid" style="margin-top:12px;">
                 <div>
-                  <label for="cut-source">Link do video no YouTube (opcional)</label>
-                  <input id="cut-source" name="source" type="url" placeholder="https://www.youtube.com/watch?v=... (vazio = piloto auto)" />
+                  <label for="cut-source">Origem do Vídeo (YouTube, Google Drive 5TB ou Local)</label>
+                  <div style="display:flex;gap:8px;">
+                    <input id="cut-source" name="source" type="text" placeholder="https://youtube.com/watch?v=... ou gdrive:Animes_Para_Cortar/ep01.mp4" style="flex:1;" />
+                    <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" title="Ver animes do seu Google Drive 5TB">📁 Drive 5TB</button>
+                  </div>
+                  <div id="gdrive-episodes-picker" style="margin-top:8px;padding:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;font-size:12px;" hidden></div>
+                  <div class="hint" style="color:var(--text-muted);font-size:12px;margin-top:4px;">✨ <b>Áudio Oficial:</b> Cortes de animes preservam 100% o áudio nativo dos dubladores (Briggs, Wendel, etc.) sem voz de robô, com loudnorm -14 LUFS e legendas dinâmicas.</div>
                 </div>
                 <div>
-                  <label for="cut-playlist">Playlist / Serie</label>
-                  <input id="cut-playlist" name="playlist" type="text" placeholder="Ex: Cortes de Podcast Brasil" />
+                  <label for="cut-playlist">Playlist / Série</label>
+                  <input id="cut-playlist" name="playlist" type="text" placeholder="Ex: Animes e Batalhas Épicas - Shorts" />
                 </div>
               </div>
               <div class="check-row">

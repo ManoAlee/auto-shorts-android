@@ -683,6 +683,99 @@ def _heatmap_peak_for_window(heatmap: Optional[List[Dict]], start: float, end: f
     return min(1.0, max(0.0, best))
 
 
+def generate_action_climax_highlights(
+    duration: float,
+    platform: PlatformPreset,
+    niche: NicheProfile,
+    num_clips: int = 3,
+    source_title: str = "",
+    heatmap: Optional[List[Dict]] = None,
+    video_path: Optional[Path] = None,
+) -> List[Dict]:
+    """Generate intelligent action/climax cuts for full anime episodes or videos lacking rich transcripts."""
+    dur = float(duration or 0.0)
+    if dur <= 10.0 and video_path and Path(video_path).is_file():
+        try:
+            import subprocess
+            proc = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(video_path)],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            dur = float((proc.stdout or "0").strip())
+        except Exception:
+            dur = 60.0
+    if dur <= 10.0:
+        dur = 60.0
+
+    hard_cap = 57.0 if platform.name in {"youtube_shorts", "instagram_reels"} else float(platform.max_duration)
+    target_dur = min(hard_cap, max(float(platform.min_duration), (float(platform.min_duration) + float(platform.max_duration)) / 2.0))
+    if target_dur <= 0:
+        target_dur = 45.0
+
+    candidates: List[Dict] = []
+
+    # If YouTube Most Replayed heatmap points exist, center around peak viewership moments
+    if heatmap:
+        sorted_peaks = sorted(heatmap, key=lambda p: float(p.get("value", 0.0)), reverse=True)
+        for pk in sorted_peaks:
+            s_peak = float(pk.get("start_time", 0.0))
+            s0 = max(15.0 if dur > 60.0 else 0.0, s_peak - (target_dur * 0.35))
+            s1 = min(dur, s0 + target_dur)
+            s0 = max(0.0, s1 - target_dur)
+            candidates.append({
+                "title": "",
+                "hook_title": "CLIMAX DO EPISODIO",
+                "clip_summary": f"Pico de retencao e acao com som original dos dubladores aos {int(s0)}s.",
+                "start_time": round(s0, 2),
+                "end_time": round(s1, 2),
+                "score": min(99, int(round(float(pk.get("value", 0.8)) * 100))),
+                "virality_reason": f"Momento mais revisto (pico {int(float(pk.get('value', 0.8))*100)}%) no video original.",
+                "cta_line": niche.cta_suggestion,
+            })
+            if len(candidates) >= num_clips * 2:
+                break
+
+    # If no heatmap or not enough clips, distribute across anime dramatic arc (avoiding 90s intro/outro)
+    if len(candidates) < num_clips:
+        start_bound = 90.0 if dur >= 300.0 else (15.0 if dur >= 60.0 else 0.0)
+        end_bound = max(start_bound + target_dur, dur - (90.0 if dur >= 420.0 else 10.0))
+        usable_span = max(target_dur, end_bound - start_bound)
+
+        climax_hooks = [
+            "MOMENTO EPICO",
+            "A GRANDE REVELACAO",
+            "PODER MAXIMO",
+            "LUTA INCRIVEL",
+            "NINGUEM ESPERAVA",
+            "O CLIMAX DO EPISODIO",
+            "CENA IMPACTANTE",
+            "GOLPE DECISIVO",
+        ]
+
+        step = usable_span / max(1, num_clips + 1)
+        for i in range(1, num_clips + 1):
+            center = start_bound + (i * step)
+            s0 = max(start_bound, center - (target_dur / 2.0))
+            s1 = min(dur, s0 + target_dur)
+            s0 = max(0.0, s1 - target_dur)
+            hook = climax_hooks[(i - 1) % len(climax_hooks)]
+            candidates.append({
+                "title": "",
+                "hook_title": hook,
+                "clip_summary": f"Corte do arco #{i} preservando audio original dos dubladores e trilha nativa.",
+                "start_time": round(s0, 2),
+                "end_time": round(s1, 2),
+                "score": 85 + (i * 3),
+                "virality_reason": f"Arco de tensao cinematografica #{i} com audio nativo dos dubladores.",
+                "cta_line": niche.cta_suggestion,
+            })
+
+    picked = dedupe_highlights(candidates)[:num_clips]
+    for idx, clip in enumerate(picked, start=1):
+        clip["title"] = _build_clip_title(source_title, clip["hook_title"], idx, niche)
+    return picked
+
+
 def score_segments_offline(
     transcript: Dict,
     platform: PlatformPreset,
@@ -694,7 +787,14 @@ def score_segments_offline(
     """Zero-cost heuristic + YouTube Most-Replayed heatmap clipper when no LLM is used."""
     segments = transcript.get("segments", [])
     if not segments:
-        return []
+        return generate_action_climax_highlights(
+            duration=float(transcript.get("duration", 0.0)),
+            platform=platform,
+            niche=niche,
+            num_clips=num_clips,
+            source_title=source_title,
+            heatmap=heatmap,
+        )
 
     hard_cap = 57.0 if platform.name in {"youtube_shorts", "instagram_reels"} else float(platform.max_duration)
     target_dur = (platform.min_duration + platform.max_duration) / 2.0
@@ -833,7 +933,14 @@ def detect_highlights(
     duration = float(transcript.get("duration", 0.0))
 
     if not segments:
-        return []
+        return generate_action_climax_highlights(
+            duration=duration,
+            platform=platform,
+            niche=niche,
+            num_clips=num_clips,
+            source_title=source_title,
+            heatmap=heatmap,
+        )
 
     has_api = bool(
         llm_fn
@@ -882,8 +989,16 @@ def detect_highlights(
 
     deduped = dedupe_highlights(all_candidates)
     if not deduped:
-        return score_segments_offline(
+        off = score_segments_offline(
             transcript, platform, niche, num_clips, source_title=source_title, heatmap=heatmap
+        )
+        return off or generate_action_climax_highlights(
+            duration=duration,
+            platform=platform,
+            niche=niche,
+            num_clips=num_clips,
+            source_title=source_title,
+            heatmap=heatmap,
         )
     for clip in deduped:
         if not clip.get("clip_summary"):
