@@ -204,12 +204,14 @@ __INLINE_CSS__
               </div>
               <div class="grid" style="margin-top:12px;">
                 <div>
-                  <label for="cut-source">Origem do Vídeo (YouTube, Google Drive 5TB ou Local)</label>
-                  <div style="display:flex;gap:8px;">
-                    <input id="cut-source" name="source" type="text" placeholder="https://youtube.com/watch?v=... ou gdrive:Animes_Para_Cortar/ep01.mp4" style="flex:1;" />
+                  <label for="cut-source">Origem do Vídeo (YouTube, Google Drive 5TB, Episódio Completo ou Local)</label>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <input id="cut-source" name="source" type="text" placeholder="https://... ou gdrive:Animes_Para_Cortar/ep01.mp4" style="flex:1;min-width:200px;" />
                     <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" title="Ver animes do seu Google Drive 5TB">📁 Drive 5TB</button>
+                    <button type="button" class="btn btn-primary" id="btn-search-full-episodes" title="Buscar episódios inteiros dublados no Archive.org e na web">🎬 Buscar Episódios Dublados</button>
                   </div>
                   <div id="gdrive-episodes-picker" style="margin-top:8px;padding:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;font-size:12px;" hidden></div>
+                  <div id="anime-search-picker" style="margin-top:8px;padding:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;font-size:12px;" hidden></div>
                   <div class="hint" style="color:var(--text-muted);font-size:12px;margin-top:4px;">✨ <b>Áudio Oficial:</b> Cortes de animes preservam 100% o áudio nativo dos dubladores (Briggs, Wendel, etc.) sem voz de robô, com loudnorm -14 LUFS e legendas dinâmicas.</div>
                 </div>
                 <div>

@@ -839,6 +839,20 @@ def make_handler(out_dir: Path):
                 self._send_json(200, build_system_diagnostics(out_dir))
                 return
 
+            if parsed.path == "/api/animes/search":
+                qs = urllib.parse.parse_qs(parsed.query)
+                q = (qs.get("q") or [""])[0].strip()
+                if not q:
+                    self._send_json(400, {"message": "Informe o nome do anime para busca (ex: ?q=naruto)"})
+                    return
+                from .anime_archive_downloader import search_all_anime_sources
+                try:
+                    res = search_all_anime_sources(q)
+                    self._send_json(200, {"ok": True, "query": q, "count": len(res), "episodes": res})
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "message": str(exc)})
+                return
+
             if parsed.path == "/v1/models":
                 caps = detect_android_llm_capabilities()
                 self._send_json(200, {

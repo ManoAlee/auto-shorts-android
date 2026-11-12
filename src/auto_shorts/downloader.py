@@ -221,6 +221,17 @@ def download_video_and_subs(
         except Exception:
             pass
 
+    # Fallback 3: direct streaming download for Archive.org and direct media links
+    if video_path is None and (url.startswith("http://") or url.startswith("https://")):
+        try:
+            from .anime_archive_downloader import download_episode_direct
+            out_mp4 = work_dir / "source.mp4"
+            download_episode_direct(url, out_mp4)
+            if out_mp4.is_file() and out_mp4.stat().st_size > 500000:
+                video_path = out_mp4
+        except Exception:
+            pass
+
     if video_path is None:
         raise FileNotFoundError(f"yt-dlp completed with code {proc.returncode} but no video file found in {work_dir}")
 

@@ -725,6 +725,64 @@
     });
   }
 
+  const btnSearchFullEpisodes = document.getElementById('btn-search-full-episodes');
+  const animeSearchPicker = document.getElementById('anime-search-picker');
+  if (btnSearchFullEpisodes && animeSearchPicker) {
+    btnSearchFullEpisodes.addEventListener('click', async () => {
+      if (!animeSearchPicker.hidden) {
+        animeSearchPicker.hidden = true;
+        return;
+      }
+      const initialQuery = (cutSourceEl && cutSourceEl.value.trim().length > 2 && !cutSourceEl.value.includes('http')) 
+        ? cutSourceEl.value.trim() 
+        : 'Yu Yu Hakusho';
+      const userQ = prompt('Qual anime ou episódio dublado você deseja buscar na web?', initialQuery);
+      if (!userQ || !userQ.trim()) return;
+
+      animeSearchPicker.hidden = false;
+      animeSearchPicker.innerHTML = `<div style="color:var(--text-muted);"><span class="spinner"></span> Pesquisando episódios dublados de "${userQ}" no Archive.org e catálogos BR...</div>`;
+      try {
+        const res = await fetch('/api/animes/search?q=' + encodeURIComponent(userQ.trim()));
+        const data = await res.json();
+        if (!data.ok || !data.episodes || data.episodes.length === 0) {
+          animeSearchPicker.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <b>🎬 Nenhum episódio encontrado para "${userQ}"</b>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('anime-search-picker').hidden=true">Fechar</button>
+            </div>
+            <p style="margin:8px 0 0;color:var(--text-muted);">Tente buscar termos clássicos como: <i>Dragon Ball Z</i>, <i>Naruto</i>, <i>Yu Yu Hakusho</i>, <i>Death Note</i> ou <i>Cavaleiros do Zodíaco</i>.</p>
+          `;
+          return;
+        }
+        let listHtml = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b>🎬 Episódios Completos Encontrados (${data.count}):</b>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('anime-search-picker').hidden=true">Fechar</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">
+        `;
+        data.episodes.forEach(ep => {
+          const epTitle = ep.title || ep.filename || 'Episódio';
+          const epUrl = ep.url || ep.details_url;
+          const epSize = ep.size_mb ? `${ep.size_mb} MB` : (ep.source || 'Archive');
+          listHtml += `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,0.05);border-radius:6px;gap:8px;">
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">
+                <strong style="color:#f8fafc;font-size:12px;">${epTitle}</strong>
+                <span style="font-size:11px;color:#94a3b8;margin-left:6px;">(${epSize})</span>
+              </div>
+              <button type="button" class="btn btn-sm btn-primary" onclick="cutSourceEl.value='${epUrl}';document.getElementById('cut-niche').value='entretenimento_animes';document.getElementById('anime-search-picker').hidden=true;showToast('Episódio selecionado! Pronto para fatiar.','ok');">Selecionar</button>
+            </div>
+          `;
+        });
+        listHtml += '</div>';
+        animeSearchPicker.innerHTML = listHtml;
+      } catch (err) {
+        animeSearchPicker.innerHTML = `<span style="color:var(--err-color);">Erro na busca: ${err.message}</span>`;
+      }
+    });
+  }
+
   const btnSentinelPull = document.getElementById('btn-sentinel-pull');
   const btnSentinelScan = document.getElementById('btn-sentinel-scan');
   const btnSentinelToggle = document.getElementById('btn-sentinel-toggle');
