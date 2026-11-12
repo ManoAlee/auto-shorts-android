@@ -1055,6 +1055,7 @@ def _build_multiscene_broll(
     work_dir: Path,
     width: int = 720,
     height: int = 1280,
+    niche: Optional[str] = None,
 ) -> Tuple[Path, str]:
     """Assemble dynamic ~4.2s visual scene switches across distinct bright clips (MoneyPrinterTurbo style)."""
     try:
