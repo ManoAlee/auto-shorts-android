@@ -2124,6 +2124,31 @@ def test_action_climax_highlights_for_full_anime_episodes():
     assert cuts[1]["start_time"] != cuts[2]["start_time"]
 
 
+def test_drive_sentinel_lifecycle_and_telemetry(tmp_path):
+    """Verify DriveSentinel engine lifecycle, background state transitions, and telemetry contract."""
+    from auto_shorts.sentinel import DriveSentinelEngine
+
+    sentinel = DriveSentinelEngine(out_dir=tmp_path, poll_interval_sec=30, num_clips_per_episode=3)
+    tel = sentinel.get_telemetry()
+    assert tel["enabled"] is True
+    assert tel["poll_interval_sec"] == 30
+    assert tel["num_clips_per_episode"] == 3
+    assert "last_action" in tel
+
+    # Test scan_now non-blocking trigger
+    scan_res = sentinel.scan_now()
+    assert scan_res["status"] == "scanning_triggered"
+
+    # Test stop and start
+    sentinel.stop()
+    assert sentinel.get_telemetry()["enabled"] is False
+
+    sentinel.start()
+    assert sentinel.get_telemetry()["enabled"] is True
+    sentinel.stop()
+
+
+
 
 
 

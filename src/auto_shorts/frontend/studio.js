@@ -245,11 +245,46 @@
     _wasRunning = running;
   }
 
+  async function refreshSentinelStatus() {
+    const badgeEl = document.getElementById('sentinel-badge');
+    const descEl = document.getElementById('sentinel-desc');
+    const toggleBtn = document.getElementById('btn-sentinel-toggle');
+    if (!badgeEl || !descEl) return;
+    try {
+      const res = await fetch('/api/sentinel/status');
+      const data = await res.json();
+      if (!data.enabled) {
+        badgeEl.textContent = '⏸️ PAUSADO';
+        badgeEl.style.background = 'rgba(239,68,68,0.2)';
+        badgeEl.style.color = '#f87171';
+        badgeEl.style.borderColor = 'rgba(239,68,68,0.4)';
+        if (toggleBtn) toggleBtn.textContent = '▶️ Retomar';
+        descEl.textContent = 'Sentinela pausado. Clique em Retomar para reativar o monitoramento contínuo do Drive 5TB.';
+        return;
+      }
+      if (toggleBtn) toggleBtn.textContent = '⏸️ Pausar';
+      if (data.mode === 'processing_episode') {
+        badgeEl.innerHTML = '<span class="spinner" style="width:10px;height:10px;margin-right:4px;"></span>FATIANDO: ' + (data.active_episode || 'Anime');
+        badgeEl.style.background = 'rgba(234,179,8,0.2)';
+        badgeEl.style.color = '#facc15';
+        badgeEl.style.borderColor = 'rgba(234,179,8,0.4)';
+        descEl.textContent = data.current_task || 'Processando clímax épicos do anime e preservando vozes originais...';
+      } else {
+        badgeEl.textContent = '🟢 ATIVO & VIGIANDO';
+        badgeEl.style.background = 'rgba(34,197,94,0.2)';
+        badgeEl.style.color = '#4ade80';
+        badgeEl.style.borderColor = 'rgba(34,197,94,0.4)';
+        descEl.textContent = (data.last_action || 'Monitorando pasta gdrive:Animes_Para_Cortar a cada 45s.') + ' (Processados: ' + (data.episodes_processed_count || 0) + ')';
+      }
+    } catch (e) {}
+  }
+
   async function refreshStatus() {
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
       updateRenderStepper(data);
+      refreshSentinelStatus();
       const nextMs = data.running ? 1400 : 5000;
       clearTimeout(_pollTimer);
       _pollTimer = setTimeout(refreshStatus, nextMs);
@@ -681,6 +716,25 @@
       } catch (err) {
         gdrivePicker.innerHTML = `<span style="color:var(--err-color);">Erro ao consultar Drive: ${err.message}</span>`;
       }
+    });
+  }
+
+  const btnSentinelScan = document.getElementById('btn-sentinel-scan');
+  const btnSentinelToggle = document.getElementById('btn-sentinel-toggle');
+  if (btnSentinelScan) {
+    btnSentinelScan.addEventListener('click', () => withBusyBtn(btnSentinelScan, 'Checando...', async () => {
+      const res = await fetch('/api/sentinel/scan-now', { method: 'POST' });
+      const d = await res.json();
+      showToast(d.message || 'Varredura disparada no Drive!', 'ok');
+      refreshSentinelStatus();
+    }));
+  }
+  if (btnSentinelToggle) {
+    btnSentinelToggle.addEventListener('click', async () => {
+      const res = await fetch('/api/sentinel/toggle', { method: 'POST' });
+      const d = await res.json();
+      showToast(d.enabled ? 'Sentinela Ativado!' : 'Sentinela Pausado!', 'ok');
+      refreshSentinelStatus();
     });
   }
 

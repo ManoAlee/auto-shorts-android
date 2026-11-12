@@ -115,6 +115,7 @@ def _is_safe_public_http_url(url: str) -> bool:
 
 
 _JOB_LOCK = threading.RLock()
+_DRIVE_SENTINEL = None
 _JOB_STATE: Dict = {
     "running": False,
     "last_status": "Pronto para operar",
@@ -993,6 +994,13 @@ def make_handler(out_dir: Path):
                     self._send_json(200, {"configured": False, "error": str(exc)})
                 return
 
+            if parsed.path == "/api/sentinel/status":
+                if _DRIVE_SENTINEL:
+                    self._send_json(200, _DRIVE_SENTINEL.get_telemetry())
+                else:
+                    self._send_json(200, {"enabled": False, "running": False, "mode": "uninitialized"})
+                return
+
             if parsed.path == "/api/world-news":
                 try:
                     headlines = fetch_world_news_headlines(topic="world", limit=12)
@@ -1152,6 +1160,13 @@ def make_handler(out_dir: Path):
                     self._send_json(200, info)
                 except Exception as exc:
                     self._send_json(200, {"configured": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/sentinel/status":
+                if _DRIVE_SENTINEL:
+                    self._send_json(200, _DRIVE_SENTINEL.get_telemetry())
+                else:
+                    self._send_json(200, {"enabled": False, "running": False, "mode": "uninitialized"})
                 return
 
             if parsed.path == "/api/world-news":
@@ -1679,6 +1694,25 @@ def make_handler(out_dir: Path):
                 self._send_json(200, {"deleted": fname})
                 return
 
+            if parsed.path == "/api/sentinel/toggle":
+                if _DRIVE_SENTINEL:
+                    if _DRIVE_SENTINEL.is_active():
+                        _DRIVE_SENTINEL.stop()
+                    else:
+                        _DRIVE_SENTINEL.start()
+                    self._send_json(200, _DRIVE_SENTINEL.get_telemetry())
+                else:
+                    self._send_json(200, {"enabled": False, "running": False})
+                return
+
+            if parsed.path == "/api/sentinel/scan-now":
+                if _DRIVE_SENTINEL:
+                    res = _DRIVE_SENTINEL.scan_now()
+                    self._send_json(200, {"message": "Varredura do Drive disparada!", "data": res})
+                else:
+                    self._send_json(400, {"message": "Sentinela nao inicializado"})
+                return
+
             if parsed.path == "/api/run":
                 src_check = str(body.get("source") or "").strip()
                 from .downloader import is_rclone_target
@@ -1798,6 +1832,13 @@ def serve_webapp(host: str = "0.0.0.0", port: int = 8787, out_dir: str | Path = 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     _save_scheduler_cfg(out_path, _load_scheduler_cfg(out_path))
+    global _DRIVE_SENTINEL
+    try:
+        from .sentinel import DriveSentinelEngine
+        _DRIVE_SENTINEL = DriveSentinelEngine(out_path, poll_interval_sec=45)
+        _DRIVE_SENTINEL.start()
+    except Exception as exc:
+        print(f"[DriveSentinel] Falha ao iniciar daemon: {exc}", flush=True)
     threading.Thread(target=_autonomous_loop, args=(out_path,), daemon=True).start()
     threading.Thread(target=_prewarm_radar_cache, daemon=True).start()
     server = _StudioHTTPServer((host, port), make_handler(out_path))

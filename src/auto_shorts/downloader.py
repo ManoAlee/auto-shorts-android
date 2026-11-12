@@ -141,6 +141,18 @@ def list_gdrive_episodes(folder: str = "gdrive:Animes_Para_Cortar") -> List[str]
     return files
 
 
+def move_gdrive_episode(source_remote_path: str, dest_folder: str = "gdrive:Animes_Processados") -> bool:
+    """Move processed episode within Google Drive to processed folder without downloading bytes."""
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin or not str(source_remote_path).strip():
+        return False
+    fname = Path(source_remote_path).name
+    dest_path = f"{dest_folder.rstrip('/')}/{fname}"
+    cmd = [rclone_bin, "moveto", source_remote_path, dest_path]
+    proc = subprocess.run(cmd, check=False)
+    return proc.returncode == 0
+
+
 def download_video_and_subs(
     url: str,
     work_dir: Path,
