@@ -1909,6 +1909,72 @@
     else loadVideos();
   });
 
+  // Story Engine Modal Wire-up
+  const storyDlg = document.getElementById('story-dlg');
+  const btnOpenStory = document.getElementById('btn-open-story-modal');
+  const btnCloseStory = document.getElementById('story-dlg-close');
+  const storyForm = document.getElementById('story-form');
+
+  if (btnOpenStory && storyDlg) {
+    btnOpenStory.addEventListener('click', () => {
+      storyDlg.showModal();
+    });
+  }
+  if (btnCloseStory && storyDlg) {
+    btnCloseStory.addEventListener('click', () => {
+      storyDlg.close();
+    });
+  }
+  if (storyForm) {
+    storyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const prompt = document.getElementById('story-prompt').value.trim();
+      const genre = document.getElementById('story-genre').value;
+      const season = parseInt(document.getElementById('story-season').value || '1', 10);
+      if (!prompt) return;
+
+      const btnGen = document.getElementById('btn-generate-story');
+      withBusyBtn(btnGen, 'Roteirizando...', async () => {
+        try {
+          const resp = await fetch('/api/story/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, genre, season }),
+          });
+          const data = await resp.json();
+          if (!data.ok || !data.script) {
+            showToast(data.message || 'Erro ao gerar historia', 'err');
+            return;
+          }
+          const s = data.script;
+          document.getElementById('story-result-wrap').hidden = false;
+          document.getElementById('story-result-title').textContent = s.title;
+          const retBadge = document.getElementById('story-retention-badge');
+          const retScore = (s.retention_score || {}).overall_retention_score || 85;
+          retBadge.textContent = 'Retencao ' + retScore + '/100';
+
+          const castBox = document.getElementById('story-cast-box');
+          castBox.innerHTML = '<strong>Elenco:</strong> ' + s.characters.map(c => '<em>' + escapeHtml(c.name) + '</em> (' + escapeHtml(c.role) + ', voz ' + escapeHtml(c.voice_key) + ')').join(' • ');
+
+          const scenesList = document.getElementById('story-scenes-list');
+          scenesList.innerHTML = s.scenes.map(sc => `
+            <div style="background:rgba(255,255,255,0.03); border-left:3px solid var(--accent); padding:8px 12px; border-radius:4px;">
+              <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">
+                <span><strong>Cena ${sc.scene_id}</strong> [${escapeHtml(sc.act)}] • ${escapeHtml(sc.camera.shot_type)} / ${escapeHtml(sc.camera.movement)}</span>
+                <span>${sc.estimated_duration_sec}s</span>
+              </div>
+              <p style="margin:0 0 4px 0; font-size:0.92rem; color:var(--text-strong);">"${escapeHtml(sc.dialogue)}"</p>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">👁️ ${escapeHtml(sc.visual_description)}</div>
+            </div>
+          `).join('');
+          showToast('Roteiro cinematografico pronto!', 'ok');
+        } catch (err) {
+          showToast('Erro de conexao ao gerar historia: ' + err.message, 'err');
+        }
+      });
+    });
+  }
+
   syncWorkstationPreview();
   loadChannelTelemetry();
   loadScheduler();
