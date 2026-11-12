@@ -93,16 +93,27 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pm_alex",
         direction="Sintese StyleTTS 2 local PT-BR natural sem robotizacao.",
     ),
+    "dublador_anime": VoiceStyle(
+        key="dublador_anime",
+        label="Dublador Anime Studio — Voz Humana Dramática PT-BR (Blend Alex+Santa / Brian HD)",
+        voice="en-US-BrianMultilingualNeural",
+        rate="+4%",
+        pitch="+0Hz",
+        openai_voice="ash",
+        elevenlabs_voice="ErXwobaYiN019PkySvjV",
+        kokoro_voice="pm_alex",
+        direction="Interpretacao cinematografica de dublador de anime brasileiro, timbre encorpado e humano.",
+    ),
     "anime_hype": VoiceStyle(
         key="anime_hype",
-        label="Animes & Teorias — Thalita / Antonio PT-BR (Ritmo Dinamico)",
-        voice="pt-BR-AntonioNeural",
-        rate="+6%",
+        label="Animes & Teorias — Dublador Studio PT-BR (Kokoro Blend / Brian Multilingual HD)",
+        voice="en-US-BrianMultilingualNeural",
+        rate="+5%",
         pitch="+0Hz",
         openai_voice="echo",
         elevenlabs_voice="ErXwobaYiN019PkySvjV",
         kokoro_voice="pm_alex",
-        direction="Voz masculina brasileira animada e envolvente para teorias de anime.",
+        direction="Voz masculina brasileira animada e envolvente de dublador para teorias de anime.",
     ),
     "authority": VoiceStyle(
         key="authority",
@@ -635,17 +646,44 @@ def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool
 
         kokoro.sess = _SafeSess()
         _KOKORO_INSTANCES[cache_key] = kokoro
-    speed = 1.08 if "+" in style.rate else 1.0
-    chunks = _split_tts_chunks(text, max_chars=210)
+    base_speed = 1.05 if "+" in style.rate else 1.01
+    chunks = _split_tts_chunks(text, max_chars=185)
     audio_parts: List[object] = []
     sample_rate = 24000
+    voice_arg: object = style.kokoro_voice
+    if style.key in {"dublador_anime", "anime_hype", "narrador_pro", "authority", "storyteller"} and hasattr(kokoro, "get_voice_style"):
+        try:
+            v_alex = np.asarray(kokoro.get_voice_style("pm_alex"), dtype=np.float32)
+            v_santa = np.asarray(kokoro.get_voice_style("pm_santa"), dtype=np.float32)
+            weights = {
+                "dublador_anime": 0.72,
+                "anime_hype": 0.72,
+                "narrador_pro": 0.55,
+                "storyteller": 0.50,
+                "authority": 0.35,
+            }
+            w_alex = weights.get(style.key, 0.55)
+            voice_arg = (w_alex * v_alex + (1.0 - w_alex) * v_santa).astype(np.float32)
+        except Exception:
+            voice_arg = style.kokoro_voice
     for idx, chunk in enumerate(chunks):
-        part, sr = kokoro.create(chunk, voice=style.kokoro_voice, speed=speed, lang="pt-br")  # type: ignore[attr-defined]
+        c_str = chunk.strip()
+        if c_str.endswith(("!", "?")):
+            dyn_speed = min(1.12, base_speed * 1.04)
+        elif "..." in c_str or "—" in c_str:
+            dyn_speed = max(0.94, base_speed * 0.96)
+        else:
+            dyn_speed = base_speed
+        try:
+            part, sr = kokoro.create(chunk, voice=voice_arg, speed=dyn_speed, lang="pt-br")  # type: ignore[attr-defined]
+        except Exception:
+            part, sr = kokoro.create(chunk, voice=style.kokoro_voice, speed=base_speed, lang="pt-br")  # type: ignore[attr-defined]
         sample_rate = int(sr)
         if len(part) > 0:
             audio_parts.append(np.asarray(part, dtype=np.float32))
             if idx < len(chunks) - 1:
-                audio_parts.append(np.zeros(int(sample_rate * 0.16), dtype=np.float32))
+                pause_sec = 0.22 if c_str.endswith(("...", "?", "!")) else 0.14
+                audio_parts.append(np.zeros(int(sample_rate * pause_sec), dtype=np.float32))
     if not audio_parts:
         return False
     samples = np.concatenate(audio_parts)
@@ -842,7 +880,7 @@ def synthesize_narration(
         )
         _trim_tts_dead_air(out_mp3)
 
-    srt_content = _word_events_to_srt(word_events, max_words=3) if (word_events and synthesized_external) else ""
+    srt_content = _word_events_to_srt(word_events, max_words=3) if (word_events and not synthesized_external) else ""
     if not srt_content.strip():
         audio_dur = _probe_media_duration(out_mp3, fallback_words=len(base_text.split()))
         srt_content = _build_weighted_srt(base_text, audio_dur, max_words=3)
@@ -1090,6 +1128,7 @@ def build_narrated_short(
     humanize: bool = True,
     niche: str = "podcast",
     burn_hook: bool = True,
+    custom_title: str = "",
 ) -> Dict:
     """Create a vertical 9:16 narrated short with warm studio voice mastering, ASS captions, thumbnail, and validation."""
     out_path = Path(out_mp4)
@@ -1251,7 +1290,7 @@ def build_narrated_short(
 
     thumb_16x9 = out_path.with_name(f"{out_path.stem}_thumb_16x9.jpg")
     cover_9x16 = out_path.with_name(f"{out_path.stem}_cover_9x16.jpg")
-    title = _build_narrated_title(hook_title, script_text)
+    title = custom_title.strip()[:92] if custom_title and custom_title.strip() else _build_narrated_title(hook_title, script_text)
     badge = get_niche_badge(niche)
     thumb_ts = min(max(1.0, duration * 0.25), max(1.0, duration - 1.0))
     try:

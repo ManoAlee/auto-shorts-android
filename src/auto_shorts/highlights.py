@@ -351,6 +351,26 @@ def call_gemini_or_openai(prompt: str) -> str:
 
 
 _PROTECTED_PROPER_NOUNS: Tuple[str, ...] = (
+    "ChatGPT",
+    "OpenAI",
+    "DeepSeek",
+    "Claude",
+    "Gemini",
+    "Nvidia",
+    "SpaceX",
+    "James Webb",
+    "Starlink",
+    "Bitcoin",
+    "Ethereum",
+    "Wall Street",
+    "Nasdaq",
+    "Ibovespa",
+    "Selic",
+    "Flow Podcast",
+    "Podpah",
+    "Inteligência Ltda",
+    "PrimoCast",
+    "Os Sócios",
     "One Piece",
     "Jujutsu Kaisen",
     "Solo Leveling",
@@ -373,9 +393,17 @@ _PROTECTED_PROPER_NOUNS: Tuple[str, ...] = (
     "Boruto",
     "Gear 5",
     "Akuma no Mi",
+    "GTA 6",
 )
 
 _ASR_AND_TRANSLATION_HEAL_RULES: Tuple[Tuple[re.Pattern, str], ...] = (
+    (re.compile(r"\bxat\s*gpt\b|\bchat\s*g\s*p\s*t\b", re.IGNORECASE), "ChatGPT"),
+    (re.compile(r"\bopen\s*a\s*i\b|\bopen\s*ai\b", re.IGNORECASE), "OpenAI"),
+    (re.compile(r"\bdip\s*sik\b|\bdeep\s*seek\b", re.IGNORECASE), "DeepSeek"),
+    (re.compile(r"\bbit\s*c[óo]in\b|\bbit\s*coim\b", re.IGNORECASE), "Bitcoin"),
+    (re.compile(r"\btaixa\s+selic\b|\bselique\b", re.IGNORECASE), "Selic"),
+    (re.compile(r"\bibov[ée]spa\b", re.IGNORECASE), "Ibovespa"),
+    (re.compile(r"\bp[óo]d\s*p[áa]\b", re.IGNORECASE), "Podpah"),
     (re.compile(r"\buma\s+pe[çc]a\b", re.IGNORECASE), "One Piece"),
     (re.compile(r"\btrevo\s+negro\b", re.IGNORECASE), "Black Clover"),
     (re.compile(r"\bbruke\b|\bbruk\b", re.IGNORECASE), "Brook"),
@@ -521,8 +549,10 @@ _GENERIC_HOOK_BANNED = {
 }
 
 
-def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
+def _polish_hook_phrase(words: List[str] | str, max_chars: int = 28) -> str:
     """Format a crisp 2-5 word uppercase hook without greetings, artifacts, or dangling words."""
+    if isinstance(words, str):
+        words = words.split()
     weak_starts = {
         "dele", "dela", "disso", "nisso", "entao", "então", "tipo", "mano", "cara",
         "mas", "e", "aí", "ai", "afirma", "disse", "diz", "conta", "explica",

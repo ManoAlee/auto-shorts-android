@@ -2043,6 +2043,59 @@ def test_smart_autopublish_priority_and_cadence(tmp_path: Path, monkeypatch) -> 
     assert can_publish_channel(load_publish_ledger(tmp_path), "tiktok")[1] == "quota_cooldown"
 
 
+def test_universal_multi_niche_cinema_story_and_hook_safety(tmp_path):
+    from auto_shorts.highlights import _polish_hook_phrase, heal_proper_nouns_and_asr
+    from auto_shorts.story_engine import (
+        NarrativeContinuityStore,
+        StoryEngine,
+        detect_universal_genre_and_niche,
+    )
+
+    # 1. Word-safe hook polishing NEVER truncates mid-word like "O SEGREDO PROIBIDO SOBRE O S"
+    hook = _polish_hook_phrase("O Segredo Proibido de Brook e Imu em One Piece 1185", max_chars=34)
+    assert not hook.endswith(" O S")
+    assert not hook.endswith(" DE")
+    assert len(hook) <= 34
+
+    # 2. Universal multi-niche auto-detection routes Finance, AI, Psychology, Podcast & Anime accurately
+    assert detect_universal_genre_and_niche("Como a taxa Selic afeta seus investimentos em 2026")[1] == "financas"
+    assert detect_universal_genre_and_niche("Novos modelos de inteligência artificial rodando no celular")[1] == "ia_tech"
+    assert detect_universal_genre_and_niche("Como a dopamina e o sono controlam seu foco diário")[1] == "desenvolvimento_pessoal"
+    assert detect_universal_genre_and_niche("O segredo proibido de Brook e Imu em One Piece 1185")[1] == "entretenimento_animes"
+
+    # 3. StoryEngine produces non-repetitive, domain-specific scripts across all niches
+    store = NarrativeContinuityStore(tmp_path / "continuity.db")
+    engine = StoryEngine(continuity_store=store)
+
+    fin_script = engine.generate_story_script(
+        prompt="O segredo oculto sobre a Taxa Selic e os Juros Compostos",
+        genre="financas_negocios",
+        use_local_llm=False,
+    )
+    fin_text = " ".join(s.dialogue for s in fin_script.scenes)
+    assert "o segredo oculto sobre o segredo oculto" not in fin_text.lower()
+    assert "mercado" in fin_text.lower() or "patrimônio" in fin_text.lower() or "caixa" in fin_text.lower()
+
+    ai_script = engine.generate_story_script(
+        prompt="A verdade sobre Inteligência Artificial Offline no Android",
+        genre="ia_futuro_tech",
+        use_local_llm=False,
+    )
+    ai_text = " ".join(s.dialogue for s in ai_script.scenes)
+    assert "a verdade sobre a verdade sobre" not in ai_text.lower()
+    assert "algoritmo" in ai_text.lower() or "infraestrutura" in ai_text.lower()
+
+    # 4. Multi-niche ASR healer fixes Tech, Finance, Podcast, and Pop Culture proper nouns
+    healed = heal_proper_nouns_and_asr("No pód pá falaram de xat gpt, dip sik, taixa selic e uma peça com bruke")
+    assert "Podpah" in healed
+    assert "ChatGPT" in healed
+    assert "DeepSeek" in healed
+    assert "Selic" in healed
+    assert "One Piece" in healed
+    assert "Brook" in healed
+
+
+
 
 
 

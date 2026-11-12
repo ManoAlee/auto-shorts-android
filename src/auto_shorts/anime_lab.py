@@ -559,14 +559,15 @@ class MangaAnimeLab:
         out_dir: Path,
         prompt: str = "O Segredo Proibido de One Piece",
         genre: str = "dark_shonen",
-        voice_style: str = "anime_hype",
-        visual_mode: str = "MULTISCENE_BROLL",  # MULTISCENE_BROLL, TRI_LAYER, RTL_PAN
+        voice_style: str = "dublador_anime",
+        visual_mode: str = "TRI_LAYER",  # TRI_LAYER, RTL_PAN, MULTISCENE_BROLL
         image_url: str = "",
         hook_override: str = "",
         custom_script_text: str = "",
     ) -> Dict[str, Any]:
         """End-to-end Next-Gen Cinema Studio producer: StoryEngine + DirectorEngine + 2.5D/B-Roll + Voice + Vision QA."""
         import urllib.request
+        from .highlights import _polish_hook_phrase
         from .narrator import build_narrated_short
         from .story_engine import NarrativeContinuityStore, StoryEngine
 
@@ -584,7 +585,8 @@ class MangaAnimeLab:
         spoken_text = custom_script_text.strip() if custom_script_text.strip() else " ".join(
             sc.dialogue.strip() for sc in script_obj.scenes if sc.dialogue.strip()
         )
-        hook_text = (hook_override.strip() or script_obj.hook_sentence or prompt[:28]).upper()[:28]
+        raw_hook_candidate = hook_override.strip() or script_obj.title or script_obj.hook_sentence or prompt
+        hook_text = _polish_hook_phrase(raw_hook_candidate, max_chars=34)
 
         idx = 1
         while (out_dir / f"cinema_ep_{idx:02d}.mp4").exists():
@@ -594,7 +596,7 @@ class MangaAnimeLab:
         work_dir.mkdir(parents=True, exist_ok=True)
 
         bg_source: str | Path = "gameplay"
-        mode_upper = str(visual_mode or "MULTISCENE_BROLL").upper()
+        mode_upper = str(visual_mode or "TRI_LAYER").upper()
 
         if mode_upper in {"TRI_LAYER", "RTL_PAN"}:
             resolved_img: Optional[Path] = None
@@ -605,11 +607,16 @@ class MangaAnimeLab:
                     radar = get_releasing_anime_radar(limit=12)
                     p_low = prompt.lower()
                     matched = next(
-                        (it for it in radar if any(w in str(it.get("title") or "").lower() for w in p_low.split() if len(w) >= 4)),
+                        (it for it in radar if any(w in str(it.get("title") or "").lower() for w in p_low.split() if len(w) >= 3)),
                         radar[0] if radar else None,
                     )
                     if matched:
-                        target_url = str(matched.get("cover") or matched.get("banner") or "")
+                        target_url = str(
+                            matched.get("image_url")
+                            or matched.get("cover")
+                            or matched.get("banner")
+                            or ""
+                        )
                 except Exception:
                     target_url = ""
 
@@ -647,6 +654,7 @@ class MangaAnimeLab:
             layout="center_crop",
             humanize=True,
             niche="entretenimento_animes",
+            custom_title=script_obj.title,
         )
         return {
             "ok": True,
