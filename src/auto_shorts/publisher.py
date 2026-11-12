@@ -654,7 +654,8 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
 
     prev_cues = int((pack.get("validation") or {}).get("subtitle_cues") or 0)
     max_dur = 180.0 if "tiktok" in str(pack.get("platform") or platform).lower() else 60.0
-    validation = validate_generated_short(mp4, ass_path=ass_path, max_duration=max_dur)
+    val_kwargs = {"ass_path": ass_path, **({"max_duration": max_dur} if max_dur != 60.0 else {})}
+    validation = validate_generated_short(mp4, **val_kwargs)
     if prev_cues > 0 and int(validation.get("subtitle_cues") or 0) == 0:
         validation["subtitle_cues"] = prev_cues
         validation["subtitle_overlaps"] = int((pack.get("validation") or {}).get("subtitle_overlaps") or 0)

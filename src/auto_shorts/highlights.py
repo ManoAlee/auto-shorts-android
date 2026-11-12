@@ -8,7 +8,7 @@ import subprocess
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .config import NICHES, PLATFORMS, NicheProfile, PlatformPreset
 from .transcript import format_transcript_for_llm
@@ -71,7 +71,11 @@ def chunk_segments(segments: List[Dict], duration: float) -> List[List[Dict]]:
 
 def dedupe_highlights(highlights: List[Dict], overlap_ratio: float = 0.35) -> List[Dict]:
     """Keep highest-scoring clips while suppressing overlapping candidates."""
-    ranked = sorted(highlights, key=lambda h: int(h.get("score", 0)), reverse=True)
+    ranked = sorted(
+        highlights,
+        key=lambda h: (float(h.get("_raw_rank", h.get("score", 0))), int(h.get("score", 0))),
+        reverse=True,
+    )
     kept: List[Dict] = []
     for cand in ranked:
         cs, ce = float(cand["start_time"]), float(cand["end_time"])
@@ -346,13 +350,77 @@ def call_gemini_or_openai(prompt: str) -> str:
     raise RuntimeError("No OPENROUTER_API_KEY, GEMINI_API_KEY, or local llama-server configured.")
 
 
+_PROTECTED_PROPER_NOUNS: Tuple[str, ...] = (
+    "One Piece",
+    "Jujutsu Kaisen",
+    "Solo Leveling",
+    "Black Clover",
+    "Dragon Ball",
+    "Demon Slayer",
+    "Kimetsu no Yaiba",
+    "Shingeki no Kyojin",
+    "Attack on Titan",
+    "Hunter x Hunter",
+    "My Hero Academia",
+    "Boku no Hero",
+    "Chainsaw Man",
+    "Blue Lock",
+    "Dandadan",
+    "Sakamoto Days",
+    "Sousou no Frieren",
+    "Bleach",
+    "Naruto",
+    "Boruto",
+    "Gear 5",
+    "Akuma no Mi",
+)
+
+_ASR_AND_TRANSLATION_HEAL_RULES: Tuple[Tuple[re.Pattern, str], ...] = (
+    (re.compile(r"\buma\s+pe[çc]a\b", re.IGNORECASE), "One Piece"),
+    (re.compile(r"\btrevo\s+negro\b", re.IGNORECASE), "Black Clover"),
+    (re.compile(r"\bbruke\b|\bbruk\b", re.IGNORECASE), "Brook"),
+    (re.compile(r"\bluf+i\b", re.IGNORECASE), "Luffy"),
+    (re.compile(r"\bzouro\b", re.IGNORECASE), "Zoro"),
+    (re.compile(r"\bfach[íi]dico\b", re.IGNORECASE), "fatídico"),
+    (re.compile(r"\barpan[áa]lise\b|\bbora\s+pran[áa]lise\b", re.IGNORECASE), "bora pra análise"),
+    (re.compile(r"\bhak[íi]\b", re.IGNORECASE), "Haki"),
+    (re.compile(r"\bimu\s+sama\b", re.IGNORECASE), "Imu-sama"),
+)
+
+_INTRO_BOILERPLATE_PHRASES: Tuple[str, ...] = (
+    "salve galera",
+    "salve, salve",
+    "sem mais delongas",
+    "bora pra análise",
+    "bora pra analise",
+    "bora para a análise",
+    "deixa o like",
+    "deixe o seu like",
+    "se inscreve no canal",
+    "inscreva-se no canal",
+    "ativa o sininho",
+    "bem-vindos a mais um vídeo",
+    "no vídeo de hoje",
+)
+
+
+def heal_proper_nouns_and_asr(text: str) -> str:
+    """Restore anime/pop-culture proper nouns and repair Whisper-tiny PT-BR phonetic hallucinations."""
+    out = str(text or "")
+    if not out:
+        return ""
+    for pat, repl in _ASR_AND_TRANSLATION_HEAL_RULES:
+        out = pat.sub(repl, out)
+    return out
+
+
 def _clean_source_title(raw_title: str) -> str:
-    cleaned = html_unescape = (raw_title or "").replace("&gt;", ">").replace("&quot;", '"')
+    cleaned = (raw_title or "").replace("&gt;", ">").replace("&quot;", '"')
     cleaned = re.sub(r"\[[^\]]*\]", "", cleaned)
     cleaned = re.sub(r"[>»]{1,3}", " ", cleaned)
     cleaned = re.sub(r"!{2,}", "!", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:\"'“”")
-    return cleaned
+    return heal_proper_nouns_and_asr(cleaned)
 
 
 def _build_clip_summary(texts: List[str], max_chars: int = 340) -> str:
@@ -360,7 +428,7 @@ def _build_clip_summary(texts: List[str], max_chars: int = 340) -> str:
     seen = set()
     ordered: List[str] = []
     for raw in texts:
-        line = " ".join(str(raw).split()).strip()
+        line = heal_proper_nouns_and_asr(" ".join(str(raw).split()).strip())
         if not line or line.lower() in seen:
             continue
         seen.add(line.lower())
@@ -406,22 +474,51 @@ def _looks_english_title(title: str) -> bool:
 
 
 def _translate_title_to_ptbr(title: str) -> str:
-    """Translate auto-translated/English source titles back into clean PT-BR without network failure crash."""
+    """Translate auto-translated/English source titles back into clean PT-BR while protecting proper nouns."""
     clean = _clean_source_title(title)
     if not clean or not _looks_english_title(clean):
         return clean
     try:
-        q = urllib.parse.quote(clean[:180])
+        protected_map: Dict[str, str] = {}
+        masked = clean
+        for idx, pn in enumerate(_PROTECTED_PROPER_NOUNS):
+            pat = re.compile(re.escape(pn), re.IGNORECASE)
+            if pat.search(masked):
+                token = f"ZXPN{idx}ZX"
+                protected_map[token] = pn
+                masked = pat.sub(token, masked)
+        q = urllib.parse.quote(masked[:180])
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q={q}"
         req = urllib.request.Request(url, headers={"User-Agent": "AutoShorts/2.0"})
         with urllib.request.urlopen(req, timeout=3.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         translated = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0]).strip()
+        for token, orig_pn in protected_map.items():
+            translated = re.sub(re.escape(token), orig_pn, translated, flags=re.IGNORECASE)
         if translated and len(translated) >= 6:
             return _clean_source_title(translated)
     except Exception:
         pass
     return ""
+
+
+_GENERIC_HOOK_BANNED = {
+    "finalmente vemos",
+    "entao vemos",
+    "então vemos",
+    "vamos ver",
+    "olha so",
+    "olha só",
+    "bora pra",
+    "nesse video",
+    "nesse vídeo",
+    "como voces",
+    "como vocês",
+    "a gente ve",
+    "a gente vê",
+    "sem mais delongas",
+    "salve galera",
+}
 
 
 def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
@@ -431,8 +528,8 @@ def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
         "mas", "e", "aí", "ai", "afirma", "disse", "diz", "conta", "explica",
         "usou", "fez", "teve", "foi", "era", "esta", "está", "falou", "fala",
         "porque", "que", "se", "o", "a", "os", "as", "um", "uma", "no", "na",
-        "salve", "ola", "olá", "fala", "agora", "então", "bem", "já", "ja", "tá", "ta",
-        "eu", "ele", "ela", "isso", "isto",
+        "salve", "ola", "olá", "fala", "agora", "bem", "já", "ja", "tá", "ta",
+        "eu", "ele", "ela", "isso", "isto", "finalmente", "vemos", "vamos",
     }
     dangling_ends = {
         "a", "o", "as", "os", "um", "uma", "de", "da", "do", "das", "dos",
@@ -440,12 +537,13 @@ def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
         "melhor", "pior", "consegue", "nao", "não", "vai", "tem", "sao", "são", "muito",
         "hip", "toda", "todo", "alguns", "algumas", "grande", "essa", "esse", "ainda",
         "bem", "fala", "autoshorts", "foi", "era", "tá", "ta", "está", "gente", "coisa",
+        "vemos", "ver", "disse", "falou",
     }
     cleaned_words: List[str] = []
     for raw_w in words:
         w = re.sub(r'^[>"\'“”»]+|[<"\'“”«]+$', "", str(raw_w or "")).strip()
         if w:
-            cleaned_words.append(w)
+            cleaned_words.append(heal_proper_nouns_and_asr(w))
     trimmed = list(cleaned_words)
     while len(trimmed) > 2 and trimmed[0].lower().strip(",.:;!?") in weak_starts:
         trimmed.pop(0)
@@ -458,35 +556,42 @@ def _polish_hook_phrase(words: List[str], max_chars: int = 28) -> str:
     while len(chosen) > 2 and chosen[-1].lower().strip(",.:;!?") in dangling_ends:
         chosen.pop()
     while chosen and chosen[-1].lower().strip(",.:;!?") in dangling_ends and len(chosen) >= 2:
-        # Avoid leaving copulas/articles trailing even on 2-word hooks ("SENADO FOI")
         if len([w for w in chosen[:-1] if len(w.strip(",.:;!?")) >= 4]) >= 1:
             chosen.pop()
         else:
             break
-    return " ".join(chosen).upper().strip(" ,;:-.\"'")
+    out = " ".join(chosen).upper().strip(" ,;:-.\"'")
+    if out.lower() in _GENERIC_HOOK_BANNED:
+        return ""
+    return out
 
 
 def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) -> str:
-    """Choose a clean, high-signal 2-5 word hook instead of raw ASR opener or dangling clause."""
-    filler = {"eh", "ah", "entao", "então", "tipo", "mano", "cara", "bom", "galera", "ola", "oi", "la", "lá", "sei", "aí", "ai", "salve"}
+    """Choose a clean, high-signal 2-5 word hook with concrete subjects instead of raw ASR filler."""
+    filler = {
+        "eh", "ah", "entao", "então", "tipo", "mano", "cara", "bom", "galera",
+        "ola", "oi", "la", "lá", "sei", "aí", "ai", "salve", "delongas", "inscreve", "like",
+    }
     best_line = ""
     best_score = -1
 
-    for idx, raw in enumerate(texts[:10]):
-        if "salve, salve" in str(raw).lower() or str(raw).lstrip().startswith((">>", '"')):
+    for idx, raw in enumerate(texts[:12]):
+        healed_raw = heal_proper_nouns_and_asr(str(raw))
+        raw_low = healed_raw.lower()
+        if any(bp in raw_low for bp in _INTRO_BOILERPLATE_PHRASES) or healed_raw.lstrip().startswith((">>", '"')):
             continue
-        words = [w for w in str(raw).split() if (len(w) > 1 or w.lower() in {"e", "a", "o"}) and not w.isdigit()]
+        words = [w for w in healed_raw.split() if (len(w) > 1 or w.lower() in {"e", "a", "o"}) and not w.isdigit()]
         if len(words) < 3:
             continue
         lowered = " ".join(words).lower()
         score = sum(3 for kw in niche.hook_keywords if kw in lowered)
-        score += 2 if ("?" in raw or "!" in raw) else 0
-        score -= sum(3 for w in words if w.lower().strip(",.?!") in filler)
+        score += 2 if ("?" in healed_raw or "!" in healed_raw) else 0
+        score -= sum(4 for w in words if w.lower().strip(",.?!") in filler)
         score += max(0, 3 - idx)
         if score > best_score:
             cand = _polish_hook_phrase(words)
             strong_tokens = [w for w in cand.split() if len(w.strip(",.:;!?")) >= 4]
-            if len(cand.split()) >= 2 and len(strong_tokens) >= 2:
+            if cand and len(cand.split()) >= 2 and len(strong_tokens) >= 2:
                 best_score = score
                 best_line = cand
 
@@ -496,7 +601,7 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
     pt_src = _translate_title_to_ptbr(source_title)
     if pt_src:
         cand = _polish_hook_phrase(pt_src.split())
-        if len(cand.split()) >= 2:
+        if cand and len(cand.split()) >= 2:
             return cand
     return "PRESTA ATENCAO NISSO"
 
@@ -547,6 +652,7 @@ def score_segments_offline(
 
     hard_cap = 57.0 if platform.name in {"youtube_shorts", "instagram_reels"} else float(platform.max_duration)
     target_dur = (platform.min_duration + platform.max_duration) / 2.0
+    total_video_dur = max(float(transcript.get("duration") or 0.0), float(segments[-1].get("end", 0.0)))
     candidates: List[Dict] = []
 
     for i, first in enumerate(segments):
@@ -580,10 +686,10 @@ def score_segments_offline(
         if dur <= 5.0:
             continue
 
-        joined = " ".join(texts)
+        joined = heal_proper_nouns_and_asr(" ".join(texts))
         lowered = joined.lower()
         keyword_hits = sum(1 for kw in niche.hook_keywords if kw in lowered)
-        first_lower = texts[0].lower()
+        first_lower = heal_proper_nouns_and_asr(texts[0]).lower()
         first_line_bonus = 15 if any(kw in first_lower for kw in niche.hook_keywords) else 0
         # Reward clips whose opening line mentions a key subject word from the video's title
         title_words = {
@@ -593,17 +699,41 @@ def score_segments_offline(
         }
         topic_opener_bonus = 10 if any(tw in first_lower for tw in title_words) else 0
         opener_energy_bonus = 6 if ("!" in texts[0] or "?" in texts[0]) else 0
-        punctuation_hits = joined.count("?") * 6 + joined.count("!") * 4
+        punctuation_hits = min(36, joined.count("?") * 6 + joined.count("!") * 4)
         closure_bonus = 12 if texts[-1].strip().endswith("?") else (10 if _ends_complete_sentence(texts[-1]) else 0)
         words_per_sec = len(joined.split()) / max(1.0, dur)
         pace_score = min(25, int(words_per_sec * 8))
         heat_peak = _heatmap_peak_for_window(heatmap, start, end)
-        heat_bonus = int(round(heat_peak * 22)) if heat_peak >= 0.45 else 0
+        heat_bonus = int(round(heat_peak * 28)) if heat_peak >= 0.40 else 0
 
-        raw_score = min(
-            99,
-            38 + keyword_hits * 8 + first_line_bonus + topic_opener_bonus + opener_energy_bonus + punctuation_hits + closure_bonus + pace_score + heat_bonus,
+        # Anti-Intro & Climax Arc Discipline: avoid 0.0s YouTuber greeting intros on full-length videos
+        intro_penalty = 0
+        if total_video_dur >= 150.0 and start < 25.0:
+            intro_penalty += 38
+        if any(bp in lowered[:220] for bp in _INTRO_BOILERPLATE_PHRASES):
+            intro_penalty += 32
+
+        climax_bonus = 0
+        if total_video_dur >= 120.0:
+            rel_pos = start / max(1.0, total_video_dur)
+            if 0.12 <= rel_pos <= 0.85:
+                climax_bonus = 14
+
+        unclamped_rank = (
+            38.0
+            + keyword_hits * 8.0
+            + first_line_bonus
+            + topic_opener_bonus
+            + opener_energy_bonus
+            + punctuation_hits
+            + closure_bonus
+            + pace_score
+            + heat_bonus
+            + climax_bonus
+            - intro_penalty
+            + (heat_peak * 5.0)
         )
+        raw_score = max(40, min(99, int(round(unclamped_rank))))
         hook = _pick_best_hook(texts, source_title, niche)
         heat_note = f", Most Replayed {int(heat_peak * 100)}%" if heat_bonus > 0 else ""
         candidates.append({
@@ -613,6 +743,7 @@ def score_segments_offline(
             "start_time": round(start, 2),
             "end_time": round(min(end, start + platform.max_duration), 2),
             "score": raw_score,
+            "_raw_rank": round(unclamped_rank, 3),
             "virality_reason": f"Heuristica offline: {keyword_hits} gatilhos de nicho, ritmo {words_per_sec:.1f} pal/s{heat_note}.",
             "cta_line": niche.cta_suggestion,
         })

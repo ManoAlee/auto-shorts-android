@@ -197,11 +197,13 @@ __INLINE_CSS__
               </div>
               <div class="actions">
                 <button type="submit" class="btn btn-primary" id="btn-run-cut">Gerar Short Agora</button>
-                <button type="button" class="btn btn-tiktok" id="btn-open-story-modal">🎬 Nova Historia IA</button>
+                <button type="button" class="btn btn-secondary" id="btn-scan-climax">🎯 Escanear Climax (Opus AI)</button>
+                <button type="button" class="btn btn-tiktok" id="btn-open-story-modal">🎬 Episodio 2.5D / Story IA</button>
                 <button type="button" class="btn btn-secondary" id="btn-horizon-radar">Atualizar Horizontes</button>
                 <button type="button" class="btn btn-secondary" id="btn-anime-radar">Radar Animes</button>
                 <button type="button" class="btn btn-secondary" id="btn-world-news">Noticias BR</button>
               </div>
+              <div id="clipper-candidates-box" class="item-grid" style="margin-top:14px;" hidden aria-live="polite"></div>
             </form>
           </div>
           <div class="preview-card" aria-label="Previa visual 9 por 16">
@@ -306,6 +308,21 @@ __INLINE_CSS__
         </form>
         <div id="brief-output" class="meta-pre" hidden></div>
         <div id="team-planner-grid" class="item-grid"></div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:22px 0 16px 0;" />
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="margin:0;">🎭 Biblia de Personagens &amp; Anime 2.5D Lab</h3>
+            <p class="panel-lead" style="margin:4px 0 0 0;">Identidade visual persistente (paleta, tracos, voz) + 8 tecnicas cinematograficas de anime/manga.</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-tiktok btn-sm" id="btn-equipe-open-story">🎬 Produzir Episodio 2.5D</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-characters">Recarregar Biblia</button>
+          </div>
+        </div>
+        <div id="characters-bible-grid" class="item-grid" style="margin-top:12px;">Carregando personagens...</div>
+        <h4 style="margin:18px 0 8px 0;">Catalogo Tecnico Anime &amp; Manga 2.5D (8 Movimentos)</h4>
+        <div id="anime-techniques-grid" class="item-grid">Carregando tecnicas 2.5D...</div>
       </section>
 
       <section id="panel-voz" role="tabpanel" aria-labelledby="tab-voz" class="panel" hidden>
@@ -518,16 +535,27 @@ __INLINE_CSS__
             <input id="story-season" name="season" type="number" min="1" max="10" value="1" />
           </div>
         </div>
-        <div style="margin-top:10px;">
-          <label for="story-prompt">Tema / Conflito Central do Episodio</label>
-          <input id="story-prompt" name="prompt" type="text" placeholder="Ex: O segredo proibido sobre os olhos carmesim..." required />
+        <div style="margin-top:10px;" class="grid">
+          <div>
+            <label for="story-prompt">Tema / Conflito Central do Episodio</label>
+            <input id="story-prompt" name="prompt" type="text" placeholder="Ex: O segredo proibido de Brook e Imu em One Piece 1185..." required />
+          </div>
+          <div>
+            <label for="story-visual-mode">Motor Visual 9:16 (Anime Lab 2.5D)</label>
+            <select id="story-visual-mode" name="visual_mode">
+              <option value="TRI_LAYER">2.5D Tri-Layer Parallax + Speed Lines (Anime/Manga)</option>
+              <option value="RTL_PAN">Pan Oriental Ken Burns (Direita p/ Esquerda)</option>
+              <option value="MULTISCENE_BROLL">Multi-Cena B-Roll Dinamico (4.2s Cuts)</option>
+            </select>
+          </div>
         </div>
         <div class="actions" style="margin-top:14px;">
-          <button type="submit" class="btn btn-tiktok" id="btn-generate-story">Gerar Roteiro Cinematografico</button>
+          <button type="submit" class="btn btn-secondary" id="btn-generate-story">1. Planejar Cenas &amp; Direcao</button>
+          <button type="button" class="btn btn-tiktok" id="btn-produce-cinema-ep">🚀 Produzir Episodio Completo (2.5D + Voz PT-BR)</button>
         </div>
       </form>
       <div id="story-result-wrap" hidden>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
           <h3 id="story-result-title" style="margin:0; font-size:1.1rem; color:var(--text-strong);"></h3>
           <span id="story-retention-badge" class="chip chip-tt">Retencao 89/100</span>
         </div>

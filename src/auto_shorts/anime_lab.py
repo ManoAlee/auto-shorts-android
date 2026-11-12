@@ -552,3 +552,108 @@ class MangaAnimeLab:
             "elapsed_sec": elapsed,
             "vtr_impact": "+25% Retenção Imersiva (Anime/Manga Lab)",
         }
+
+    @classmethod
+    def produce_cinematic_anime_story_short(
+        cls,
+        out_dir: Path,
+        prompt: str = "O Segredo Proibido de One Piece",
+        genre: str = "dark_shonen",
+        voice_style: str = "anime_hype",
+        visual_mode: str = "MULTISCENE_BROLL",  # MULTISCENE_BROLL, TRI_LAYER, RTL_PAN
+        image_url: str = "",
+        hook_override: str = "",
+        custom_script_text: str = "",
+    ) -> Dict[str, Any]:
+        """End-to-end Next-Gen Cinema Studio producer: StoryEngine + DirectorEngine + 2.5D/B-Roll + Voice + Vision QA."""
+        import urllib.request
+        from .narrator import build_narrated_short
+        from .story_engine import NarrativeContinuityStore, StoryEngine
+
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        c_store = NarrativeContinuityStore(out_dir / "narrative_continuity.db")
+        engine = StoryEngine(continuity_store=c_store)
+        script_obj = engine.generate_story_script(
+            prompt=prompt,
+            genre=genre,
+            season=1,
+            target_duration_sec=38.0,
+        )
+
+        spoken_text = custom_script_text.strip() if custom_script_text.strip() else " ".join(
+            sc.dialogue.strip() for sc in script_obj.scenes if sc.dialogue.strip()
+        )
+        hook_text = (hook_override.strip() or script_obj.hook_sentence or prompt[:28]).upper()[:28]
+
+        idx = 1
+        while (out_dir / f"cinema_ep_{idx:02d}.mp4").exists():
+            idx += 1
+        out_mp4 = out_dir / f"cinema_ep_{idx:02d}.mp4"
+        work_dir = out_dir / f"_narrate_{out_mp4.stem}"
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        bg_source: str | Path = "gameplay"
+        mode_upper = str(visual_mode or "MULTISCENE_BROLL").upper()
+
+        if mode_upper in {"TRI_LAYER", "RTL_PAN"}:
+            resolved_img: Optional[Path] = None
+            target_url = str(image_url or "").strip()
+            if not target_url:
+                try:
+                    from .anime_trends import get_releasing_anime_radar
+                    radar = get_releasing_anime_radar(limit=12)
+                    p_low = prompt.lower()
+                    matched = next(
+                        (it for it in radar if any(w in str(it.get("title") or "").lower() for w in p_low.split() if len(w) >= 4)),
+                        radar[0] if radar else None,
+                    )
+                    if matched:
+                        target_url = str(matched.get("cover") or matched.get("banner") or "")
+                except Exception:
+                    target_url = ""
+
+            if target_url.startswith(("http://", "https://")):
+                try:
+                    dl_img = work_dir / "_anime_key_visual.jpg"
+                    req = urllib.request.Request(target_url, headers={"User-Agent": "AutoShorts/2.0"})
+                    with urllib.request.urlopen(req, timeout=8.0) as resp:
+                        data = resp.read()
+                    if len(data) > 5000:
+                        dl_img.write_bytes(data)
+                        resolved_img = dl_img
+                except Exception:
+                    resolved_img = None
+
+            if resolved_img and resolved_img.is_file():
+                bg_25d = work_dir / "_bg_25d_loop.mp4"
+                r25 = cls.render_manga_panel_video(
+                    image_path=resolved_img,
+                    out_mp4=bg_25d,
+                    duration_sec=14.0,
+                    mode=mode_upper,
+                    add_speed_lines=True,
+                    quality="mobile",
+                )
+                if r25.get("ok") and bg_25d.is_file():
+                    bg_source = bg_25d
+
+        nar_res = build_narrated_short(
+            bg_video=bg_source,
+            script_text=spoken_text,
+            out_mp4=out_mp4,
+            hook_title=hook_text,
+            style_key=voice_style,
+            layout="center_crop",
+            humanize=True,
+            niche="entretenimento_animes",
+        )
+        return {
+            "ok": True,
+            "filename": out_mp4.name,
+            "output": str(out_mp4),
+            "script": script_obj.to_dict(),
+            "narration_result": nar_res,
+            "visual_audit": nar_res.get("visual_audit"),
+            "validation": nar_res.get("validation"),
+        }

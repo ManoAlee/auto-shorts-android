@@ -24,6 +24,7 @@ from typing import Dict, List, Optional
 from .anime_trends import get_releasing_anime_radar
 from .config import LOUDNORM_FILTER, METADATA_SCRUB, NICHES, PLATFORMS, load_dotenv_file
 from .evolution import EvolutionStore
+from .highlights import detect_highlights, heal_proper_nouns_and_asr
 from .gameplay import discover_dynamic_visual_queries, ensure_gameplay_library, fetch_gameplay_clip, list_gameplay_clips
 from .horizon_radar import _ptbr_headline, build_horizon_spoken_script, fetch_horizon_trends
 from .narrator import (
@@ -253,10 +254,12 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         items.append({
             "filename": mp4.name,
             "size_mb": round(mp4.stat().st_size / (1024 * 1024), 2),
-            "title": pack.get("title", mp4.name),
-            "hook_title": pack.get("hook_title", ""),
+            "title": heal_proper_nouns_and_asr(str(pack.get("title", mp4.name))),
+            "hook_title": heal_proper_nouns_and_asr(str(pack.get("hook_title", ""))),
+            "clip_summary": heal_proper_nouns_and_asr(str(pack.get("clip_summary") or pack.get("caption", "")[:220])),
+            "virality_reason": str(pack.get("virality_reason", "")),
             "hashtags": pack.get("hashtags", []),
-            "caption": pack.get("caption", ""),
+            "caption": heal_proper_nouns_and_asr(str(pack.get("caption", ""))),
             "thumb_16x9": thumb_16.name if thumb_16.is_file() else None,
             "validation": validation,
             "visual_audit": pack.get("visual_audit"),
@@ -1180,6 +1183,37 @@ def make_handler(out_dir: Path):
                     self._send_json(500, {"ok": False, "error": str(exc)})
                 return
 
+            if parsed.path == "/api/cinema/produce":
+                def cinema_worker():
+                    _set_job_progress(1, 5, "1/5 Story & Director Engine: criando roteiro e planos de camera...", 20)
+                    prompt_str = str(body.get("prompt") or "O Segredo Proibido de One Piece").strip()
+                    genre_str = str(body.get("genre") or "dark_shonen").strip()
+                    voice_str = str(body.get("voice_style") or "anime_hype").strip()
+                    vmode_str = str(body.get("visual_mode") or "TRI_LAYER").strip()
+                    img_url = str(body.get("image_url") or "").strip()
+                    hook_ov = str(body.get("hook_title") or "").strip()
+                    custom_sc = str(body.get("custom_script") or "").strip()
+                    _set_job_progress(3, 5, f"3/5 Renderizando {vmode_str} 2.5D + Voz Neural + Legendas ASS...", 62)
+                    res = MangaAnimeLab.produce_cinematic_anime_story_short(
+                        out_dir=out_dir,
+                        prompt=prompt_str,
+                        genre=genre_str,
+                        voice_style=voice_str,
+                        visual_mode=vmode_str,
+                        image_url=img_url,
+                        hook_override=hook_ov,
+                        custom_script_text=custom_sc,
+                    )
+                    _set_job_progress(5, 5, f"5/5 Episodio Cinema validado: {res.get('filename')}", 100)
+                    _JOB_STATE.update({
+                        "last_status": f"Episodio Cinema validado: {res.get('filename')}",
+                        "last_result": res,
+                    })
+
+                pos = _enqueue_job("Produzindo Episodio Next-Gen Cinema (Story + 2.5D + Voz + QA)...", cinema_worker)
+                self._send_json(202, {"ok": True, "message": f"Episodio Cinema adicionado na fila ({pos})!", "queued": pos})
+                return
+
             if parsed.path == "/api/validate":
                 target = _safe_child_path(out_dir, str(body.get("filename") or ""))
                 if not target or not target.is_file():
@@ -1265,6 +1299,64 @@ def make_handler(out_dir: Path):
                 res = inspect_youtube_innertube(str(body.get("url") or ""))
                 record_synapse_stage(out_dir, "innertube_inspect", (time.monotonic() - t0) * 1000.0, ok=bool(res.get("ok")))
                 self._send_json(200 if res.get("ok") else 400, res)
+                return
+
+            if parsed.path == "/api/clipper/candidates":
+                raw_url = str(body.get("url") or "").strip()
+                niche_k = str(body.get("niche") or "entretenimento_animes").strip()
+                plat_k = str(body.get("platform") or "youtube_shorts").strip()
+                it_info = inspect_youtube_innertube(raw_url) if raw_url else {"ok": False}
+                title_str = heal_proper_nouns_and_asr(str(it_info.get("title") or body.get("title") or "Video Analisado"))
+                peaks = it_info.get("peaks") or []
+                heatmap_pts = [
+                    {
+                        "start_time": float(p.get("start_sec", 0.0)),
+                        "end_time": float(p.get("end_sec", float(p.get("start_sec", 0.0)) + 20.0)),
+                        "value": float(p.get("intensity_pct", 50.0)) / 100.0,
+                    }
+                    for p in peaks
+                ]
+                # Check if we have a local subtitle file in out_dir/_work*
+                from .transcript import load_transcript
+                sub_candidates = sorted(
+                    list(out_dir.glob("_work*/*.vtt")) + list(out_dir.glob("_work*/*.srt")) + list(out_dir.glob("_work*/*.json")),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+                candidates = []
+                if sub_candidates:
+                    try:
+                        tr = load_transcript(sub_candidates[0])
+                        candidates = detect_highlights(
+                            tr,
+                            platform_key=plat_k,
+                            niche_key=niche_k,
+                            num_clips=4,
+                            use_llm=False,
+                            source_title=title_str,
+                            heatmap=heatmap_pts,
+                        )
+                    except Exception:
+                        candidates = []
+                if not candidates and peaks:
+                    for idx, pk in enumerate(peaks[:4], 1):
+                        s0 = max(25.0, float(pk.get("start_sec", 30.0)))
+                        s1 = s0 + (62.0 if "tiktok" in plat_k else 42.0)
+                        candidates.append({
+                            "title": f"{title_str[:72]} (Climax #{idx})",
+                            "hook_title": f"CLIMAX {int(pk.get('intensity_pct', 90))}% REPLAY",
+                            "clip_summary": f"Pico de retencao Most Replayed ({pk.get('label', '')}) detectado aos {int(s0)}s.",
+                            "start_time": round(s0, 1),
+                            "end_time": round(s1, 1),
+                            "score": min(99, int(pk.get("intensity_pct", 88))),
+                            "virality_reason": f"Pico InnerTube Most Replayed ({int(pk.get('intensity_pct', 88))}%)",
+                        })
+                self._send_json(200, {
+                    "ok": True,
+                    "title": title_str,
+                    "channel": it_info.get("channel", ""),
+                    "candidates": candidates,
+                })
                 return
 
             if parsed.path == "/api/synapse/pacing":

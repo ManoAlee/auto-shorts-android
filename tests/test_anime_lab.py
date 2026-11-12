@@ -224,3 +224,41 @@ def test_webapp_anime_lab_endpoints(tmp_path):
     assert p_code == 200
     assert p_payload["ok"] is True
     assert p_payload["resolution"] == "720x1280"
+
+
+def test_proper_noun_healer_and_anti_intro_scorer():
+    from auto_shorts.config import NICHES, PLATFORMS
+    from auto_shorts.highlights import heal_proper_nouns_and_asr, score_segments_offline
+
+    corrupted = "Salve galera, arpanálise de Uma Peça 1185! O bruke teve um dia fachídico com Imu sama."
+    healed = heal_proper_nouns_and_asr(corrupted)
+    assert "One Piece" in healed
+    assert "Uma Peça" not in healed
+    assert "Brook" in healed
+    assert "fatídico" in healed
+    assert "bora pra análise" in healed
+    assert "Imu-sama" in healed
+
+    # Verify anti-intro scorer picks the mid-video climax over a 0.0s YouTuber intro
+    transcript = {
+        "duration": 300.0,
+        "segments": [
+            {"start": 0.0, "end": 18.0, "text": "Salve galera, sem mais delongas, bora pra análise e deixa o like no canal!"},
+            {"start": 18.0, "end": 38.0, "text": "Inscreva-se no canal e ativa o sininho para mais vídeos."},
+            {"start": 110.0, "end": 135.0, "text": "O segredo proibido de Brook e Imu-sama em One Piece finalmente foi revelado no capítulo 1185!"},
+            {"start": 135.0, "end": 158.0, "text": "Essa teoria muda tudo sobre a cicatriz de queimadura e o poder oculto dos mares?"},
+        ],
+    }
+    heatmap = [{"start_time": 110.0, "end_time": 158.0, "value": 0.95}]
+    picked = score_segments_offline(
+        transcript=transcript,
+        platform=PLATFORMS["youtube_shorts"],
+        niche=NICHES["entretenimento_animes"],
+        num_clips=1,
+        source_title="ONE PIECE 1185 - O Passado de Brook",
+        heatmap=heatmap,
+    )
+    assert len(picked) == 1
+    assert picked[0]["start_time"] >= 100.0
+    assert "one piece" in picked[0]["title"].lower()
+    assert picked[0]["hook_title"] != "FINALMENTE VEMOS"

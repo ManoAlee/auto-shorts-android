@@ -1086,6 +1086,13 @@
         badges.appendChild(ytPill);
       }
 
+      if (v.hook_title) {
+        const hkBadge = document.createElement('span');
+        hkBadge.className = 'pill pill-tt';
+        hkBadge.textContent = '🎯 ' + v.hook_title;
+        badges.appendChild(hkBadge);
+      }
+
       const opus = v.opus_scorecard;
       if (opus) {
         const opPill = document.createElement('span');
@@ -1094,6 +1101,16 @@
         badges.appendChild(opPill);
       }
       card.appendChild(badges);
+
+      if (v.clip_summary) {
+        const sumEl = document.createElement('p');
+        sumEl.style.fontSize = '0.82rem';
+        sumEl.style.color = 'var(--ink-muted)';
+        sumEl.style.margin = '6px 0 8px 0';
+        sumEl.style.lineHeight = '1.4';
+        sumEl.textContent = String(v.clip_summary).slice(0, 175) + (String(v.clip_summary).length > 175 ? '...' : '');
+        card.appendChild(sumEl);
+      }
 
       if (opus && typeof opus.opus_score === 'number') {
         const trk = document.createElement('div');
@@ -1555,6 +1572,29 @@
         showToast(d.message || 'Teoria na fila!', 'ok');
         refreshStatus();
       }));
+      const btnCinema25d = document.createElement('button');
+      btnCinema25d.type = 'button';
+      btnCinema25d.className = 'btn btn-tiktok btn-sm';
+      btnCinema25d.textContent = '✨ Episodio 2.5D';
+      btnCinema25d.addEventListener('click', () => withBusyBtn(btnCinema25d, 'Na fila...', async () => {
+        startOptimisticRender('1/5 Produzindo Episodio 2.5D: ' + (a.title || '').slice(0, 26));
+        const r = await fetch('/api/cinema/produce', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: 'O Segredo Oculto de ' + a.title,
+            genre: 'dark_shonen',
+            voice_style: 'anime_hype',
+            visual_mode: 'TRI_LAYER',
+            image_url: a.image_url || '',
+            hook_title: ('SEGREDO DE ' + a.title).toUpperCase().slice(0, 28),
+          }),
+        });
+        const d = await r.json();
+        showToast(d.message || 'Episodio 2.5D na fila!', 'ok');
+        refreshStatus();
+      }));
+      acts.appendChild(btnCinema25d);
       acts.appendChild(btnGo);
       acts.appendChild(btnNarr);
       row.appendChild(acts);
@@ -1669,7 +1709,46 @@
     });
   }
 
-  /* Equipe, Planner, Synapse RE & Sistema */
+  /* Equipe, Planner, Character Bible, Anime 2.5D Lab, Synapse RE & Sistema */
+  async function loadCharactersAndAnimeLab() {
+    const cGrid = document.getElementById('characters-bible-grid');
+    const tGrid = document.getElementById('anime-techniques-grid');
+    if (cGrid) {
+      try {
+        const cData = await (await fetch('/api/characters')).json();
+        cGrid.innerHTML = '';
+        (cData.characters || []).forEach((ch) => {
+          const card = document.createElement('div');
+          card.className = 'video-card';
+          const phy = ch.physical || {};
+          const cos = ch.costume || {};
+          card.innerHTML = `
+            <h3>${escapeHtml(ch.name)} <small style="font-size:0.75rem; color:var(--ink-muted);">(${escapeHtml(ch.role)})</small></h3>
+            <div class="topic-meta" style="margin-bottom:6px;">${escapeHtml(ch.archetype)} • Voz: <strong>${escapeHtml(ch.voice_key)}</strong></div>
+            <div style="font-size:0.8rem; color:var(--ink-muted);">Cabelo: ${escapeHtml(phy.hair_color || '')} | Olhos: ${escapeHtml(phy.eye_color || '')} | Traje: ${escapeHtml(cos.primary_outfit || '')}</div>
+          `;
+          cGrid.appendChild(card);
+        });
+      } catch (e) {}
+    }
+    if (tGrid) {
+      try {
+        const tData = await (await fetch('/api/anime-lab/techniques')).json();
+        tGrid.innerHTML = '';
+        (tData.techniques || []).forEach((tk) => {
+          const card = document.createElement('div');
+          card.className = 'video-card';
+          card.innerHTML = `
+            <h3>${escapeHtml(tk.name_pt)}</h3>
+            <div class="topic-meta" style="margin-bottom:6px;">${escapeHtml(tk.category)} • Impacto: <strong>${escapeHtml(tk.retention_impact)}</strong></div>
+            <div style="font-size:0.78rem; color:var(--ink-muted);">${escapeHtml(tk.when_to_use || '')}</div>
+          `;
+          tGrid.appendChild(card);
+        });
+      } catch (e) {}
+    }
+  }
+
   async function loadTeamAndPlanner() {
     const grid = document.getElementById('team-personas-grid');
     if (grid && grid.dataset.loaded !== '1') {
@@ -1691,6 +1770,7 @@
         grid.dataset.loaded = '1';
       } catch (e) {}
     }
+    loadCharactersAndAnimeLab();
   }
 
   document.getElementById('brief-form').addEventListener('submit', (e) => {
@@ -1909,20 +1989,93 @@
     else loadVideos();
   });
 
+  const btnScanClimax = document.getElementById('btn-scan-climax');
+  const clipperCandBox = document.getElementById('clipper-candidates-box');
+  if (btnScanClimax && clipperCandBox) {
+    btnScanClimax.addEventListener('click', () => {
+      const srcVal = (cutSourceEl && cutSourceEl.value.trim()) || '';
+      withBusyBtn(btnScanClimax, 'Analisando Climax...', async () => {
+        clipperCandBox.hidden = false;
+        clipperCandBox.innerHTML = '<div class="empty-state">Analisando curvas Most Replayed + Anti-Intro 25s...</div>';
+        const r = await fetch('/api/clipper/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: srcVal,
+            niche: cutNicheEl ? cutNicheEl.value : 'entretenimento_animes',
+            platform: cutPlatformEl ? cutPlatformEl.value : 'youtube_shorts',
+          }),
+        });
+        const d = await r.json();
+        const cands = d.candidates || [];
+        clipperCandBox.innerHTML = '';
+        if (!cands.length) {
+          clipperCandBox.innerHTML = '<div class="empty-state">Cole um link do YouTube ou rode um corte primeiro para inspecionar as janelas de climax.</div>';
+          return;
+        }
+        cands.forEach((c, idx) => {
+          const card = document.createElement('div');
+          card.className = 'video-card';
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+              <span class="pill pill-tt">🎯 ${escapeHtml(c.hook_title || ('CLIMAX #' + (idx + 1)))}</span>
+              <span class="pill pill-ok">Score ${c.score || 92}/100 • ${c.start_time}s–${c.end_time}s</span>
+            </div>
+            <h3 style="font-size:0.92rem; margin:0 0 4px 0;">${escapeHtml(c.title || d.title || 'Janela Viral')}</h3>
+            <p style="font-size:0.8rem; color:var(--ink-muted); margin:0 0 6px 0;">${escapeHtml(c.clip_summary || '')}</p>
+            <div class="topic-meta">${escapeHtml(c.virality_reason || '')}</div>
+          `;
+          clipperCandBox.appendChild(card);
+        });
+        showToast(cands.length + ' janelas de climax identificadas (sem intro 0.0s)!', 'ok');
+      });
+    });
+  }
+
   // Story Engine Modal Wire-up
   const storyDlg = document.getElementById('story-dlg');
   const btnOpenStory = document.getElementById('btn-open-story-modal');
+  const btnEquipeOpenStory = document.getElementById('btn-equipe-open-story');
+  const btnRefreshChars = document.getElementById('btn-refresh-characters');
   const btnCloseStory = document.getElementById('story-dlg-close');
   const storyForm = document.getElementById('story-form');
+  const btnProduceCinemaEp = document.getElementById('btn-produce-cinema-ep');
 
   if (btnOpenStory && storyDlg) {
-    btnOpenStory.addEventListener('click', () => {
-      storyDlg.showModal();
-    });
+    btnOpenStory.addEventListener('click', () => storyDlg.showModal());
+  }
+  if (btnEquipeOpenStory && storyDlg) {
+    btnEquipeOpenStory.addEventListener('click', () => storyDlg.showModal());
+  }
+  if (btnRefreshChars) {
+    btnRefreshChars.addEventListener('click', () => loadCharactersAndAnimeLab());
   }
   if (btnCloseStory && storyDlg) {
-    btnCloseStory.addEventListener('click', () => {
-      storyDlg.close();
+    btnCloseStory.addEventListener('click', () => storyDlg.close());
+  }
+  if (btnProduceCinemaEp) {
+    btnProduceCinemaEp.addEventListener('click', () => {
+      const promptEl = document.getElementById('story-prompt');
+      const prompt = (promptEl && promptEl.value.trim()) || 'O Segredo Proibido de One Piece 1185';
+      const genre = (document.getElementById('story-genre') && document.getElementById('story-genre').value) || 'dark_shonen';
+      const vmode = (document.getElementById('story-visual-mode') && document.getElementById('story-visual-mode').value) || 'TRI_LAYER';
+      withBusyBtn(btnProduceCinemaEp, 'Enfileirando 2.5D...', async () => {
+        startOptimisticRender('1/5 Produzindo Episodio Next-Gen Cinema (' + vmode + ')...');
+        const resp = await fetch('/api/cinema/produce', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            genre: genre,
+            voice_style: 'anime_hype',
+            visual_mode: vmode,
+          }),
+        });
+        const d = await resp.json();
+        if (storyDlg) storyDlg.close();
+        showToast(d.message || 'Episodio Cinema adicionado na fila!', 'ok');
+        refreshStatus();
+      });
     });
   }
   if (storyForm) {

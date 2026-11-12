@@ -11,7 +11,7 @@ from .config import NICHES, QUALITY_PRESETS, get_niche_badge
 from .discovery import discover_videos
 from .downloader import download_video_and_subs, is_url, load_source_metadata, transcribe_with_whisper_cpp
 from .evolution import EvolutionStore
-from .highlights import detect_highlights
+from .highlights import detect_highlights, heal_proper_nouns_and_asr
 from .publisher import (
     add_video_to_playlist,
     build_publish_pack,
@@ -33,6 +33,20 @@ from .validator import validate_generated_short
 from .yt_algorithm import score_short_for_youtube_algorithm
 
 
+def _heal_segments(segments: List[Dict]) -> List[Dict]:
+    healed: List[Dict] = []
+    for seg in segments:
+        copy_seg = dict(seg)
+        copy_seg["text"] = heal_proper_nouns_and_asr(str(seg.get("text") or ""))
+        if isinstance(seg.get("words"), list):
+            copy_seg["words"] = [
+                {**w, "word": heal_proper_nouns_and_asr(str(w.get("word") or ""))}
+                for w in seg["words"]
+            ]
+        healed.append(copy_seg)
+    return healed
+
+
 def _build_clip_subtitles_and_summary(
     render_src: Path,
     render_dur: float,
@@ -47,8 +61,15 @@ def _build_clip_subtitles_and_summary(
     language: str,
     relative_to_clip: bool,
 ) -> Optional[str]:
-    """Prefer fresh clip-level whisper.cpp -ojf on the <=57s cut audio for exact word sync & clean PT-BR."""
-    if os.getenv("USE_CLIP_WHISPER", "1") == "1" and (shutil.which("whisper-cli") or shutil.which("main")):
+    """Use clean healed source subtitles when available; fall back to clip-level whisper.cpp when needed."""
+    healed_fallback = _heal_segments(fallback_segments)
+    win_segs = [
+        s for s in healed_fallback
+        if float(s.get("end", 0.0)) > fallback_start and float(s.get("start", 0.0)) < fallback_end
+    ]
+    has_rich_fallback = len(win_segs) >= 3 and any(isinstance(s.get("words"), list) and s.get("words") for s in win_segs)
+
+    if not has_rich_fallback and os.getenv("USE_CLIP_WHISPER", "1") == "1" and (shutil.which("whisper-cli") or shutil.which("main")):
         try:
             asr_dir = work_dir / f"_asr_{ass_file.stem}"
             asr_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +77,7 @@ def _build_clip_subtitles_and_summary(
                 render_src, asr_dir, model_path=whisper_model, language=language
             )
             tr = load_transcript(sub_path)
-            segs = tr.get("segments") or []
+            segs = _heal_segments(tr.get("segments") or [])
             if segs:
                 generate_ass_subtitles(
                     segs, 0.0, render_dur, ass_file, width=width, height=height, relative_to_clip=True
@@ -66,7 +87,7 @@ def _build_clip_subtitles_and_summary(
             pass
 
     generate_ass_subtitles(
-        fallback_segments,
+        healed_fallback,
         fallback_start,
         fallback_end,
         ass_file,
@@ -74,6 +95,8 @@ def _build_clip_subtitles_and_summary(
         height=height,
         relative_to_clip=relative_to_clip,
     )
+    if win_segs:
+        return " ".join(s.get("text", "").strip() for s in win_segs if s.get("text")).strip()[:340]
     return None
 
 
@@ -307,8 +330,7 @@ def run_pipeline(
             except OSError:
                 pass
 
-        max_dur = 180.0 if "tiktok" in platform.lower() else 60.0
-        validation = validate_generated_short(out_mp4, ass_path=ass_file, max_duration=max_dur)
+        validation = validate_generated_short(out_mp4, ass_path=ass_file)
         pack = build_publish_pack(
             {**clip, "output_path": str(out_mp4), "clip_id": clip_id},
             platform,

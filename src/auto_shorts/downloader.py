@@ -167,12 +167,17 @@ def transcribe_with_whisper_cpp(
     subprocess.run(ffmpeg_cmd, check=True)
 
     out_prefix = work_dir / "whisper_out"
+    domain_prompt = (
+        "Português do Brasil. One Piece, Luffy, Zoro, Brook, Imu-sama, Haki, Akuma no Mi, "
+        "Jujutsu Kaisen, Sukuna, Gojo, Solo Leveling, Naruto, Bleach, análise, capítulo, fatídico."
+    )
     subprocess.run(
         [
             whisper_bin,
             "-m", str(resolved_model),
             "-f", str(wav_path),
             "-l", language,
+            "--prompt", domain_prompt,
             "-osrt", "-ojf",
             "-of", str(out_prefix),
         ],
