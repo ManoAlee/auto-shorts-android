@@ -10,8 +10,11 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .config import NICHES
+from .config import NICHES, load_dotenv_file
 from .retention import get_retention_profile
+
+# Ensure local .env is loaded
+load_dotenv_file()
 
 
 def build_publish_pack(
