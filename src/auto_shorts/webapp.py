@@ -57,6 +57,13 @@ from .offline_llm import (
 )
 from .retention import _dir_bytes, prune_storage
 from .smart_autopublish import get_autopublish_plan, run_smart_publish_cycle
+from .character_engine import (
+    CharacterBibleEntry,
+    CharacterDatabase,
+    CharacterVisualAuditor,
+    CostumeDetails,
+    PhysicalTraits,
+)
 from .story_engine import NarrativeContinuityStore, STORY_GENRES, StoryEngine
 from .team import build_persona_script_brief, generate_channel_planner, is_llm_configured, list_channel_personas
 from .tiktok_algorithm import build_mentalist_script_blueprint, get_tiktok_algorithm_blueprint
@@ -918,6 +925,23 @@ def make_handler(out_dir: Path):
                 self._send_json(200, {"characters": [c.to_dict() for c in chars], "story_id": sid})
                 return
 
+            if parsed.path == "/api/character/list":
+                cdb = CharacterDatabase(out_dir / "narrative_continuity.db")
+                all_chars = cdb.list_all_characters()
+                self._send_json(200, {"characters": [c.to_dict() for c in all_chars], "total": len(all_chars)})
+                return
+
+            if parsed.path == "/api/character/detail":
+                qs = urllib.parse.parse_qs(parsed.query)
+                cid = (qs.get("char_id") or [""])[0]
+                cdb = CharacterDatabase(out_dir / "narrative_continuity.db")
+                entry = cdb.get_character(cid)
+                if not entry:
+                    self._send_error(404, "CHAR_NOT_FOUND", "Personagem nao encontrado")
+                    return
+                self._send_json(200, entry.to_dict())
+                return
+
             if parsed.path.startswith("/media-preview/"):
                 fname = urllib.parse.unquote(parsed.path[len("/media-preview/"):])
                 preview_dir = out_dir / "_preview"
@@ -1027,6 +1051,59 @@ def make_handler(out_dir: Path):
                     })
                 except Exception as exc:
                     self._send_json(500, {"ok": False, "message": f"Erro na geracao narrativa: {exc}"})
+                return
+
+            if parsed.path == "/api/character/create":
+                try:
+                    cdb = CharacterDatabase(out_dir / "narrative_continuity.db")
+                    cid = str(body.get("char_id") or f"char_{int(time.time())}")
+                    phy_data = body.get("physical") or {}
+                    cos_data = body.get("costume") or {}
+                    entry = CharacterBibleEntry(
+                        char_id=cid,
+                        name=str(body.get("name") or "Novo Personagem"),
+                        role=str(body.get("role") or "PROTAGONIST"),
+                        archetype=str(body.get("archetype") or "Aventureiro"),
+                        personality_summary=str(body.get("personality") or "Determinado e estrategista"),
+                        physical=PhysicalTraits(**phy_data) if phy_data else PhysicalTraits(),
+                        costume=CostumeDetails(**cos_data) if cos_data else CostumeDetails(),
+                        voice_key=str(body.get("voice_key") or "pm_alex"),
+                        voice_speed=float(body.get("voice_speed") or 1.05),
+                        voice_pitch=float(body.get("voice_pitch") or 1.0),
+                        expressions_map=body.get("expressions") or {},
+                        poses_map=body.get("poses") or {},
+                    )
+                    cdb.save_character(entry)
+                    self._send_json(200, {
+                        "ok": True,
+                        "character": entry.to_dict(),
+                        "message": f"Personagem '{entry.name}' salvo na biblia de continuidade!",
+                    })
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "message": f"Erro ao salvar personagem: {exc}"})
+                return
+
+            if parsed.path == "/api/character/prompt":
+                try:
+                    cdb = CharacterDatabase(out_dir / "narrative_continuity.db")
+                    cid = str(body.get("char_id") or "")
+                    entry = cdb.get_character(cid)
+                    if not entry:
+                        self._send_error(404, "CHAR_NOT_FOUND", "Personagem nao encontrado")
+                        return
+                    expr = str(body.get("expression") or "NEUTRAL")
+                    pose = str(body.get("pose") or "STAND_NEUTRAL")
+                    prompt_str = entry.compile_visual_prompt(expression=expr, pose=pose)
+                    self._send_json(200, {
+                        "ok": True,
+                        "char_id": cid,
+                        "name": entry.name,
+                        "expression": expr,
+                        "pose": pose,
+                        "compiled_prompt": prompt_str,
+                    })
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "message": f"Erro ao compilar prompt: {exc}"})
                 return
 
             if parsed.path == "/api/voice-preview":
