@@ -421,6 +421,78 @@ def test_webapp_accessibility_and_voice_styles():
         assert f'for="{field_id}"' in doc
 
 
+def test_webapp_delete_bulk_and_all(tmp_path):
+    from auto_shorts.webapp import make_handler
+    import io
+
+    # Create dummy video files
+    v1 = tmp_path / "test_v1.mp4"
+    v1.write_bytes(b"dummy1")
+    v1_json = tmp_path / "test_v1.publish.json"
+    v1_json.write_text('{"title": "v1"}')
+    v1_thumb = tmp_path / "test_v1_thumb_16x9.jpg"
+    v1_thumb.write_bytes(b"thumb1")
+
+    v2 = tmp_path / "test_v2.mp4"
+    v2.write_bytes(b"dummy2")
+    v2_json = tmp_path / "test_v2.publish.json"
+    v2_json.write_text('{"title": "v2"}')
+
+    v3 = tmp_path / "test_v3.mp4"
+    v3.write_bytes(b"dummy3")
+
+    handler_cls = make_handler(out_dir=tmp_path)
+
+    # 1. Test single delete
+    req_body = json.dumps({"filename": "test_v1.mp4"}).encode("utf-8")
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(req_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(req_body))}
+    handler.path = "/api/delete"
+    handler.requestline = "POST /api/delete HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.do_POST()
+
+    assert not v1.exists()
+    assert not v1_json.exists()
+    assert not v1_thumb.exists()
+    assert v2.exists()
+    assert v3.exists()
+
+    # 2. Test bulk list delete
+    req_body = json.dumps({"filenames": ["test_v2.mp4"]}).encode("utf-8")
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(req_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(req_body))}
+    handler.path = "/api/delete"
+    handler.requestline = "POST /api/delete HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.do_POST()
+
+    assert not v2.exists()
+    assert not v2_json.exists()
+    assert v3.exists()
+
+    # 3. Test delete all
+    req_body = json.dumps({"all": True}).encode("utf-8")
+    handler = handler_cls.__new__(handler_cls)
+    handler.rfile = io.BytesIO(req_body)
+    handler.wfile = io.BytesIO()
+    handler.headers = {"Content-Length": str(len(req_body))}
+    handler.path = "/api/delete"
+    handler.requestline = "POST /api/delete HTTP/1.1"
+    handler.request_version = "HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.do_POST()
+
+    assert not v3.exists()
+    assert list(tmp_path.glob("*.mp4")) == []
+
+
 def test_anime_release_radar_parses_anilist(monkeypatch):
     sample = {
         "data": {

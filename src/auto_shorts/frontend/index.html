@@ -360,25 +360,73 @@ __INLINE_CSS__
       </section>
 
       <section id="panel-videos" role="tabpanel" aria-labelledby="tab-videos" class="panel" hidden>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <!-- Acervo Header & Hub Actions -->
+        <div class="acervo-header-wrap">
           <div>
-            <h2>Acervo Local, Visao &amp; Multi-Publicacao</h2>
-            <p class="panel-lead" style="margin-bottom:0;">Envie direto para o TikTok (`@aleplaytv5`), YouTube ou inspecione o Scorecard 5D.</p>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h2>Acervo &amp; Multi-Publicação</h2>
+              <span id="acervo-total-badge" class="pill pill-ok">0 vídeos</span>
+            </div>
+            <p class="panel-lead" style="margin-bottom:0;">Envie direto para o TikTok (@aleplaytv5) ou YouTube Shorts, inspecione Scorecards Opus 5D e gerencie em lote.</p>
           </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-success btn-sm" id="btn-auto-validate-all">Auto-Validar Visao &amp; Fila</button>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-optimize-all">Otimizar IA</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-videos">Atualizar</button>
+          <div class="acervo-quick-actions">
+            <button type="button" class="btn btn-success btn-sm" id="btn-auto-validate-all">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Auto-Validar Visão</span>
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-optimize-all">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Otimizar IA</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-videos" title="Recarregar acervo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <span>Atualizar</span>
+            </button>
           </div>
         </div>
+
+        <!-- Barra de Gestão em Lote e Exclusão Rápida -->
+        <div class="acervo-bulk-bar" aria-label="Ações em Lote do Acervo">
+          <div class="acervo-bulk-left">
+            <label class="acervo-select-all-label" title="Selecionar ou desselecionar todos os vídeos exibidos">
+              <input type="checkbox" id="chk-select-all-videos" aria-label="Selecionar todos os vídeos">
+              <span>Selecionar Todos</span>
+            </label>
+            <span id="acervo-selected-count" class="pill" hidden>0 selecionados</span>
+            <button type="button" id="btn-delete-selected" class="btn btn-danger btn-sm" disabled title="Excluir apenas os vídeos selecionados">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              <span>Excluir Selecionados</span>
+            </button>
+            <button type="button" id="btn-delete-all" class="btn btn-danger-outline btn-sm" title="Apagar todos os vídeos do acervo de uma só vez">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Limpar Todo o Acervo</span>
+            </button>
+          </div>
+
+          <div class="acervo-bulk-right">
+            <div class="acervo-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="acervo-search-input" placeholder="Filtrar vídeos (Ctrl+K)..." aria-label="Filtrar vídeos no acervo">
+              <button type="button" id="btn-clear-acervo-search" aria-label="Limpar busca" hidden>×</button>
+            </div>
+            <select id="acervo-sort-select" class="form-select form-select-sm" aria-label="Ordenar vídeos">
+              <option value="recent">Mais Recentes</option>
+              <option value="opus_desc">Maior Score Opus (5D)</option>
+              <option value="duration_desc">Maior Duração</option>
+              <option value="title_asc">Título (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
         <div id="acervo-filter-chips" class="filter-chips" role="group" aria-label="Filtrar videos do acervo">
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="all" aria-pressed="true">Todos</button>
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="tiktok_ready" aria-pressed="false">Pronto p/ TikTok</button>
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="tiktok_sent" aria-pressed="false">Enviados TikTok</button>
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="approved" aria-pressed="false">Aprovados</button>
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="queued" aria-pressed="false">Na Fila YT</button>
-          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="published" aria-pressed="false">Publicados YT</button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="all" aria-pressed="true">Todos <span class="chip-count" id="count-all">0</span></button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="tiktok_ready" aria-pressed="false">Pronto TikTok <span class="chip-count" id="count-tt-ready">0</span></button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="tiktok_sent" aria-pressed="false">Enviados TikTok <span class="chip-count" id="count-tt-sent">0</span></button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="approved" aria-pressed="false">Aprovados <span class="chip-count" id="count-approved">0</span></button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="queued" aria-pressed="false">Na Fila YT <span class="chip-count" id="count-queued">0</span></button>
+          <button type="button" class="filter-chip acervo-chip" data-acervo-filter="published" aria-pressed="false">Publicados YT <span class="chip-count" id="count-published">0</span></button>
         </div>
+
         <div id="videos-list" class="item-grid">Carregando videos...</div>
       </section>
 

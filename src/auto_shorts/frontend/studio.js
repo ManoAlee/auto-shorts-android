@@ -866,13 +866,70 @@
     });
   }
 
+  let _selectedVideos = new Set();
+  let _acervoSort = 'recent';
+
+  function updateBulkBar() {
+    const selCountEl = document.getElementById('acervo-selected-count');
+    const btnDelSel = document.getElementById('btn-delete-selected');
+    const chkAll = document.getElementById('chk-select-all-videos');
+    const count = _selectedVideos.size;
+    if (selCountEl) {
+      selCountEl.hidden = count === 0;
+      selCountEl.textContent = count + ' selecionado' + (count > 1 ? 's' : '');
+    }
+    if (btnDelSel) {
+      btnDelSel.disabled = count === 0;
+      const span = btnDelSel.querySelector('span');
+      if (span) span.textContent = count > 0 ? ('Excluir Selecionados (' + count + ')') : 'Excluir Selecionados';
+    }
+    if (chkAll) {
+      const visibleChks = document.querySelectorAll('.video-select-chk');
+      if (visibleChks.length > 0) {
+        chkAll.checked = visibleChks.length === count && count > 0;
+        chkAll.indeterminate = count > 0 && count < visibleChks.length;
+      } else {
+        chkAll.checked = false;
+        chkAll.indeterminate = false;
+      }
+    }
+  }
+
+  function updateAcervoCounters() {
+    const total = _videosCache.length;
+    const isApproved = (v) => v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
+    const ttSentCount = _videosCache.filter((v) => v.tiktok && v.tiktok.publish_id).length;
+    const ttReadyCount = _videosCache.filter((v) => isApproved(v) && !(v.tiktok && v.tiktok.publish_id)).length;
+    const appCount = _videosCache.filter(isApproved).length;
+    const qCount = _videosCache.filter((v) => !!v.queued_for_auto_publish).length;
+    const pubCount = _videosCache.filter((v) => v.youtube && v.youtube.url).length;
+
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setVal('acervo-total-badge', total + ' vídeo' + (total !== 1 ? 's' : ''));
+    setVal('count-all', total);
+    setVal('count-tt-ready', ttReadyCount);
+    setVal('count-tt-sent', ttSentCount);
+    setVal('count-approved', appCount);
+    setVal('count-queued', qCount);
+    setVal('count-published', pubCount);
+  }
+
   /* Clean Acervo Cards + Fast TikTok/YouTube Delivery & Filter Pills */
   function renderVideosGrid() {
     const box = document.getElementById('videos-list');
     if (!box) return;
-    const filterTxt = (document.getElementById('studio-search') ? document.getElementById('studio-search').value : '').trim().toLowerCase();
-    const filtered = _videosCache.filter((v) => {
-      if (filterTxt && !(v.title + ' ' + v.caption + ' ' + v.filename).toLowerCase().includes(filterTxt)) return false;
+    updateAcervoCounters();
+
+    const searchInput = document.getElementById('acervo-search-input') || document.getElementById('studio-search');
+    const filterTxt = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const clearBtn = document.getElementById('btn-clear-acervo-search');
+    if (clearBtn) clearBtn.hidden = !filterTxt;
+
+    let filtered = _videosCache.filter((v) => {
+      if (filterTxt) {
+        const queryHaystack = [v.title, v.caption, v.filename, v.niche, ...(v.hashtags || [])].filter(Boolean).join(' ').toLowerCase();
+        if (!queryHaystack.includes(filterTxt)) return false;
+      }
       const visOk = v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
       const ttSent = !!(v.tiktok && v.tiktok.publish_id);
       if (_acervoFilter === 'tiktok_ready') return visOk && !ttSent;
@@ -882,18 +939,121 @@
       if (_acervoFilter === 'published') return !!(v.youtube && v.youtube.url);
       return true;
     });
+
+    // Sorting
+    const sortSel = document.getElementById('acervo-sort-select');
+    _acervoSort = sortSel ? sortSel.value : 'recent';
+    if (_acervoSort === 'opus_desc') {
+      filtered.sort((a, b) => ((b.opus_scorecard && b.opus_scorecard.opus_score) || 0) - ((a.opus_scorecard && a.opus_scorecard.opus_score) || 0));
+    } else if (_acervoSort === 'duration_desc') {
+      filtered.sort((a, b) => ((b.validation && b.validation.duration) || 0) - ((a.validation && a.validation.duration) || 0));
+    } else if (_acervoSort === 'title_asc') {
+      filtered.sort((a, b) => (a.title || a.filename).localeCompare(b.title || b.filename));
+    }
+
     if (!filtered.length) {
       box.innerHTML = '';
       const empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = filterTxt ? 'Nenhum Short corresponde ao filtro.' : 'Nenhum video nesta categoria. Use Criar & Radar ou ajuste o filtro.';
+      empty.className = 'empty-state-card';
+      empty.innerHTML = `
+        <div class="empty-state-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>
+          </svg>
+        </div>
+        <h3>${filterTxt ? 'Nenhum vídeo corresponde à busca' : 'Acervo Vazio & Pronto para Produção'}</h3>
+        <p>${filterTxt ? 'Tente pesquisar com outras palavras-chave ou limpe o campo de busca.' : 'Todos os vídeos anteriores foram limpos. Inicie uma nova produção instantânea pelo Piloto 24/7 ou explore tendências virais no Radar!'}</p>
+        <div class="empty-state-actions">
+          ${filterTxt ? '<button type="button" class="btn btn-secondary btn-sm" id="btn-empty-clear">Limpar Busca</button>' : `
+            <button type="button" class="btn btn-primary btn-sm" id="btn-empty-autopilot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Gerar Lote com IA (Piloto 24/7)</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-empty-radar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              <span>Explorar Radar</span>
+            </button>
+          `}
+        </div>
+      `;
       box.appendChild(empty);
+      if (document.getElementById('btn-empty-clear')) {
+        document.getElementById('btn-empty-clear').addEventListener('click', () => {
+          if (searchInput) searchInput.value = '';
+          renderVideosGrid();
+        });
+      }
+      if (document.getElementById('btn-empty-autopilot')) {
+        document.getElementById('btn-empty-autopilot').addEventListener('click', () => {
+          const btn = document.getElementById('btn-trigger-autopilot');
+          if (btn) btn.click();
+        });
+      }
+      if (document.getElementById('btn-empty-radar')) {
+        document.getElementById('btn-empty-radar').addEventListener('click', () => activateTab(0));
+      }
+      updateBulkBar();
       return;
     }
+
     box.innerHTML = '';
     filtered.forEach((v) => {
       const card = document.createElement('article');
       card.className = 'video-card';
+
+      // Top Quick Controls (Checkbox + Fast Delete Button)
+      const topBar = document.createElement('div');
+      topBar.className = 'card-top-controls';
+
+      const chkLabel = document.createElement('label');
+      chkLabel.className = 'card-chk-wrap';
+      chkLabel.title = 'Selecionar vídeo para ações em lote';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'video-select-chk';
+      chk.dataset.filename = v.filename;
+      chk.checked = _selectedVideos.has(v.filename);
+      chk.addEventListener('change', () => {
+        if (chk.checked) _selectedVideos.add(v.filename);
+        else _selectedVideos.delete(v.filename);
+        updateBulkBar();
+      });
+      chkLabel.appendChild(chk);
+      topBar.appendChild(chkLabel);
+
+      const btnQuickDel = document.createElement('button');
+      btnQuickDel.type = 'button';
+      btnQuickDel.className = 'btn-quick-delete';
+      btnQuickDel.title = 'Excluir vídeo do acervo (rápido)';
+      btnQuickDel.setAttribute('aria-label', 'Excluir ' + (v.title || v.filename));
+      btnQuickDel.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+      btnQuickDel.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('Deseja excluir este vídeo do acervo?\n\n' + (v.title || v.filename))) return;
+        card.style.opacity = '0.35';
+        card.style.transform = 'scale(0.97)';
+        card.style.transition = 'all 180ms ease';
+        try {
+          const res = await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: v.filename }),
+          });
+          const d = await res.json();
+          _selectedVideos.delete(v.filename);
+          _videosCache = _videosCache.filter((item) => item.filename !== v.filename);
+          renderVideosGrid();
+          showToast('Vídeo excluído com sucesso.', 'info');
+          loadChannelTelemetry();
+        } catch (err) {
+          card.style.opacity = '1';
+          card.style.transform = '';
+          showToast('Erro ao excluir: ' + err.message, 'err');
+        }
+      });
+      topBar.appendChild(btnQuickDel);
+      card.appendChild(topBar);
+
       const h3 = document.createElement('h3');
       h3.textContent = v.title || v.filename;
       card.appendChild(h3);
@@ -1011,7 +1171,113 @@
       card.appendChild(acts);
       box.appendChild(card);
     });
+    updateBulkBar();
   }
+
+  // Bulk Toolbar Listeners
+  const chkSelectAll = document.getElementById('chk-select-all-videos');
+  if (chkSelectAll) {
+    chkSelectAll.addEventListener('change', () => {
+      const visibleChks = document.querySelectorAll('.video-select-chk');
+      if (chkSelectAll.checked) {
+        visibleChks.forEach((c) => {
+          c.checked = true;
+          if (c.dataset.filename) _selectedVideos.add(c.dataset.filename);
+        });
+      } else {
+        visibleChks.forEach((c) => {
+          c.checked = false;
+          if (c.dataset.filename) _selectedVideos.delete(c.dataset.filename);
+        });
+      }
+      updateBulkBar();
+    });
+  }
+
+  const btnDeleteSelected = document.getElementById('btn-delete-selected');
+  if (btnDeleteSelected) {
+    btnDeleteSelected.addEventListener('click', async () => {
+      const count = _selectedVideos.size;
+      if (count === 0) return;
+      if (!confirm(`Tem certeza que deseja excluir os ${count} vídeo(s) selecionados?`)) return;
+      withBusyBtn(btnDeleteSelected, 'Excluindo...', async () => {
+        try {
+          const res = await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filenames: Array.from(_selectedVideos) }),
+          });
+          const d = await res.json();
+          const toDel = new Set(_selectedVideos);
+          _videosCache = _videosCache.filter((item) => !toDel.has(item.filename));
+          _selectedVideos.clear();
+          renderVideosGrid();
+          showToast((d.count || count) + ' vídeo(s) excluído(s) com sucesso!', 'ok');
+          loadChannelTelemetry();
+        } catch (e) {
+          showToast('Erro ao excluir selecionados: ' + e.message, 'err');
+        }
+      });
+    });
+  }
+
+  const btnDeleteAll = document.getElementById('btn-delete-all');
+  if (btnDeleteAll) {
+    btnDeleteAll.addEventListener('click', () => {
+      if (!_videosCache.length) {
+        showToast('O acervo já está vazio.', 'info');
+        return;
+      }
+      if (!confirm('⚠️ ATENÇÃO: Deseja apagar TODOS os vídeos do acervo permanentemente?\n\nEsta ação excluirá todos os MP4s, roteiros e capas gerados.')) return;
+      withBusyBtn(btnDeleteAll, 'Limpando acervo...', async () => {
+        try {
+          const res = await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ all: true }),
+          });
+          const d = await res.json();
+          _videosCache = [];
+          _selectedVideos.clear();
+          renderVideosGrid();
+          showToast('Todo o acervo foi limpo com sucesso!', 'ok');
+          loadChannelTelemetry();
+        } catch (e) {
+          showToast('Erro ao limpar acervo: ' + e.message, 'err');
+        }
+      });
+    });
+  }
+
+  // Search Input & Sort Listeners
+  const acervoSearchInput = document.getElementById('acervo-search-input');
+  if (acervoSearchInput) {
+    acervoSearchInput.addEventListener('input', () => renderVideosGrid());
+  }
+  const btnClearSearch = document.getElementById('btn-clear-acervo-search');
+  if (btnClearSearch) {
+    btnClearSearch.addEventListener('click', () => {
+      if (acervoSearchInput) acervoSearchInput.value = '';
+      renderVideosGrid();
+      if (acervoSearchInput) acervoSearchInput.focus();
+    });
+  }
+  const acervoSortSelect = document.getElementById('acervo-sort-select');
+  if (acervoSortSelect) {
+    acervoSortSelect.addEventListener('change', () => renderVideosGrid());
+  }
+
+  // Keyboard shortcut Ctrl+K to search
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const search = document.getElementById('acervo-search-input');
+      if (search) {
+        e.preventDefault();
+        activateTab(3); // tab acervo
+        search.focus();
+      }
+    }
+  });
 
   async function loadVideos() {
     const box = document.getElementById('videos-list');

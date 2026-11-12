@@ -1267,6 +1267,49 @@ def make_handler(out_dir: Path):
                 return
 
             if parsed.path == "/api/delete":
+                if body.get("all"):
+                    deleted = []
+                    for mp4 in list(out_dir.glob("*.mp4")):
+                        fname = mp4.name
+                        for sidecar in (
+                            mp4,
+                            mp4.with_suffix(".publish.json"),
+                            mp4.with_name(f"{mp4.stem}_thumb_16x9.jpg"),
+                            mp4.with_name(f"{mp4.stem}_cover_9x16.jpg"),
+                            mp4.with_suffix(".ass"),
+                        ):
+                            if sidecar.is_file():
+                                sidecar.unlink(missing_ok=True)
+                        narr_dir = out_dir / f"_narrate_{mp4.stem}"
+                        if narr_dir.is_dir():
+                            shutil.rmtree(narr_dir, ignore_errors=True)
+                        deleted.append(fname)
+                    self._send_json(200, {"deleted": deleted, "count": len(deleted), "message": f"{len(deleted)} video(s) excluido(s) com sucesso."})
+                    return
+
+                filenames = body.get("filenames")
+                if isinstance(filenames, list) and filenames:
+                    deleted = []
+                    for fn in filenames:
+                        target = _safe_child_path(out_dir, str(fn or ""))
+                        if target and target.is_file():
+                            fname = target.name
+                            for sidecar in (
+                                target,
+                                target.with_suffix(".publish.json"),
+                                target.with_name(f"{target.stem}_thumb_16x9.jpg"),
+                                target.with_name(f"{target.stem}_cover_9x16.jpg"),
+                                target.with_suffix(".ass"),
+                            ):
+                                if sidecar.is_file():
+                                    sidecar.unlink(missing_ok=True)
+                            narr_dir = out_dir / f"_narrate_{target.stem}"
+                            if narr_dir.is_dir():
+                                shutil.rmtree(narr_dir, ignore_errors=True)
+                            deleted.append(fname)
+                    self._send_json(200, {"deleted": deleted, "count": len(deleted), "message": f"{len(deleted)} video(s) excluido(s)."})
+                    return
+
                 target = _safe_child_path(out_dir, str(body.get("filename") or ""))
                 if not target or not target.is_file():
                     self._send_json(404, {"message": "Arquivo nao encontrado"})
@@ -1277,10 +1320,14 @@ def make_handler(out_dir: Path):
                     target.with_suffix(".publish.json"),
                     target.with_name(f"{target.stem}_thumb_16x9.jpg"),
                     target.with_name(f"{target.stem}_cover_9x16.jpg"),
+                    target.with_suffix(".ass"),
                 ):
                     if sidecar.is_file():
                         sidecar.unlink(missing_ok=True)
-                self._send_json(200, {"deleted": fname})
+                narr_dir = out_dir / f"_narrate_{target.stem}"
+                if narr_dir.is_dir():
+                    shutil.rmtree(narr_dir, ignore_errors=True)
+                self._send_json(200, {"deleted": fname, "count": 1, "message": f"{fname} excluido com sucesso."})
                 return
 
             if parsed.path == "/api/run":
