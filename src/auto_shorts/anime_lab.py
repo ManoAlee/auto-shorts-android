@@ -559,25 +559,30 @@ class MangaAnimeLab:
         out_dir: Path,
         prompt: str = "O Segredo Proibido de One Piece",
         genre: str = "dark_shonen",
-        voice_style: str = "dublador_anime",
-        visual_mode: str = "TRI_LAYER",  # TRI_LAYER, RTL_PAN, MULTISCENE_BROLL
+        voice_style: str = "",
+        visual_mode: str = "MULTISCENE_BROLL",  # MULTISCENE_BROLL, TRI_LAYER, RTL_PAN
         image_url: str = "",
         hook_override: str = "",
         custom_script_text: str = "",
+        niche_override: str = "",
     ) -> Dict[str, Any]:
-        """End-to-end Next-Gen Cinema Studio producer: StoryEngine + DirectorEngine + 2.5D/B-Roll + Voice + Vision QA."""
+        """End-to-end Universal Multi-Niche Cinema Studio producer: StoryEngine + DirectorEngine + Hybrid 2.5D/Multi-Scene B-Roll + Voice + Vision QA."""
         import urllib.request
         from .highlights import _polish_hook_phrase
-        from .narrator import build_narrated_short
-        from .story_engine import NarrativeContinuityStore, StoryEngine
+        from .narrator import _build_multiscene_broll, build_narrated_short
+        from .story_engine import NarrativeContinuityStore, StoryEngine, detect_universal_genre_and_niche
 
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        resolved_genre, auto_niche, auto_voice = detect_universal_genre_and_niche(prompt, genre)
+        resolved_niche = (niche_override or auto_niche or "podcast").strip()
+        resolved_voice = (voice_style or auto_voice or "narrador_pro").strip()
+
         c_store = NarrativeContinuityStore(out_dir / "narrative_continuity.db")
         engine = StoryEngine(continuity_store=c_store)
         script_obj = engine.generate_story_script(
             prompt=prompt,
-            genre=genre,
+            genre=resolved_genre,
             season=1,
             target_duration_sec=38.0,
         )
@@ -596,33 +601,48 @@ class MangaAnimeLab:
         work_dir.mkdir(parents=True, exist_ok=True)
 
         bg_source: str | Path = "gameplay"
-        mode_upper = str(visual_mode or "TRI_LAYER").upper()
+        mode_upper = str(visual_mode or "MULTISCENE_BROLL").upper()
 
         if mode_upper in {"TRI_LAYER", "RTL_PAN"}:
             resolved_img: Optional[Path] = None
             target_url = str(image_url or "").strip()
             if not target_url:
-                try:
-                    from .anime_trends import get_releasing_anime_radar
-                    radar = get_releasing_anime_radar(limit=12)
-                    p_low = prompt.lower()
-                    matched = next(
-                        (it for it in radar if any(w in str(it.get("title") or "").lower() for w in p_low.split() if len(w) >= 3)),
-                        radar[0] if radar else None,
-                    )
-                    if matched:
-                        target_url = str(
-                            matched.get("image_url")
-                            or matched.get("cover")
-                            or matched.get("banner")
-                            or ""
+                p_low = prompt.lower()
+                if resolved_niche == "entretenimento_animes":
+                    try:
+                        from .anime_trends import get_releasing_anime_radar
+                        radar = get_releasing_anime_radar(limit=12)
+                        matched = next(
+                            (it for it in radar if any(w in str(it.get("title") or "").lower() for w in p_low.split() if len(w) >= 3)),
+                            radar[0] if radar else None,
                         )
-                except Exception:
-                    target_url = ""
+                        if matched:
+                            target_url = str(
+                                matched.get("image_url")
+                                or matched.get("cover")
+                                or matched.get("banner")
+                                or ""
+                            )
+                    except Exception:
+                        target_url = ""
+                else:
+                    try:
+                        from .world_news import fetch_world_news_headlines
+                        news_topic = "tech" if resolved_niche in {"ia_tech", "financas"} else "world"
+                        headlines = fetch_world_news_headlines(topic=news_topic, limit=10)
+                        with_img = [h for h in headlines if str(h.get("image_url") or "").startswith("http")]
+                        matched_news = next(
+                            (h for h in with_img if any(w in str(h.get("title") or "").lower() for w in p_low.split() if len(w) >= 4)),
+                            with_img[0] if with_img else None,
+                        )
+                        if matched_news:
+                            target_url = str(matched_news.get("image_url") or "")
+                    except Exception:
+                        target_url = ""
 
             if target_url.startswith(("http://", "https://")):
                 try:
-                    dl_img = work_dir / "_anime_key_visual.jpg"
+                    dl_img = work_dir / "_cinema_key_visual.jpg"
                     req = urllib.request.Request(target_url, headers={"User-Agent": "AutoShorts/2.0"})
                     with urllib.request.urlopen(req, timeout=8.0) as resp:
                         data = resp.read()
@@ -633,33 +653,48 @@ class MangaAnimeLab:
                     resolved_img = None
 
             if resolved_img and resolved_img.is_file():
-                bg_25d = work_dir / "_bg_25d_loop.mp4"
+                bg_25d = work_dir / "_bg_25d_hook.mp4"
+                use_speed_lines = resolved_niche == "entretenimento_animes"
                 r25 = cls.render_manga_panel_video(
                     image_path=resolved_img,
                     out_mp4=bg_25d,
-                    duration_sec=14.0,
+                    duration_sec=8.5,
                     mode=mode_upper,
-                    add_speed_lines=True,
+                    add_speed_lines=use_speed_lines,
                     quality="mobile",
                 )
                 if r25.get("ok") and bg_25d.is_file():
-                    bg_source = bg_25d
+                    # Hybrid Multi-Scene: combine 2.5D Key Visual Hook with dynamic 4.2s B-roll cuts
+                    # so the video NEVER stays stuck on a single static image for 35+ seconds!
+                    hybrid_bg, _ = _build_multiscene_broll(
+                        out_root=out_dir,
+                        primary_bg=bg_25d,
+                        primary_style="25d_parallax",
+                        duration=42.0,
+                        work_dir=work_dir,
+                        width=720,
+                        height=1280,
+                    )
+                    bg_source = hybrid_bg if hybrid_bg.is_file() else bg_25d
 
         nar_res = build_narrated_short(
             bg_video=bg_source,
             script_text=spoken_text,
             out_mp4=out_mp4,
             hook_title=hook_text,
-            style_key=voice_style,
+            style_key=resolved_voice,
             layout="center_crop",
             humanize=True,
-            niche="entretenimento_animes",
+            niche=resolved_niche,
             custom_title=script_obj.title,
         )
         return {
             "ok": True,
             "filename": out_mp4.name,
             "output": str(out_mp4),
+            "niche": resolved_niche,
+            "genre": resolved_genre,
+            "voice_style": resolved_voice,
             "script": script_obj.to_dict(),
             "narration_result": nar_res,
             "visual_audit": nar_res.get("visual_audit"),
