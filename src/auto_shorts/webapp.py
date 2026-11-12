@@ -1715,8 +1715,10 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/sentinel/pull-now":
                 if _DRIVE_SENTINEL:
-                    res = _DRIVE_SENTINEL.pull_now()
-                    self._send_json(200, {"message": "Puxada automatica de anime iniciada da web!", "data": res})
+                    topic = str(body.get("topic") or "").strip()
+                    res = _DRIVE_SENTINEL.pull_now(topic=topic or None)
+                    msg = "Puxada automática de plantão tech iniciada!" if topic in ("tech", "news") else "Puxada automática de anime iniciada da web!"
+                    self._send_json(200, {"message": msg, "data": res})
                 else:
                     self._send_json(400, {"message": "Sentinela nao inicializado"})
                 return

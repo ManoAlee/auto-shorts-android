@@ -74,13 +74,16 @@ def fetch_world_news_headlines(
     get = fetcher or _http_get_text
     collected: List[Dict] = []
 
-    # 1. BBC News Brasil, Euronews PT & G1 (global/BR journalism natively in Portuguese)
+    # 1. BBC News Brasil, Euronews PT, G1, Tecnoblog & Incidentes Globais
     for rss_url, src_label, cat_name in (
+        ("https://news.google.com/rss/search?q=Microsoft+OR+CrowdStrike+OR+AWS+OR+Cloudflare+OR+apagao+OR+pane+when:2d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Tech Global", "tech_ia"),
+        ("https://tecnoblog.net/feed/", "Tecnoblog", "tech_ia"),
         ("https://feeds.bbci.co.uk/portuguese/rss.xml", "BBC News Brasil", "mundo"),
         ("https://pt.euronews.com/rss?level=theme&name=news", "Euronews Mundo", "mundo"),
         ("https://g1.globo.com/rss/g1/tecnologia/", "G1 Tecnologia", "tech_ia"),
         ("https://g1.globo.com/rss/g1/economia/", "G1 Economia", "economia"),
         ("https://g1.globo.com/rss/g1/mundo/", "G1 Mundo", "mundo"),
+        ("https://www.bleepingcomputer.com/feed/", "BleepingComputer", "tech_ia"),
     ):
         try:
             collected.extend(_parse_rss_items(
@@ -246,6 +249,15 @@ def translate_en_to_ptbr(
 
 def _build_complete_news_hook(pt_title: str, max_chars: int = 32) -> str:
     """Build a punchy uppercase hook without stopping mid-clause on a preposition, article, or transitive verb."""
+    t_lower = (pt_title or "").lower()
+    if any(k in t_lower for k in ("apagao", "apagão", "fora do ar", "pane", "interrupcao", "interrupção", "queda")):
+        if "microsoft" in t_lower:
+            return "APAGÃO NA MICROSOFT!"
+        if "aws" in t_lower or "amazon" in t_lower:
+            return "ALERTA NA AMAZON!"
+        if "google" in t_lower:
+            return "PANE NO GOOGLE!"
+        return "APAGÃO GLOBAL NO AR!"
     return clean_word_boundary_hook(pt_title, max_chars=max_chars, fallback="URGENTE NO MUNDO")
 
 
