@@ -674,6 +674,7 @@ class MangaAnimeLab:
                         work_dir=work_dir,
                         width=720,
                         height=1280,
+                        niche=resolved_niche,
                     )
                     bg_source = hybrid_bg if hybrid_bg.is_file() else bg_25d
 

@@ -99,24 +99,45 @@ _PLACEHOLDER_LITERALS = {
     "titulo",
     "title",
     "hook",
+    " hook_title",
+    "hook_title",
     "gancho",
     "cta",
     "n/a",
     "...",
     "null",
     "none",
+    "4 words in caps",
+    "four words in caps",
+    "curious title",
+    "short call",
+    "real reason",
 }
+
+_PLACEHOLDER_SUBSTRINGS = (
+    "titulo curioso",
+    "gancho em ",
+    "motivo real",
+    "chamada curta",
+    "4 words",
+    "words in caps",
+    "in caps",
+    "4 palavras",
+    "6 palavras",
+    "caixa alta",
+    "max 65",
+    "curious title",
+    "short call",
+    "real reason",
+    "hook_title",
+)
 
 
 def _is_placeholder_text(val: object) -> bool:
     txt = str(val or "").strip().lower()
-    return (
-        txt in _PLACEHOLDER_LITERALS
-        or txt.startswith("titulo curioso")
-        or txt.startswith("gancho em ")
-        or txt.startswith("motivo real")
-        or txt.startswith("chamada curta")
-    )
+    if txt in _PLACEHOLDER_LITERALS:
+        return True
+    return any(sub in txt for sub in _PLACEHOLDER_SUBSTRINGS)
 
 
 def _ends_complete_sentence(text: str) -> bool:
@@ -178,6 +199,9 @@ def _sanitize_highlights(
         dur = end - start
         if dur < min_ok:
             continue
+        if duration >= 150.0 and start < 20.0 and segs and float(segs[-1].get("end", 0.0)) >= 90.0:
+            # Never let an LLM pick the 0.0s YouTuber intro when the video has a full body (>150s)
+            continue
         if segs or dur > hard_cap:
             end = _snap_end_to_sentence(segs, start, end, min_dur=min_ok, hard_cap=hard_cap)
 
@@ -186,7 +210,7 @@ def _sanitize_highlights(
         if _is_placeholder_text(raw_hook):
             hook_title = _pick_best_hook(clip_texts, source_title, niche or NICHES["geral"])
         else:
-            hook_title = raw_hook[:48].upper()
+            hook_title = _polish_hook_phrase(raw_hook, max_chars=34) or _pick_best_hook(clip_texts, source_title, niche or NICHES["geral"])
 
         raw_title = str(item.get("title") or "").strip()
         if _is_placeholder_text(raw_title):
@@ -819,12 +843,14 @@ def detect_highlights(
     if not segments:
         return []
 
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    has_real_openai = bool(openai_key and openai_key.lower() not in {"local", "none", "null"})
     has_api = bool(
         llm_fn
-        or os.getenv("OPENROUTER_API_KEY")
-        or os.getenv("GEMINI_API_KEY")
-        or os.getenv("LOCAL_LLM_URL")
-        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("OPENROUTER_API_KEY", "").strip()
+        or os.getenv("GEMINI_API_KEY", "").strip()
+        or os.getenv("LOCAL_LLM_URL", "").strip()
+        or has_real_openai
     )
     if not use_llm or not has_api:
         return score_segments_offline(

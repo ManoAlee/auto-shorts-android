@@ -239,9 +239,23 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         return []
     items: List[Dict] = []
     for mp4 in sorted(out_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
-        if mp4.stat().st_size < 50000:
+        try:
+            st = mp4.stat()
+        except OSError:
+            continue
+        if st.st_size < 50000:
             continue
         pack_file = mp4.with_suffix(".publish.json")
+        if not pack_file.is_file():
+            try:
+                head = mp4.read_bytes()[:65536]
+                if b"ftyp" in head[:64] and b"moov" not in head:
+                    # Half-written FFmpeg encode without finalized +faststart moov atom
+                    if (time.time() - st.st_mtime) > 240:
+                        mp4.unlink(missing_ok=True)
+                    continue
+            except OSError:
+                continue
         pack = {}
         if pack_file.is_file():
             try:

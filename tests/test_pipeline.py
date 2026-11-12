@@ -2094,6 +2094,38 @@ def test_universal_multi_niche_cinema_story_and_hook_safety(tmp_path):
     assert "One Piece" in healed
     assert "Brook" in healed
 
+    # 5. Reject English/LLM schema placeholders ("4 WORDS IN CAPS") and 0.0s intro cuts on long videos
+    from auto_shorts.gameplay import NICHE_STYLE_AFFINITY, _BRAINROT_GAMEPLAY_STYLES
+    from auto_shorts.highlights import _is_placeholder_text, detect_highlights
+
+    assert _is_placeholder_text("4 WORDS IN CAPS") is True
+    assert _is_placeholder_text("GANCHO EM 4 PALAVRAS") is True
+    assert _is_placeholder_text("Curious Title") is True
+
+    long_tx = {
+        "duration": 300.0,
+        "segments": [
+            {"start": 0.0, "end": 70.0, "text": "Fala galera bem vindos ao canal deixa o like e se inscreva agora."},
+            {"start": 90.0, "end": 165.0, "text": "O segredo da taxa Selic e dos juros compostos que muda todo investimento no Brasil!"},
+        ],
+    }
+    picked = detect_highlights(
+        long_tx,
+        platform_key="tiktok_rewards",
+        niche_key="financas",
+        num_clips=1,
+        llm_fn=lambda _p: '{"highlights":[{"title":"Curious Title","hook_title":"4 WORDS IN CAPS","start_time":0.0,"end_time":70.0,"score":95}]}',
+        use_llm=True,
+        source_title="Segredo da Taxa Selic",
+    )
+    assert len(picked) == 1
+    assert picked[0]["start_time"] >= 80.0
+    assert picked[0]["hook_title"] != "4 WORDS IN CAPS"
+
+    # 6. Non-gaming niches never map to Minecraft / Subway Surfers / GTA brainrot gameplay
+    for niche_key in ("financas", "ia_tech", "noticias_mundiais", "entretenimento_animes", "podcast", "desenvolvimento_pessoal", "saude_fitness"):
+        assert not (set(NICHE_STYLE_AFFINITY[niche_key]) & _BRAINROT_GAMEPLAY_STYLES)
+
 
 
 
