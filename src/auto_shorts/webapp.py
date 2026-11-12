@@ -1713,6 +1713,14 @@ def make_handler(out_dir: Path):
                     self._send_json(400, {"message": "Sentinela nao inicializado"})
                 return
 
+            if parsed.path == "/api/sentinel/pull-now":
+                if _DRIVE_SENTINEL:
+                    res = _DRIVE_SENTINEL.pull_now()
+                    self._send_json(200, {"message": "Puxada automatica de anime iniciada da web!", "data": res})
+                else:
+                    self._send_json(400, {"message": "Sentinela nao inicializado"})
+                return
+
             if parsed.path == "/api/run":
                 src_check = str(body.get("source") or "").strip()
                 from .downloader import is_rclone_target

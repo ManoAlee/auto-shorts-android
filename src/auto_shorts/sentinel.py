@@ -3,8 +3,8 @@
 Continuously watches Google Drive 5TB (gdrive:Animes_Para_Cortar), automatically ingests
 new episodes, cuts 3-5 action-packed vertical shorts preserving authentic dubber audio,
 uploads completed shorts to gdrive:Shorts_Finalizados, moves source episode to
-gdrive:Animes_Processados without downloading heavy bytes twice, and falls back to
-autonomous viral trend cycles when the drive queue is clear.
+gdrive:Animes_Processados without downloading heavy bytes twice, AND AUTONOMOUSLY PULLS
+trending Brazilian dubbed anime scenes directly from the web when the Drive queue is empty.
 """
 
 import json
@@ -20,10 +20,23 @@ from .downloader import (
     list_gdrive_episodes,
     move_gdrive_episode,
     refresh_gdrive_token,
+    upload_to_rclone,
 )
 from .mahoraga import MahoragaEngine
 
 logger = logging.getLogger("DriveSentinel")
+
+AUTO_ANIME_PULL_QUERIES = [
+    "jujutsu kaisen dublado cena epica brasil",
+    "dragon ball z dublado melhores momentos brasil",
+    "naruto shippuden dublado luta epica brasil",
+    "demon slayer dublado cena epica brasil",
+    "one piece dublado cena epica brasil",
+    "solo leveling dublado cena brasil",
+    "bleach dublado cena epica brasil",
+    "hunter x hunter dublado cena epica brasil",
+    "death note dublado cena tensa brasil",
+]
 
 
 class DriveSentinelEngine:
@@ -31,14 +44,16 @@ class DriveSentinelEngine:
         self,
         out_dir: str | Path = "output",
         poll_interval_sec: int = 45,
-        autonomous_fallback_hours: int = 3,
+        auto_pull_interval_min: int = 45,
         num_clips_per_episode: int = 3,
+        auto_pull_enabled: bool = True,
     ):
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.poll_interval_sec = max(15, poll_interval_sec)
-        self.autonomous_fallback_hours = max(1, autonomous_fallback_hours)
+        self.auto_pull_interval_min = max(10, auto_pull_interval_min)
         self.num_clips_per_episode = max(1, min(10, num_clips_per_episode))
+        self.auto_pull_enabled = auto_pull_enabled
         self._db_path = self.out_dir / "shorts_evolution.db"
         self._cfg_file = self.out_dir / "sentinel_state.json"
         self._lock = threading.RLock()
@@ -52,10 +67,13 @@ class DriveSentinelEngine:
             "last_check_ts": 0.0,
             "last_action": "Sentinela inicializado",
             "episodes_processed_count": 0,
+            "web_animes_pulled_count": 0,
             "current_task": "",
             "last_error": "",
             "active_episode": None,
-            "last_autonomous_cycle_ts": 0.0,
+            "last_auto_pull_ts": 0.0,
+            "auto_pull_query_index": 0,
+            "auto_pull_enabled": self.auto_pull_enabled,
         }
         self._load_state()
 
@@ -65,7 +83,6 @@ class DriveSentinelEngine:
                 data = json.loads(self._cfg_file.read_text(encoding="utf-8"))
                 with self._lock:
                     self._state.update(data)
-                    # Reset dynamic execution flags
                     self._state["running"] = False
                     self._state["active_episode"] = None
             except Exception:
@@ -106,16 +123,23 @@ class DriveSentinelEngine:
             return True
 
     def scan_now(self) -> Dict:
-        """Trigger an immediate check outside the scheduled sleep."""
+        """Trigger an immediate check of Google Drive."""
         t = threading.Thread(target=self._execute_single_round, name="DriveSentinelInstantScan", daemon=True)
         t.start()
         return {"status": "scanning_triggered", "timestamp": time.time()}
+
+    def pull_now(self) -> Dict:
+        """Force an immediate automated pull of a trending anime from the web."""
+        t = threading.Thread(target=self._pull_web_anime_episode, name="DriveSentinelInstantPull", daemon=True)
+        t.start()
+        return {"status": "pull_triggered", "timestamp": time.time()}
 
     def get_telemetry(self) -> Dict:
         with self._lock:
             snap = dict(self._state)
             snap["running"] = bool(self._worker_thread and self._worker_thread.is_alive())
             snap["poll_interval_sec"] = self.poll_interval_sec
+            snap["auto_pull_interval_min"] = self.auto_pull_interval_min
             snap["num_clips_per_episode"] = self.num_clips_per_episode
             return snap
 
@@ -130,7 +154,6 @@ class DriveSentinelEngine:
                     self._state["mode"] = "error_backoff"
                 logger.exception("Error in sentinel loop iteration: %s", exc)
 
-            # Sleep in 1-second chunks for responsive thread termination
             for _ in range(self.poll_interval_sec):
                 if self._stop_event.is_set():
                     break
@@ -163,17 +186,19 @@ class DriveSentinelEngine:
             self._process_drive_episode(target_ep)
             return
 
-        # 3. No drive episodes pending: check autonomous trend cycle fallback
+        # 3. No drive episodes pending: check if we should auto-pull an anime from the web
         with self._lock:
-            last_auto = float(self._state.get("last_autonomous_cycle_ts") or 0.0)
-            elapsed_hours = (time.time() - last_auto) / 3600.0
+            auto_pull_on = bool(self._state.get("auto_pull_enabled", True))
+            last_pull = float(self._state.get("last_auto_pull_ts") or 0.0)
+            elapsed_min = (time.time() - last_pull) / 60.0
 
-        if elapsed_hours >= self.autonomous_fallback_hours:
-            self._trigger_autonomous_fallback()
+        if auto_pull_on and elapsed_min >= self.auto_pull_interval_min:
+            self._pull_web_anime_episode()
         else:
             with self._lock:
                 self._state["mode"] = "idle_watching"
-                self._state["last_action"] = f"Drive limpo (0 pendentes). Monitorando a cada {self.poll_interval_sec}s."
+                remaining_min = max(0, int(self.auto_pull_interval_min - elapsed_min))
+                self._state["last_action"] = f"Drive limpo (0 pendentes). Próximo anime automático em ~{remaining_min}min."
                 self._state["active_episode"] = None
                 self._persist_state()
 
@@ -220,7 +245,6 @@ class DriveSentinelEngine:
                 self._state["last_error"] = ""
                 self._persist_state()
 
-            # Record in Mahoraga
             MahoragaEngine(self._db_path).record_adaptation_event(
                 phenomenon="sentinel_episode_sliced",
                 spoke="Raio VIII (Autonomous Slicer)",
@@ -242,36 +266,55 @@ class DriveSentinelEngine:
                 success=False,
             )
 
-    def _trigger_autonomous_fallback(self) -> None:
-        """When Google Drive has no pending anime episodes, autonomously create viral news/trends shorts."""
+    def _pull_web_anime_episode(self) -> None:
+        """Autonomously discover and pull a trending Brazilian dubbed anime from the web and slice it."""
         with self._lock:
-            self._state["mode"] = "autonomous_cycle"
-            self._state["current_task"] = "Gerando Short de Notícias / Radar de Animes..."
+            idx = int(self._state.get("auto_pull_query_index", 0)) % len(AUTO_ANIME_PULL_QUERIES)
+            query = AUTO_ANIME_PULL_QUERIES[idx]
+            self._state["auto_pull_query_index"] = idx + 1
+            self._state["mode"] = "pulling_web_anime"
+            self._state["current_task"] = f"Puxando automaticamente cena de anime: '{query}'..."
+            self._state["last_action"] = f"Buscando anime na web: {query}"
             self._persist_state()
 
-        from .world_news import produce_world_news_short
+        from .pipeline import run_autopilot
 
         try:
-            fb = produce_world_news_short(
+            logger.info("DriveSentinel auto-pulling anime from web with query: %s", query)
+            res = run_autopilot(
                 out_dir=self.out_dir,
-                topic="world",
-                auto_publish=True,
+                platform="youtube_shorts",
+                niche="entretenimento_animes",
+                query=query,
+                num_clips=self.num_clips_per_episode,
+                layout="blur_bg",
+                quality="mobile",
                 use_llm=True,
+                auto_layout=True,
+                playlist_name="Animes e Batalhas Épicas - Shorts",
+                auto_publish=True,
             )
-            # Backup to Google Drive Shorts_Finalizados
-            from .downloader import upload_to_rclone
-            out_file = fb.get("output")
-            if out_file and Path(out_file).is_file():
-                upload_to_rclone(Path(out_file), "gdrive:Shorts_Finalizados")
 
+            num_clips = len(res.get("clips") or [])
             with self._lock:
-                self._state["last_autonomous_cycle_ts"] = time.time()
-                self._state["mode"] = "autonomous_cycle_done"
-                self._state["last_action"] = f"Ciclo de tendências concluído: {fb.get('title', '')[:50]}"
+                self._state["last_auto_pull_ts"] = time.time()
+                self._state["web_animes_pulled_count"] = int(self._state.get("web_animes_pulled_count", 0)) + 1
+                self._state["mode"] = "web_anime_done"
+                self._state["last_action"] = f"Puxado com sucesso! {num_clips} cortes gerados de '{query}' e salvos no Drive 5TB."
+                self._state["last_error"] = ""
                 self._persist_state()
 
+            MahoragaEngine(self._db_path).record_adaptation_event(
+                phenomenon="sentinel_web_anime_pulled",
+                spoke="Raio VIII (Autonomous Slicer)",
+                action=f"Anime puxado automaticamente da web ('{query}'): {num_clips} cortes salvos.",
+                success=True,
+            )
+
         except Exception as exc:
-            logger.exception("Autonomous trend cycle fallback failed: %s", exc)
+            logger.exception("Failed auto-pulling anime for query %s: %s", query, exc)
             with self._lock:
+                self._state["mode"] = "pull_error"
                 self._state["last_error"] = str(exc)[:200]
+                self._state["last_action"] = f"Falha ao puxar da web. Próxima tentativa em {self.poll_interval_sec}s."
                 self._persist_state()

@@ -269,6 +269,12 @@
         badgeEl.style.color = '#facc15';
         badgeEl.style.borderColor = 'rgba(234,179,8,0.4)';
         descEl.textContent = data.current_task || 'Processando clímax épicos do anime e preservando vozes originais...';
+      } else if (data.mode === 'pulling_web_anime') {
+        badgeEl.innerHTML = '<span class="spinner" style="width:10px;height:10px;margin-right:4px;"></span>PUXANDO DA WEB';
+        badgeEl.style.background = 'rgba(168,85,247,0.2)';
+        badgeEl.style.color = '#c084fc';
+        badgeEl.style.borderColor = 'rgba(168,85,247,0.4)';
+        descEl.textContent = data.current_task || 'Descobrindo e baixando cena épica dublada da web...';
       } else {
         badgeEl.textContent = '🟢 ATIVO & VIGIANDO';
         badgeEl.style.background = 'rgba(34,197,94,0.2)';
@@ -719,8 +725,17 @@
     });
   }
 
+  const btnSentinelPull = document.getElementById('btn-sentinel-pull');
   const btnSentinelScan = document.getElementById('btn-sentinel-scan');
   const btnSentinelToggle = document.getElementById('btn-sentinel-toggle');
+  if (btnSentinelPull) {
+    btnSentinelPull.addEventListener('click', () => withBusyBtn(btnSentinelPull, 'Puxando...', async () => {
+      const res = await fetch('/api/sentinel/pull-now', { method: 'POST' });
+      const d = await res.json();
+      showToast(d.message || 'Puxada automática disparada!', 'ok');
+      refreshSentinelStatus();
+    }));
+  }
   if (btnSentinelScan) {
     btnSentinelScan.addEventListener('click', () => withBusyBtn(btnSentinelScan, 'Checando...', async () => {
       const res = await fetch('/api/sentinel/scan-now', { method: 'POST' });

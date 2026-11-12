@@ -18,8 +18,14 @@ NICHE_SEARCH_QUERIES: Dict[str, List[str]] = {
         "automacao ia tecnologia brasil",
     ],
     "entretenimento_animes": [
-        "teoria anime manga brasil",
-        "explicando final anime manga brasil",
+        "anime dublado cena epica brasil",
+        "jujutsu kaisen dublado melhores momentos brasil",
+        "dragon ball z dublado cena marcante brasil",
+        "naruto shippuden dublado luta epica brasil",
+        "demon slayer dublado cena brasil",
+        "one piece dublado cena epica brasil",
+        "solo leveling dublado cena brasil",
+        "bleach dublado cena epica brasil",
     ],
     "desenvolvimento_pessoal": [
         "habitos disciplina podcast brasil",
