@@ -1025,6 +1025,7 @@ def _build_multiscene_broll(
     work_dir: Path,
     width: int = 720,
     height: int = 1280,
+    niche: str = "geral",
 ) -> Tuple[Path, str]:
     """Assemble dynamic ~4.2s visual scene switches across distinct bright clips (MoneyPrinterTurbo style)."""
     try:
@@ -1032,12 +1033,13 @@ def _build_multiscene_broll(
             return primary_bg, primary_style
         if not primary_bg.is_file() or b"ftyp" not in primary_bg.read_bytes()[:64]:
             return primary_bg, primary_style
-        from .gameplay import _extract_style_tag, _is_segment_visually_bright, list_gameplay_clips, probe_video_duration
+        from .gameplay import _BRAINROT_GAMEPLAY_STYLES, _extract_style_tag, _is_segment_visually_bright, list_gameplay_clips, probe_video_duration
         import random
 
         clips = [
             c for c in sorted(list_gameplay_clips(out_root), key=lambda p: p.name)
             if c.is_file() and c.stat().st_size > 50_000 and b"ftyp" in c.read_bytes()[:64]
+            and (niche == "gameplay" or _extract_style_tag(c) not in _BRAINROT_GAMEPLAY_STYLES)
         ]
         others = [c for c in clips if c != primary_bg and _is_segment_visually_bright(c, 5.0)]
         if not others:
