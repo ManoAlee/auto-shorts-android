@@ -41,10 +41,11 @@ def score_short_for_youtube_algorithm(
 
     # 2. Retention, pacing & length sweet spot (30 pts)
     dur = float(v.get("duration") or 0.0)
+    is_tiktok = "tiktok" in (str(p.get("platform") or "") + " " + str(p.get("output_path") or "") + " " + filename).lower()
     ret_pts = 0
-    if 13.0 <= dur <= 22.0 or 34.0 <= dur <= 58.0:
+    if 13.0 <= dur <= 22.0 or 34.0 <= dur <= 58.0 or (is_tiktok and 60.0 <= dur <= 130.0):
         ret_pts += 15
-    elif 5.0 <= dur <= 60.0:
+    elif 5.0 <= dur <= 60.0 or (is_tiktok and dur <= 180.0):
         ret_pts += 10
         tips.append("Duracao ideal no algoritmo Shorts: 15-20s (alta conclusao) ou 35-55s (retencao narrativa).")
     elif dur > 60.0:
@@ -62,7 +63,7 @@ def score_short_for_youtube_algorithm(
 
     # 3. Search & Shorts Feed Metadata (20 pts)
     seo_pts = 0
-    if "#Shorts" in caption or "#Shorts" in tags:
+    if "#Shorts" in caption or "#Shorts" in tags or is_tiktok:
         seo_pts += 7
     else:
         tips.append("Inclua #Shorts na descricao.")

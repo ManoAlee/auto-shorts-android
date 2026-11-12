@@ -99,45 +99,24 @@ _PLACEHOLDER_LITERALS = {
     "titulo",
     "title",
     "hook",
-    " hook_title",
-    "hook_title",
     "gancho",
     "cta",
     "n/a",
     "...",
     "null",
     "none",
-    "4 words in caps",
-    "four words in caps",
-    "curious title",
-    "short call",
-    "real reason",
 }
-
-_PLACEHOLDER_SUBSTRINGS = (
-    "titulo curioso",
-    "gancho em ",
-    "motivo real",
-    "chamada curta",
-    "4 words",
-    "words in caps",
-    "in caps",
-    "4 palavras",
-    "6 palavras",
-    "caixa alta",
-    "max 65",
-    "curious title",
-    "short call",
-    "real reason",
-    "hook_title",
-)
 
 
 def _is_placeholder_text(val: object) -> bool:
     txt = str(val or "").strip().lower()
-    if txt in _PLACEHOLDER_LITERALS:
-        return True
-    return any(sub in txt for sub in _PLACEHOLDER_SUBSTRINGS)
+    return (
+        txt in _PLACEHOLDER_LITERALS
+        or txt.startswith("titulo curioso")
+        or txt.startswith("gancho em ")
+        or txt.startswith("motivo real")
+        or txt.startswith("chamada curta")
+    )
 
 
 def _ends_complete_sentence(text: str) -> bool:
@@ -199,9 +178,6 @@ def _sanitize_highlights(
         dur = end - start
         if dur < min_ok:
             continue
-        if duration >= 150.0 and start < 20.0 and segs and float(segs[-1].get("end", 0.0)) >= 90.0:
-            # Never let an LLM pick the 0.0s YouTuber intro when the video has a full body (>150s)
-            continue
         if segs or dur > hard_cap:
             end = _snap_end_to_sentence(segs, start, end, min_dur=min_ok, hard_cap=hard_cap)
 
@@ -210,7 +186,7 @@ def _sanitize_highlights(
         if _is_placeholder_text(raw_hook):
             hook_title = _pick_best_hook(clip_texts, source_title, niche or NICHES["geral"])
         else:
-            hook_title = _polish_hook_phrase(raw_hook, max_chars=34) or _pick_best_hook(clip_texts, source_title, niche or NICHES["geral"])
+            hook_title = raw_hook[:48].upper()
 
         raw_title = str(item.get("title") or "").strip()
         if _is_placeholder_text(raw_title):
@@ -591,7 +567,8 @@ def _polish_hook_phrase(words: List[str] | str, max_chars: int = 28) -> str:
         "melhor", "pior", "consegue", "nao", "não", "vai", "tem", "sao", "são", "muito",
         "hip", "toda", "todo", "alguns", "algumas", "grande", "essa", "esse", "ainda",
         "bem", "fala", "autoshorts", "foi", "era", "tá", "ta", "está", "gente", "coisa",
-        "vemos", "ver", "disse", "falou",
+        "vemos", "ver", "disse", "falou", "tentando", "mesmo", "entao", "então", "quando",
+        "como", "onde", "sobre", "contra", "entre", "quase", "outro", "outra",
     }
     cleaned_words: List[str] = []
     for raw_w in words:
@@ -629,19 +606,30 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
     best_line = ""
     best_score = -1
 
+    clean_src = _clean_source_title(source_title)
+    src_hook = ""
+    if clean_src and not _looks_english_title(clean_src):
+        first_clause = re.split(r"[!?:|—\-]+", clean_src)[0].strip()
+        src_cand = _polish_hook_phrase(first_clause.split(), max_chars=28)
+        if src_cand and len(src_cand.split()) >= 2:
+            src_hook = src_cand
+
     for idx, raw in enumerate(texts[:12]):
         healed_raw = heal_proper_nouns_and_asr(str(raw))
         raw_low = healed_raw.lower()
         if any(bp in raw_low for bp in _INTRO_BOILERPLATE_PHRASES) or healed_raw.lstrip().startswith((">>", '"')):
             continue
-        words = [w for w in healed_raw.split() if (len(w) > 1 or w.lower() in {"e", "a", "o"}) and not w.isdigit()]
+        clauses = [c.strip() for c in re.split(r"[.!?]+", healed_raw) if len(c.split()) >= 3] or [healed_raw]
+        clause_txt = clauses[0]
+        words = [w for w in clause_txt.split() if (len(w) > 1 or w.lower() in {"e", "a", "o"}) and not w.isdigit()]
         if len(words) < 3:
             continue
         lowered = " ".join(words).lower()
-        score = sum(3 for kw in niche.hook_keywords if kw in lowered)
+        kw_hits = sum(3 for kw in niche.hook_keywords if kw in lowered)
+        score = kw_hits
         score += 2 if ("?" in healed_raw or "!" in healed_raw) else 0
         score -= sum(4 for w in words if w.lower().strip(",.?!") in filler)
-        score += max(0, 3 - idx)
+        score += max(0, 2 - idx)
         if score > best_score:
             cand = _polish_hook_phrase(words)
             strong_tokens = [w for w in cand.split() if len(w.strip(",.:;!?")) >= 4]
@@ -649,8 +637,12 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
                 best_score = score
                 best_line = cand
 
+    if src_hook and best_score < 4:
+        return src_hook
     if best_line and best_score > 0:
         return best_line
+    if src_hook:
+        return src_hook
 
     pt_src = _translate_title_to_ptbr(source_title)
     if pt_src:
@@ -843,14 +835,12 @@ def detect_highlights(
     if not segments:
         return []
 
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    has_real_openai = bool(openai_key and openai_key.lower() not in {"local", "none", "null"})
     has_api = bool(
         llm_fn
-        or os.getenv("OPENROUTER_API_KEY", "").strip()
-        or os.getenv("GEMINI_API_KEY", "").strip()
-        or os.getenv("LOCAL_LLM_URL", "").strip()
-        or has_real_openai
+        or os.getenv("OPENROUTER_API_KEY")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("LOCAL_LLM_URL")
+        or os.getenv("OPENAI_API_KEY")
     )
     if not use_llm or not has_api:
         return score_segments_offline(

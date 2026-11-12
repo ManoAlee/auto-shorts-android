@@ -233,10 +233,11 @@ def validate_generated_short(
         if metrics["width"] < 480:
             errors.append(f"Resolucao abaixo do minimo ({metrics['width']}x{metrics['height']}).")
 
+    eff_max_duration = 180.0 if ("tiktok" in p.name.lower() and max_duration == 60.0) else max_duration
     if metrics["duration"] < 4.0:
         errors.append(f"Duracao muito curta ({metrics['duration']}s < 4.0s).")
-    elif metrics["duration"] > max_duration:
-        errors.append(f"Duracao excede o limite de Shorts ({metrics['duration']}s > {max_duration:.0f}s).")
+    elif metrics["duration"] > eff_max_duration:
+        errors.append(f"Duracao excede o limite de Shorts ({metrics['duration']}s > {eff_max_duration:.0f}s).")
 
     if not metrics["audio_codec"]:
         errors.append("Stream de audio ausente.")

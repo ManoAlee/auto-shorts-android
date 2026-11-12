@@ -249,11 +249,11 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         if not pack_file.is_file():
             try:
                 head = mp4.read_bytes()[:65536]
-                if b"ftyp" in head[:64] and b"moov" not in head:
-                    # Half-written FFmpeg encode without finalized +faststart moov atom
-                    if (time.time() - st.st_mtime) > 240:
+                if b"ftyp" in head[:64]:
+                    if (time.time() - st.st_mtime) > 240 and b"moov" not in head:
                         mp4.unlink(missing_ok=True)
-                    continue
+                    if (time.time() - st.st_mtime) < 120 or b"moov" not in head:
+                        continue
             except OSError:
                 continue
         pack = {}
@@ -264,7 +264,7 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
                 pack = {}
         thumb_16 = mp4.with_name(f"{mp4.stem}_thumb_16x9.jpg")
         validation = pack.get("validation")
-        algo = pack.get("algorithm") or score_short_for_youtube_algorithm(pack, validation, mp4.name)
+        algo = score_short_for_youtube_algorithm(pack, validation, mp4.name)
         items.append({
             "filename": mp4.name,
             "size_mb": round(mp4.stat().st_size / (1024 * 1024), 2),

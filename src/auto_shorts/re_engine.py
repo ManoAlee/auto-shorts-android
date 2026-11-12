@@ -372,11 +372,12 @@ def score_short_opus_runbook(pack: Dict, validation: Optional[Dict] = None, dura
         c_rehook = 19 if (has_multi_bg and cues >= 12) else (15 if (cues >= 8 or has_multi_bg) else 9)
 
     # 4. Payoff & crisp ending without repetitive beg-outro bloat (0-20)
-    weak_outro = "acompanhar os proximos cortes" in cap.lower() and dur > 52.0
+    is_tiktok = "tiktok" in str(pack.get("platform") or pack.get("output_path") or "").lower()
+    weak_outro = "acompanhar os proximos cortes" in cap.lower() and dur > 52.0 and not is_tiktok
     if weak_outro:
         flaws.append("Outro generico longo no final; encurte payoff para elevar loop.")
-    c_payoff = 15 if weak_outro else (18 if 18.0 <= dur <= 48.0 else 13)
-    if dur > 57.0:
+    c_payoff = 15 if weak_outro else (18 if (18.0 <= dur <= 58.0 or (is_tiktok and 60.0 <= dur <= 130.0)) else 13)
+    if dur > 57.0 and not is_tiktok:
         flaws.append("Duracao perto de 60s reduz taxa de conclusao no Feed Shorts.")
     if not has_multi_bg:
         flaws.append("Fundo unico ou pouco dinamico — prefira B-Roll multi-cena ~4s.")
