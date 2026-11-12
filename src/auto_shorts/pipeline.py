@@ -154,7 +154,17 @@ def run_pipeline(
     resolved_meta: Dict = dict(source_meta or {})
 
     detected_sub: Optional[Path] = Path(srt_path) if srt_path else None
-    if is_url(source):
+    from .downloader import is_gdrive_url, is_rclone_target, download_from_gdrive, download_from_rclone
+
+    if is_gdrive_url(source):
+        video_path = download_from_gdrive(source, work_dir)
+        if not resolved_meta.get("title"):
+            resolved_meta["title"] = video_path.stem.replace("_", " ").title()
+    elif is_rclone_target(source):
+        video_path = download_from_rclone(source, work_dir)
+        if not resolved_meta.get("title"):
+            resolved_meta["title"] = video_path.stem.replace("_", " ").title()
+    elif is_url(source):
         max_h = 1080 if quality == "high" else 720
         video_path, yt_sub = download_video_and_subs(
             source, work_dir, max_height=max_h, cookies_path=cookies_path

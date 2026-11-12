@@ -49,6 +49,70 @@ def _find_downloaded_video(work_dir: Path) -> Optional[Path]:
     return None
 
 
+def is_gdrive_url(url: str) -> bool:
+    """Check if URL is a Google Drive shareable link."""
+    u = (url or "").lower()
+    return "drive.google.com" in u or "docs.google.com" in u
+
+
+def is_rclone_target(target: str) -> bool:
+    """Check if target is an rclone remote path (e.g. 'gdrive:animes/ep01.mp4')."""
+    t = str(target or "").strip()
+    return ":" in t and not t.startswith(("http://", "https://", "file://")) and not (len(t) > 2 and t[1:3] == ":\\")
+
+
+def download_from_gdrive(url: str, work_dir: Path) -> Path:
+    """Download file from Google Drive via gdown or rclone."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    out_target = work_dir / "source.mp4"
+    try:
+        import gdown  # type: ignore
+        res = gdown.download(url, str(out_target), quiet=False, fuzzy=True)
+        if res and Path(res).is_file() and Path(res).stat().st_size > 1000:
+            return Path(res)
+    except Exception:
+        pass
+
+    # Fallback to rclone if configured
+    if shutil.which("rclone"):
+        cmd = ["rclone", "copyto", url, str(out_target)]
+        subprocess.run(cmd, check=False)
+        if out_target.is_file() and out_target.stat().st_size > 1000:
+            return out_target
+
+    cand = _find_downloaded_video(work_dir)
+    if cand and cand.is_file():
+        return cand
+    raise RuntimeError(f"Falha ao baixar video do Google Drive via URL: {url}")
+
+
+def download_from_rclone(remote_path: str, work_dir: Path) -> Path:
+    """Download video from configured rclone remote (e.g. 'gdrive:animes/ep1.mp4')."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    out_target = work_dir / "source.mp4"
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin:
+        raise RuntimeError("rclone não está instalado no sistema.")
+    cmd = [rclone_bin, "copyto", remote_path, str(out_target), "--stats", "5s", "-P"]
+    proc = subprocess.run(cmd, check=False)
+    if proc.returncode == 0 and out_target.is_file() and out_target.stat().st_size > 1000:
+        return out_target
+    cand = _find_downloaded_video(work_dir)
+    if cand and cand.is_file():
+        return cand
+    raise RuntimeError(f"Falha ao copiar arquivo via rclone '{remote_path}' (codigo {proc.returncode})")
+
+
+def upload_to_rclone(local_path: Path, remote_folder: str) -> bool:
+    """Upload completed short to Google Drive via rclone."""
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin or not local_path.is_file():
+        return False
+    cmd = [rclone_bin, "copy", str(local_path), remote_folder]
+    proc = subprocess.run(cmd, check=False)
+    return proc.returncode == 0
+
+
 def download_video_and_subs(
     url: str,
     work_dir: Path,
