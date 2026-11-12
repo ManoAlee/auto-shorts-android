@@ -18,6 +18,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 import urllib.request
 
+from .mahoraga import MahoragaEngine, immunize_spoken_script
 from .offline_llm import detect_android_llm_capabilities, strip_reasoning_tags
 
 
@@ -780,50 +781,189 @@ class StoryEngine:
         detected_genre, _, _ = detect_universal_genre_and_niche(raw_prompt, genre)
         spk_0 = chars[0].char_id if chars else "narrator"
         spk_1 = chars[1].char_id if len(chars) > 1 else spk_0
+        mahoraga = MahoragaEngine()
+        spoke_idx, spoke = mahoraga.select_adaptive_spoke(detected_genre, core_subject)
+        v_idx = (spoke_idx + ep_num) % 3
 
         if detected_genre == "financas_negocios":
-            hook = f"Quase todo mundo comete esse erro fatal ao lidar com {core_subject}!"
-            loop = f"É exatamente essa regra que separa quem perde poder de compra de quem domina {core_subject}."
+            variants = [
+                (
+                    f"Quase todo mundo ignora esse detalhe prático quando o assunto é {core_subject}!",
+                    f"É exatamente essa regra que separa quem perde poder de compra de quem domina {core_subject}.",
+                    [
+                        f"Na superfície, a maioria acredita que basta seguir o fluxo comum do mercado para ter segurança.",
+                        f"Mas os números mostram que pequenas taxas invisíveis e decisões atrasadas drenam até trinta por cento do resultado acumulado.",
+                        f"A grande virada acontece quando você antecipa o movimento e protege seu caixa antes da maioria perceber.",
+                        f"Aplicar esse ajuste simples hoje muda completamente sua margem de segurança nos próximos doze meses!",
+                        f"Você já aplicava essa estratégia na prática? Comente aqui embaixo!",
+                    ],
+                ),
+                (
+                    f"Por que {core_subject} está mudando a estratégia de quem investe com inteligência no Brasil?",
+                    f"Quem entende {core_subject} agora sai na frente antes do próximo ciclo de mercado.",
+                    [
+                        f"Sempre que o cenário econômico aperta, o investidor médio reage tarde demais às oscilações.",
+                        f"Analisando os dados reais de {core_subject}, fica claro onde está o verdadeiro custo de oportunidade no orçamento.",
+                        f"Enquanto muitos olham apenas para a rentabilidade bruta, o ganho real vem do controle de liquidez e proteção contra juros.",
+                        f"Reorganizar essa alocação protege o patrimônio e cria fluxo de caixa consistente mês a mês!",
+                        f"Como você está posicionando sua carteira hoje? Deixe nos comentários!",
+                    ],
+                ),
+                (
+                    f"O cálculo real por trás de {core_subject} que raramente explicam de forma direta!",
+                    f"Dominar a lógica de {core_subject} é o passo mais seguro para multiplicar patrimônio no longo prazo.",
+                    [
+                        f"Quando colocamos os números na ponta do lápis, a diferença entre o hábito comum e a decisão estratégica assusta.",
+                        f"No caso de {core_subject}, pequenos ajustes percentuais geram um efeito bola de neve decisivo ao longo do ano.",
+                        f"O ponto-chave é eliminar intermediários caros e focar no que realmente entrega retorno líquido real.",
+                        f"Essa mudança simples transforma passivos invisíveis em reserva produtiva para o seu bolso!",
+                        f"Qual foi a sua maior lição financeira este ano? Comente aqui!",
+                    ],
+                ),
+            ]
+            hook, loop, body_lines = variants[v_idx]
             dialogues = [
                 (spk_0, hook, f"Close-up dinâmico destacando o impacto financeiro de {core_subject}."),
-                ("narrator", f"Na superfície, a maioria acredita que basta seguir o fluxo comum do mercado para ter segurança.", f"Gráfico cinematográfico mostrando a curva real por trás de {core_subject}."),
-                (spk_1, f"Mas os números mostram que pequenas taxas invisíveis e decisões atrasadas drenam até trinta por cento do resultado acumulado.", "Enquadramento médio focado nos dados comparativos de longo prazo."),
-                (spk_0, f"A grande virada acontece quando você antecipa o movimento e protege seu caixa antes da maioria perceber.", "Mudança rápida de câmera revelando a estratégia dos grandes investidores."),
-                (spk_1, f"Aplicar esse ajuste simples hoje muda completamente sua margem de segurança nos próximos doze meses!", "Zoom de impacto nos indicadores positivos de patrimônio."),
-                (spk_0, f"Você já aplicava essa estratégia na prática? Comente aqui embaixo! {loop}", "Fechamento executivo em estúdio com transição limpa para loop."),
+                ("narrator", body_lines[0], f"Gráfico cinematográfico mostrando a curva real por trás de {core_subject}."),
+                (spk_1, body_lines[1], "Enquadramento médio focado nos dados comparativos de longo prazo."),
+                (spk_0, body_lines[2], "Mudança rápida de câmera revelando a estratégia dos grandes investidores."),
+                (spk_1, body_lines[3], "Zoom de impacto nos indicadores positivos de patrimônio."),
+                (spk_0, f"{body_lines[4]} {loop}", "Fechamento executivo em estúdio com transição limpa para loop."),
             ]
         elif detected_genre == "ia_futuro_tech":
-            hook = f"O segredo sobre {core_subject} que a indústria nunca te contou acaba de mudar tudo!"
-            loop = f"E essa evolução em {core_subject} mostra que o futuro chegou muito mais rápido do que previram."
+            variants = [
+                (
+                    f"A mudança técnica em {core_subject} que está redefinindo toda a indústria agora!",
+                    f"E essa evolução em {core_subject} mostra que a nova geração de tecnologia já está entre nós.",
+                    [
+                        f"Até poucos meses atrás, rodar soluções desse nível exigia infraestrutura pesada e custos altíssimos.",
+                        f"Agora, com otimização extrema de algoritmos, tarefas que levavam horas são resolvidas em poucos segundos.",
+                        f"O detalhe que poucos perceberam é que quem domina essa arquitetura agora ganha uma vantagem competitiva imediata.",
+                        f"Essa mudança não substitui apenas processos manuais, ela permite criar sistemas inteiros com muito menos recursos!",
+                        f"Você já testou isso nos seus projetos? Deixe nos comentários!",
+                    ],
+                ),
+                (
+                    f"Por que engenheiros e empresas estão migrando tão rápido para {core_subject}?",
+                    f"É por isso que {core_subject} se tornou peça central na engenharia de software moderna.",
+                    [
+                        f"O maior gargalo da tecnologia atual nunca foi falta de código, mas sim eficiência de algoritmo, latência e confiabilidade em produção.",
+                        f"Com a chegada de {core_subject}, o processamento local e a automação inteligente atingiram outro patamar de velocidade.",
+                        f"Na prática, equipes enxutas conseguem entregar em dias o que antes exigia meses de desenvolvimento complexo.",
+                        f"O resultado direto é código mais limpo, menor custo operacional e respostas em tempo real!",
+                        f"Qual ferramenta mais acelerou seu trabalho recentemente? Comente aqui!",
+                    ],
+                ),
+                (
+                    f"O que ninguém te contou sobre como {core_subject} funciona por baixo do capô!",
+                    f"Entender a engenharia de {core_subject} separa quem apenas usa ferramentas de quem lidera o mercado.",
+                    [
+                        f"Quando olhamos apenas para a interface final, parece mágica, mas o segredo está na arquitetura de execução.",
+                        f"Em {core_subject}, a combinação de modelos compactos com hardware otimizado reduziu drasticamente o consumo de memória.",
+                        f"Isso abre espaço para aplicações autônomas rodando direto na borda, com privacidade total e zero latência de rede.",
+                        f"Estamos vendo a maior transição de infraestrutura tecnológica da última década acontecer ao vivo!",
+                        f"O que você acha desse avanço? Compartilhe nos comentários!",
+                    ],
+                ),
+            ]
+            hook, loop, body_lines = variants[v_idx]
             dialogues = [
                 (spk_0, hook, f"Close-up tecnológico mostrando {core_subject} em execução real."),
-                ("narrator", f"Até poucos meses atrás, rodar soluções desse nível exigia infraestrutura pesada e custos altíssimos.", f"Plano aberto comparando servidores antigos com a nova arquitetura de {core_subject}."),
-                (spk_1, f"Agora, com otimização extrema de algoritmos, tarefas que levavam horas são resolvidas em poucos segundos.", "Corte dinâmico exibindo velocidade de processamento e eficiência."),
-                (spk_0, f"O detalhe que poucos perceberam é que quem domina essa ferramenta agora ganha uma vantagem impossível de ignorar.", "Ângulo dramático destacando o salto de produtividade prática."),
-                (spk_1, f"Essa mudança não substitui apenas processos manuais, ela redefine como criamos projetos inteiros do zero!", "Zoom rápido no resultado final gerado com precisão."),
-                (spk_0, f"Você já testou isso no seu dia a dia? Deixe nos comentários! {loop}", "Encerramento futurista conectado ao gancho inicial."),
+                ("narrator", body_lines[0], f"Plano aberto comparando servidores antigos com a nova arquitetura de {core_subject}."),
+                (spk_1, body_lines[1], "Corte dinâmico exibindo velocidade de processamento e eficiência."),
+                (spk_0, body_lines[2], "Ângulo dramático destacando o salto de produtividade prática."),
+                (spk_1, body_lines[3], "Zoom rápido no resultado final gerado com precisão."),
+                (spk_0, f"{body_lines[4]} {loop}", "Encerramento futurista conectado ao gancho inicial."),
             ]
         elif detected_genre in {"psicologia_mentalismo", "saude_biohacking"}:
-            hook = f"O segredo sobre {core_subject} que ninguém percebeu no próprio cérebro!"
-            loop = f"Por isso entender {core_subject} transforma completamente sua rotina desde os primeiros minutos do dia."
+            variants = [
+                (
+                    f"O segredo sobre {core_subject} que ninguém percebeu no próprio cérebro!",
+                    f"Por isso entender {core_subject} transforma completamente sua rotina desde os primeiros minutos do dia.",
+                    [
+                        "Estudos de neurociência mostram que nosso foco e energia são moldados por sinais automáticos do ambiente.",
+                        "Quando você ignora esse mecanismo biológico, seu cérebro entra em fadiga de decisão logo nas primeiras horas.",
+                        "O segredo está em inverter o estímulo: um ajuste de dois minutos reprograma a resposta automática da mente.",
+                        "O resultado imediato é mais clareza mental, controle emocional e energia real ao longo de todo o dia!",
+                        "Faça esse teste amanhã cedo e me conte nos comentários!",
+                    ],
+                ),
+                (
+                    f"Por que sua mente sabota sua concentração quando o assunto é {core_subject}?",
+                    f"Dominar esse gatilho de {core_subject} devolve seu controle mental sem depender de força de vontade.",
+                    [
+                        "A maioria das pessoas tenta vencer o cansaço mental com mais pressão, o que só aumenta o ruído cognitivo.",
+                        "Na prática, o sistema nervoso responde muito melhor a micro-pausas estratégicas e redução de estímulos vazios.",
+                        "Quando você troca o piloto automático por um protocolo simples de respiração e foco, a dopamina estabiliza.",
+                        "Em poucos dias, tarefas difíceis voltam a parecer leves e sua memória retém muito mais informação!",
+                        "Qual hábito mais drena sua energia hoje? Deixe nos comentários!",
+                    ],
+                ),
+                (
+                    f"O padrão invisível por trás de {core_subject} que muda sua produtividade!",
+                    f"Aplicar essa lógica simples de {core_subject} protege sua mente contra exaustão crônica.",
+                    [
+                        "Pouca gente sabe, mas os primeiros trinta minutos após acordar definem a química do foco para o dia inteiro.",
+                        "Expor o cérebro a alertas e comparações logo cedo dispara um ciclo de ansiedade difícil de frear.",
+                        "Ao criar uma janela limpa antes das telas, você preserva atenção profunda para o que realmente importa.",
+                        "O ganho aparece rápido: decisões mais calmas, menos procrastinação e noites de sono muito melhores!",
+                        "Você já testou uma rotina sem telas ao acordar? Comente aqui!",
+                    ],
+                ),
+            ]
+            hook, loop, body_lines = variants[v_idx]
             dialogues = [
                 (spk_0, hook, f"Close-up expressivo ilustrando o gatilho neural ligado a {core_subject}."),
-                ("narrator", f"Estudos de neurociência mostram que nosso foco e energia são moldados por sinais automáticos do ambiente.", f"Visualização clara do ciclo de atenção e dopamina em {core_subject}."),
-                (spk_1, f"Quando você ignora esse mecanismo biológico, seu cérebro entra em fadiga de decisão logo nas primeiras horas.", "Enquadramento médio mostrando o contraste entre distração e foco profundo."),
-                (spk_0, f"O segredo está em inverter o estímulo: um ajuste de dois minutos reprograma a resposta automática da mente.", "Transição visual rápida destacando a quebra do padrão mental."),
-                (spk_1, f"O resultado imediato é mais clareza mental, controle emocional e energia real ao longo de todo o dia!", "Zoom nos indicadores de performance cognitiva e bem-estar."),
-                (spk_0, f"Faça esse teste amanhã cedo e me conte nos comentários! {loop}", "Fechamento calmo e magnético conectando ao início."),
+                ("narrator", body_lines[0], f"Visualização clara do ciclo de atenção e dopamina em {core_subject}."),
+                (spk_1, body_lines[1], "Enquadramento médio mostrando o contraste entre distração e foco profundo."),
+                (spk_0, body_lines[2], "Transição visual rápida destacando a quebra do padrão mental."),
+                (spk_1, body_lines[3], "Zoom nos indicadores de performance cognitiva e bem-estar."),
+                (spk_0, f"{body_lines[4]} {loop}", "Fechamento calmo e magnético conectando ao início."),
             ]
         elif detected_genre in {"podcast_debates", "jornalismo_global", "curiosidades_cosmicas"}:
-            hook = f"A verdade oculta sobre {core_subject} acaba de revelar o que quase ninguém percebeu!"
-            loop = f"E esse desdobramento sobre {core_subject} muda totalmente o que veremos nas próximas semanas."
+            variants = [
+                (
+                    f"A verdade oculta sobre {core_subject} acaba de revelar o que quase ninguém percebeu!",
+                    f"E esse desdobramento sobre {core_subject} muda totalmente o que veremos nas próximas semanas.",
+                    [
+                        "Enquanto todo mundo olhava apenas para a versão superficial da notícia, os dados reais apontavam para outra direção.",
+                        "Quando cruzamos os fatos mais recentes, fica evidente como uma decisão estratégica nos bastidores alterou todo o equilíbrio.",
+                        "O ponto de virada é que o efeito prático disso já começou a aparecer e impacta diretamente o cenário atual.",
+                        "Quem entende esse movimento antes da maioria consegue enxergar exatamente para onde o jogo está indo agora!",
+                        "Qual é a sua opinião sobre essa virada? Comente aqui embaixo!",
+                    ],
+                ),
+                (
+                    f"O detalhe decisivo em {core_subject} que dividiu os especialistas esta semana!",
+                    f"Acompanhar os próximos capítulos de {core_subject} vai mostrar quem realmente acertou a previsão.",
+                    [
+                        "À primeira vista, parecia apenas mais uma manchete passageira sem grandes consequências práticas.",
+                        "Mas uma análise mais atenta mostra que os interesses envolvidos nessa escolha têm impacto de longo prazo.",
+                        "De um lado, quem defende mudança imediata; do outro, quem alerta para o efeito colateral no curto prazo.",
+                        "O fato concreto é que o público já sente os reflexos dessa decisão no dia a dia!",
+                        "De que lado desse debate você fica? Deixe seu comentário!",
+                    ],
+                ),
+                (
+                    f"Por que {core_subject} virou o assunto mais comentado nos bastidores hoje?",
+                    f"E essa história sobre {core_subject} ainda está longe do capítulo final.",
+                    [
+                        "Poucas vezes um tema conectou tantos fatores econômicos, tecnológicos e humanos ao mesmo tempo.",
+                        "Os registros divulgados recentemente preenchem lacunas que antes deixavam toda a discussão no escuro.",
+                        "Agora, com as cartas na mesa, cada novo anúncio ganha um peso muito maior para o mercado e para o público.",
+                        "Entender o contexto completo evita cair em narrativas rasas e revela a tendência real!",
+                        "O que você espera que aconteça daqui pra frente? Comente aqui!",
+                    ],
+                ),
+            ]
+            hook, loop, body_lines = variants[v_idx]
             dialogues = [
                 (spk_0, hook, f"Enquadramento de estúdio destacando a manchete central sobre {core_subject}."),
-                ("narrator", f"Enquanto todo mundo olhava apenas para a versão superficial da notícia, os dados reais apontavam para outra direção.", f"Sequência visual contextualizando o cenário completo de {core_subject}."),
-                (spk_1, f"Quando cruzamos os fatos mais recentes, fica evidente como uma decisão estratégica nos bastidores alterou todo o equilíbrio.", "Corte aproximado destacando o ponto crítico da análise."),
-                (spk_0, f"O ponto de virada é que o efeito prático disso já começou a aparecer e impacta diretamente o cenário atual.", "Movimento de câmera dinâmico revelando a consequência imediata."),
-                (spk_1, f"Quem entende esse movimento antes da maioria consegue enxergar exatamente para onde o jogo está indo agora!", "Close-up de alto impacto no clímax da revelação."),
-                (spk_0, f"Qual é a sua opinião sobre essa virada? Comente aqui embaixo! {loop}", "Encerramento jornalístico limpo pronto para replay contínuo."),
+                ("narrator", body_lines[0], f"Sequência visual contextualizando o cenário completo de {core_subject}."),
+                (spk_1, body_lines[1], "Corte aproximado destacando o ponto crítico da análise."),
+                (spk_0, body_lines[2], "Movimento de câmera dinâmico revelando a consequência imediata."),
+                (spk_1, body_lines[3], "Close-up de alto impacto no clímax da revelação."),
+                (spk_0, f"{body_lines[4]} {loop}", "Encerramento jornalístico limpo pronto para replay contínuo."),
             ]
         else:
             stop_caps = {"O", "A", "Os", "As", "Um", "Uma", "De", "Do", "Da", "Em", "No", "Na", "Segredo", "Proibido", "Oculto", "Teoria", "Capitulo", "Capítulo", "One", "Piece"}
@@ -834,16 +974,52 @@ class StoryEngine:
             ]
             char_a = named_entities[0] if named_entities else (chars[0].name if chars else "Ren")
             char_b = named_entities[1] if len(named_entities) > 1 else (chars[1].name if len(chars) > 1 else "Imu")
-            hook = f"O segredo proibido sobre {core_subject} que quase ninguém percebeu acaba de mudar tudo!"
-            loop = f"E essa revelação sobre {core_subject} é apenas o começo do que está por vir."
+            variants = [
+                (
+                    f"O segredo proibido sobre {core_subject} que quase ninguém percebeu acaba de mudar tudo!",
+                    f"E essa revelação sobre {core_subject} é apenas o começo do que está por vir.",
+                    [
+                        f"Durante muito tempo, a verdadeira conexão envolvendo {char_a} parecia apenas uma teoria distante.",
+                        f"Mas as pistas recentes ligando {char_a} e {char_b} trouxeram à tona um passado apagado da história.",
+                        "O que parecia coincidência era, na verdade, uma peça central guardada a sete chaves.",
+                        f"Agora que a verdade veio à tona, o desfecho envolvendo {char_a} se tornou inevitável!",
+                        "Qual é a sua teoria sobre isso? Comente aqui embaixo!",
+                    ],
+                ),
+                (
+                    f"A pista oculta em {core_subject} que muda completamente o rumo da história!",
+                    f"Depois dessa virada envolvendo {char_a}, nenhum capítulo seguinte será igual.",
+                    [
+                        f"Quem acompanhou apenas a batalha principal deixou passar o gesto silencioso de {char_a} no momento decisivo.",
+                        f"Quando comparamos essa cena com os eventos antigos de {char_b}, o quebra-cabeça finalmente se fecha.",
+                        "Cada detalhe visual tinha um propósito exato preparado muito antes desse confronto acontecer.",
+                        f"Se essa aliança ou ruptura se confirmar, o equilíbrio de forças inteiro vai desabar!",
+                        "Você também notou esse detalhe escondido? Deixe seu palpite!",
+                    ],
+                ),
+                (
+                    f"Ninguém estava pronto para o que {core_subject} acabou de revelar!",
+                    f"E o próximo passo de {char_a} pode reescrever tudo o que sabíamos até aqui.",
+                    [
+                        f"Por trás da aparente calma antes da tempestade, {char_a} carregava uma resposta que mudaria todo o arco.",
+                        f"O contraste com a trajetória de {char_b} deixa claro que o verdadeiro conflito nunca foi apenas força bruta.",
+                        "Existe uma regra antiga quebrada exatamente nessa cena, e os sinais estavam lá desde o começo.",
+                        "Agora a contagem regressiva começou e cada segundo aproxima o ponto sem volta!",
+                        "O que você faria no lugar dele? Comente sua teoria!",
+                    ],
+                ),
+            ]
+            hook, loop, body_lines = variants[v_idx]
             dialogues = [
                 (spk_0, hook, f"Close-up dramático nos olhos de {char_a} diante da revelação sobre {core_subject}."),
-                ("narrator", f"Durante muito tempo, a verdadeira conexão envolvendo {char_a} parecia apenas uma teoria distante.", f"Plano aberto cinematográfico revelando o cenário principal de {core_subject}."),
-                (spk_1, f"Mas as pistas recentes ligando {char_a} e {char_b} trouxeram à tona um passado apagado da história.", f"Enquadramento médio focado na tensão entre {char_a} e {char_b}."),
-                (spk_0, f"O que parecia coincidência era, na verdade, uma peça central guardada a sete chaves.", "Ângulo holandês destacando o momento exato da reviravolta."),
-                (spk_1, f"Agora que a verdade veio à tona, o desfecho envolvendo {char_a} se tornou inevitável!", f"Zoom extremo no clímax dramático entre {char_a} e {char_b}."),
-                (spk_0, f"Qual é a sua teoria sobre isso? Comente aqui embaixo! {loop}", f"{char_a} encarando o horizonte enquanto a cena fecha em suspense."),
+                ("narrator", body_lines[0], f"Plano aberto cinematográfico revelando o cenário principal de {core_subject}."),
+                (spk_1, body_lines[1], f"Enquadramento médio focado na tensão entre {char_a} e {char_b}."),
+                (spk_0, body_lines[2], "Ângulo holandês destacando o momento exato da reviravolta."),
+                (spk_1, body_lines[3], f"Zoom extremo no clímax dramático entre {char_a} e {char_b}."),
+                (spk_0, f"{body_lines[4]} {loop}", f"{char_a} encarando o horizonte enquanto a cena fecha em suspense."),
             ]
+
+        mahoraga.record_speech_turn(detected_genre, spoke["id"], core_subject, immunize_spoken_script(hook))
 
         act_specs = [
             ("HOOK", "CLOSE_UP", "SLOW_ZOOM_IN", "IMPACT_LINES", "WHOOSH"),

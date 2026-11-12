@@ -653,10 +653,7 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
             pack["caption"] = "\n".join(cap_lines)
 
     prev_cues = int((pack.get("validation") or {}).get("subtitle_cues") or 0)
-    is_tt = "tiktok" in (str(pack.get("platform") or platform) + " " + mp4.name).lower()
-    if is_tt and platform == "youtube_shorts":
-        platform = "tiktok_rewards"
-    max_dur = 180.0 if is_tt else 60.0
+    max_dur = 180.0 if "tiktok" in str(pack.get("platform") or platform).lower() else 60.0
     val_kwargs = {"ass_path": ass_path, **({"max_duration": max_dur} if max_dur != 60.0 else {})}
     validation = validate_generated_short(mp4, **val_kwargs)
     if prev_cues > 0 and int(validation.get("subtitle_cues") or 0) == 0:

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from .config import LOUDNORM_FILTER, METADATA_SCRUB, QUALITY_PRESETS
+from .mahoraga import MahoragaEngine, clean_word_boundary_hook
 from .retention import build_pattern_interrupt_filter
 from .subtitles import escape_ffmpeg_filter_path
 
@@ -28,8 +29,9 @@ def find_default_font() -> Optional[str]:
 
 
 def _format_hook_banner(raw: str, max_chars: int = 34) -> tuple[str, int]:
-    """Wrap hook banner into max 2 balanced lines so text never overflows video edges."""
-    words = " ".join((raw or "").split()).upper()[:max_chars].split()
+    """Wrap hook banner into max 2 balanced lines on strict word boundaries so text NEVER slices mid-word."""
+    cleaned = clean_word_boundary_hook(raw, max_chars=max_chars, fallback="")
+    words = cleaned.split()
     if not words:
         return "", 0
     if len(" ".join(words)) <= 18:
@@ -324,24 +326,53 @@ def render_clip(
     )
     try:
         subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError:
-        if encoder == "h264_mediacodec":
-            fallback_cmd = build_ffmpeg_command(
+    except subprocess.CalledProcessError as first_err:
+        mahoraga = MahoragaEngine(Path(out_path).parent / "shorts_evolution.db")
+        # Stage 1 Counter-Adaptation: libx264 + static scale (punch_zoom=1.0)
+        fallback_cmd_1 = build_ffmpeg_command(
+            source_path=source_path,
+            out_path=out_path,
+            start_time=start_time,
+            end_time=end_time,
+            layout=layout,
+            quality=quality,
+            ass_path=ass_path,
+            hook_title=hook_title,
+            font_path=font_path,
+            encoder="libx264",
+            normalize_audio=normalize_audio,
+            punch_zoom=1.0,
+        )
+        try:
+            subprocess.run(fallback_cmd_1, check=True)
+            mahoraga.adapt_to_phenomenon(
+                phenomenon="ffmpeg_render_filter_fail",
+                niche="renderer",
+                trigger_detail=f"exit={first_err.returncode} on {Path(out_path).name}",
+                counter_action="Adapted filterchain to libx264 + static scale (punch_zoom=1.0)",
+            )
+        except subprocess.CalledProcessError as second_err:
+            # Stage 2 Counter-Adaptation: strip ASS/drawtext overlay in case of subtitle/font parser fault
+            fallback_cmd_2 = build_ffmpeg_command(
                 source_path=source_path,
                 out_path=out_path,
                 start_time=start_time,
                 end_time=end_time,
-                layout=layout,
+                layout="blur_bg",
                 quality=quality,
-                ass_path=ass_path,
-                hook_title=hook_title,
-                font_path=font_path,
+                ass_path=None,
+                hook_title="",
+                font_path=None,
                 encoder="libx264",
-                normalize_audio=normalize_audio,
-                punch_zoom=punch_zoom,
+                normalize_audio=False,
+                punch_zoom=1.0,
             )
-            subprocess.run(fallback_cmd, check=True)
-        else:
-            raise
+            subprocess.run(fallback_cmd_2, check=True)
+            mahoraga.adapt_to_phenomenon(
+                phenomenon="ffmpeg_overlay_parser_fail",
+                niche="renderer",
+                trigger_detail=f"exit={second_err.returncode} on {Path(out_path).name}",
+                counter_action="Adapted to clean blur_bg base render without overlay crash",
+            )
     return Path(out_path)
 

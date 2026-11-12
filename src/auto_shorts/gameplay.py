@@ -50,18 +50,14 @@ GAMEPLAY_QUERIES: Dict[str, List[str]] = {
 }
 
 NICHE_STYLE_AFFINITY: Dict[str, List[str]] = {
-    "noticias_mundiais": ["drone_cinema", "urban_rain", "space_cosmos"],
-    "ia_tech": ["space_cosmos", "urban_rain", "drone_cinema"],
-    "financas": ["finance_minimal", "drone_cinema", "urban_rain"],
-    "desenvolvimento_pessoal": ["drone_cinema", "urban_rain", "space_cosmos"],
-    "saude_fitness": ["fitness_motion", "drone_cinema", "urban_rain"],
-    "entretenimento_animes": ["urban_rain", "space_cosmos", "drone_cinema"],
-    "podcast": ["urban_rain", "drone_cinema", "space_cosmos"],
-    "concursos": ["drone_cinema", "urban_rain", "finance_minimal"],
-    "gameplay": ["minecraft", "subway", "gta_ramp", "beamng", "satisfying"],
+    "noticias_mundiais": ["drone_cinema", "urban_rain", "subway", "minecraft", "gta_ramp"],
+    "ia_tech": ["space_cosmos", "urban_rain", "minecraft", "beamng", "gta_ramp"],
+    "financas": ["finance_minimal", "drone_cinema", "gta_ramp", "subway", "minecraft"],
+    "desenvolvimento_pessoal": ["urban_rain", "drone_cinema", "satisfying", "minecraft", "subway"],
+    "saude_fitness": ["fitness_motion", "drone_cinema", "satisfying", "subway", "minecraft"],
+    "entretenimento_animes": ["minecraft", "subway", "gta_ramp", "beamng", "urban_rain"],
+    "podcast": ["subway", "minecraft", "gta_ramp", "satisfying", "urban_rain"],
 }
-
-_BRAINROT_GAMEPLAY_STYLES = {"minecraft", "subway", "gta_ramp", "beamng", "satisfying"}
 
 
 def discover_dynamic_visual_queries(niche: str = "geral", topic: str = "") -> Tuple[str, List[str]]:
@@ -276,18 +272,6 @@ def pick_evolving_background(
 
     if not clips:
         return None
-
-    # Never inject random Minecraft/Subway/GTA gameplay into non-gaming niches when coherent cinematic B-roll exists
-    if niche not in {"gameplay", "geral"}:
-        coherent_clips = [
-            c for c in clips
-            if _extract_style_tag(c) in preferred_for_niche
-            or _extract_style_tag(c).startswith("adaptive_")
-            or _extract_style_tag(c) not in _BRAINROT_GAMEPLAY_STYLES
-        ]
-        if coherent_clips:
-            clips = coherent_clips
-            existing_styles = sorted({_extract_style_tag(c) for c in clips})
 
     store = EvolutionStore(Path(out_dir) / "shorts_evolution.db")
     chosen_style = store.select_evolving_background_style(niche, existing_styles, last_style=last_style)

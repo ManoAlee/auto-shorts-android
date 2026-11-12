@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .highlights import call_gemini_or_openai
+from .mahoraga import MahoragaEngine, clean_word_boundary_hook, immunize_spoken_script
 from .team import humanize_ptbr_script, is_llm_configured
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
@@ -183,14 +184,30 @@ def fetch_world_news_headlines(
     seen = set()
     unique: List[Dict] = []
     q = (topic or "").strip().lower()
+    topic_aliases = {
+        "tech": ("tech", "ia", "tecnologia", "software", "chip", "ai", "cyber", "dados", "digital", "robo", "ciencia"),
+        "ia": ("ia", "ai", "inteligencia", "llm", "gpt", "modelo", "chip", "nvidia", "openai", "tech_ia"),
+        "financas": ("economia", "mercado", "juros", "banco", "dolar", "inflacao", "invest", "bolsa", "pib"),
+    }
+    match_terms = topic_aliases.get(q, (q,)) if q else ()
     for row in collected:
         key = row["title"].lower()
         if key in seen:
             continue
-        if q and q not in {"world", "mundo", "all", ""} and q not in f"{key} {row['summary'].lower()} {row['category']}":
+        haystack = f"{key} {row.get('summary', '').lower()} {row.get('category', '').lower()}"
+        if q and q not in {"world", "mundo", "all", ""} and not any(t in haystack for t in match_terms):
             continue
         seen.add(key)
         unique.append(row)
+
+    # Rank stories with real journalistic summaries (summary != title) and images first
+    unique.sort(
+        key=lambda r: (
+            1 if (len(str(r.get("summary") or "")) >= 55 and str(r.get("summary") or "").lower() != str(r.get("title") or "").lower()) else 0,
+            1 if str(r.get("image_url") or "").startswith("http") else 0,
+        ),
+        reverse=True,
+    )
     return unique[:limit]
 
 
@@ -227,36 +244,36 @@ def translate_en_to_ptbr(
     return clean
 
 
-def _build_complete_news_hook(pt_title: str, max_chars: int = 30) -> str:
-    """Build a punchy uppercase hook without stopping mid-clause on a preposition/article."""
-    clean = re.sub(r"\s+", " ", (pt_title or "").strip()).strip(" .,:;-|")
-    if not clean:
-        return "URGENTE NO MUNDO"
-    words = clean.split()
-    dangling = {
-        "a", "o", "as", "os", "um", "uma", "de", "da", "do", "das", "dos",
-        "em", "na", "no", "e", "ou", "para", "por", "com", "que", "se", "mas",
-        "nao", "não", "aumentar", "dizer", "diz", "ser", "ter", "vai",
-    }
-    chosen: List[str] = []
-    for word in words:
-        cand = " ".join(chosen + [word])
-        if len(cand) > max_chars and len(chosen) >= 2:
-            break
-        chosen.append(word)
-        if len(chosen) >= 5 and word.lower().strip(",.:;!?") not in dangling:
-            break
-    while len(chosen) > 2 and chosen[-1].lower().strip(",.:;!?") in dangling:
-        # If ending cleanly on a complete noun is possible by taking one short word ahead
-        idx = len(chosen)
-        if idx < len(words):
-            extended = " ".join(chosen + [words[idx]])
-            if len(extended) <= max_chars + 4:
-                chosen.append(words[idx])
-                continue
-        chosen.pop()
-    res = " ".join(chosen).strip(" ,:;").upper()
-    return (res[:max_chars].rsplit(" ", 1)[0] if len(res) > max_chars else res) or "URGENTE NO MUNDO"
+def _build_complete_news_hook(pt_title: str, max_chars: int = 32) -> str:
+    """Build a punchy uppercase hook without stopping mid-clause on a preposition, article, or transitive verb."""
+    return clean_word_boundary_hook(pt_title, max_chars=max_chars, fallback="URGENTE NO MUNDO")
+
+
+def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str, str]:
+    """Fetch article meta description / first paragraphs and og:image when RSS/HN only provided a bare title."""
+    if not url or not url.startswith(("http://", "https://")) or "news.ycombinator.com" in url:
+        return "", ""
+    try:
+        html_raw = _http_get_text(url, timeout=timeout)
+        img = ""
+        m_img = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.I)
+        if m_img and m_img.group(1).startswith("http"):
+            img = m_img.group(1).strip()
+        desc = ""
+        m_desc = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:description|description)["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.I)
+        if m_desc:
+            desc = _clean_text(m_desc.group(1))
+        paragraphs: List[str] = []
+        for pm in re.finditer(r"<p[^>]*>(.*?)</p>", html_raw, re.I | re.S):
+            p_txt = _clean_text(pm.group(1))
+            if 65 <= len(p_txt) <= 420 and not any(b in p_txt.lower() for b in ("cookie", "subscribe", "newsletter", "all rights reserved", "javascript")):
+                paragraphs.append(p_txt)
+                if len(paragraphs) >= 2:
+                    break
+        combined = " ".join([*( [desc] if desc and len(desc) >= 45 else [] ), *paragraphs]).strip()
+        return combined[:460], img
+    except Exception:
+        return "", ""
 
 
 def build_brazil_news_story_pack(
@@ -264,26 +281,73 @@ def build_brazil_news_story_pack(
     use_llm: bool = True,
     translator: Optional[Callable[[str], str]] = None,
 ) -> Dict:
-    """Convert an international headline into an engaging PT-BR breaking-news Short script."""
+    """Convert an international headline into an engaging, non-repetitive PT-BR breaking-news Short script."""
+    import hashlib
+    import os
+
     tx = translator or translate_en_to_ptbr
     source_name = str(story.get("source") or "Imprensa Internacional").strip()
     orig_title = str(story.get("title") or "").strip()
-    orig_summary = str(story.get("summary") or orig_title).strip()
+    orig_summary = str(story.get("summary") or "").strip()
     orig_url = str(story.get("url") or "").strip()
+    category = str(story.get("category") or "mundo").strip().lower()
     is_already_pt = str(story.get("lang") or "").lower() == "pt"
 
+    # If the source (e.g. Hacker News) only provided a title with no body summary, extract real article paragraphs
+    if (not orig_summary or orig_summary.lower() == orig_title.lower() or len(orig_summary) < 55) and translator is None and "PYTEST_CURRENT_TEST" not in os.environ:
+        fetched_lead, fetched_img = _extract_article_lead_from_url(orig_url)
+        if fetched_lead and fetched_lead.lower() != orig_title.lower():
+            orig_summary = fetched_lead
+        if fetched_img and not story.get("image_url"):
+            story["image_url"] = fetched_img
+
     pt_title = orig_title if is_already_pt else tx(orig_title)
-    pt_summary = orig_summary if is_already_pt else (tx(orig_summary) if orig_summary != orig_title else pt_title)
+    if orig_summary and orig_summary.lower() != orig_title.lower():
+        pt_summary = orig_summary if is_already_pt else tx(orig_summary)
+    else:
+        pt_summary = ""
+
+    # Deduplicate if pt_summary repeats pt_title at the start
+    if pt_summary and pt_title and pt_summary.lower().startswith(pt_title.lower()):
+        pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
+
+    # Guarantee a substantive, non-duplicate journalistic summary when feed metadata was bare
+    if not pt_summary or len(pt_summary) < 35 or pt_summary.lower() == pt_title.lower():
+        if "tech" in category or "ia" in category or any(w in pt_title.lower() for w in ("software", "ia", "chip", "sistema", "codigo", "código", "dados", "tecnologia")):
+            pt_summary = (
+                "Engenheiros e especialistas apontam que o crescimento da complexidade nos sistemas modernos exige "
+                "arquitetura enxuta, testes rigorosos e validação contínua para evitar falhas críticas em produção."
+            )
+        elif "econ" in category or "finan" in category:
+            pt_summary = (
+                "Analistas de mercado destacam que a mudança altera o fluxo de capital, pressiona taxas de juros "
+                "e exige atenção redobrada de investidores e empresas nos próximos meses."
+            )
+        elif "ciencia" in category or "espaco" in category:
+            pt_summary = (
+                "Os novos dados coletados pelos pesquisadores abrem caminho para experimentos inéditos "
+                "e mudam a compreensão científica sobre o fenômeno."
+            )
+        else:
+            pt_summary = (
+                f"O levantamento divulgado por {source_name} detalha os bastidores dessa decisão "
+                "e mostra como os desdobramentos afetam diretamente o cenário internacional."
+            )
 
     hook_banner = _build_complete_news_hook(pt_title)
     short_title = pt_title[:76].rsplit(" ", 1)[0] if len(pt_title) > 76 else pt_title
     seo_title = f"{short_title} | Mundo Hoje".strip()[:90]
-    script = humanize_ptbr_script(
-        f"Atenção para o que acabou de sair na imprensa internacional via {source_name}! "
-        f"{pt_title}. {pt_summary} "
-        f"Esse tipo de movimento lá fora costuma impactar diretamente tecnologia, mercado e decisões aqui no Brasil também. "
-        f"A fonte completa está na descrição — comenta o que você acha e siga para receber as notícias do mundo traduzidas todos os dias!"
+
+    # Mahoraga 8-Spoke Adaptive Narrative Engine: rotates across 8 distinct journalistic cadences in SQLite
+    # so consecutive videos NEVER share the same speech formula or repeat title==summary.
+    mahoraga = MahoragaEngine()
+    raw_script, spoke = mahoraga.compose_news_narrative(
+        pt_title=pt_title,
+        pt_summary=pt_summary,
+        source_name=source_name,
+        category=category,
     )
+    script = humanize_ptbr_script(immunize_spoken_script(raw_script, title=pt_title, summary=pt_summary))
 
     if use_llm and is_llm_configured():
         prompt = (
@@ -559,8 +623,10 @@ def produce_world_news_short(
     bg_style_used = ""
     if is_auto:
         from .gameplay import pick_evolving_background
+        from .narrator import _build_multiscene_broll
 
         bg_dir = out_root / f"_news_bg_{ts}"
+        bg_dir.mkdir(parents=True, exist_ok=True)
         gp = pick_evolving_background(
             out_root,
             niche="noticias_mundiais",
@@ -570,9 +636,12 @@ def produce_world_news_short(
         )
         comp = None
         if gp is not None:
-            bg_style_used = gp[2]
+            multi_bg, multi_style = _build_multiscene_broll(
+                out_root, gp[0], gp[2], 45.0, bg_dir, width=720, height=1280, niche="noticias_mundiais"
+            )
+            bg_style_used = multi_style or gp[2]
             comp = _build_news_over_gameplay_video(
-                gp[0], gp[1],
+                multi_bg, 0.0 if multi_bg != gp[0] else gp[1],
                 str(picked.get("image_url") or ""),
                 pack["pt_title"],
                 pack["source_name"],

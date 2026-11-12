@@ -28,6 +28,7 @@ vendor-research/
 *.jpg
 *.png
 !docs/images/*.png
+!docs/images/*.jpg
 !docs/images/*.svg
 
 # Compiled binaries & build artifacts

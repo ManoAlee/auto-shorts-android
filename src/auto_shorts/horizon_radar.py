@@ -6,6 +6,7 @@ import time
 from typing import Callable, Dict, List, Optional
 
 from .anime_trends import get_releasing_anime_radar
+from .mahoraga import MahoragaEngine, immunize_spoken_script
 from .world_news import fetch_world_news_headlines, translate_en_to_ptbr
 
 _TITLE_TX_CACHE: Dict[str, str] = {}
@@ -444,48 +445,115 @@ def build_horizon_spoken_script(item: Dict, use_llm: bool = True) -> str:
     is_tech_ai = any(k in topic_low for k in (" ia ", "arm", "celular", "offline", "modelo", "nuvem", "chip", "tecnologia", "app", "software"))
     is_finance = (not is_tech_ai) and ("dinheiro" in horizon or "finan" in horizon or any(k in topic_low for k in ("salario", "juros", "taxa", "invest", "dinheiro")))
 
+    mahoraga = MahoragaEngine()
+    niche_key = "ia_tech" if is_tech_ai else ("financas" if is_finance else (horizon or "geral"))
+    spoke_idx, spoke = mahoraga.select_adaptive_spoke(niche_key, title)
+
     if is_tech_ai:
-        body = (
-            f"Muita gente ainda acha que inteligência artificial só funciona pagando assinatura cara na nuvem. "
-            f"A virada em {title.lower()} é que os processadores de celular atuais já rodam modelos leves direto no aparelho, sem depender de internet. "
-            f"Isso traz resposta na hora, privacidade total dos seus dados e zero custo mensal com servidor externo. "
-            f"Você usaria uma IA 100% offline direto no seu celular? Comenta aqui embaixo e se inscreva para acompanhar os próximos testes!"
-        )
+        variants = [
+            (
+                f"Muita gente ainda acha que inteligência artificial só funciona pagando assinatura cara na nuvem. "
+                f"A virada em {title.lower()} é que os processadores de celular atuais já rodam modelos leves direto no aparelho, sem depender de internet. "
+                f"Isso traz resposta na hora, privacidade total dos seus dados e zero custo mensal com servidor externo. "
+                f"Você usaria uma IA 100% offline direto no seu celular? Comenta aqui embaixo!"
+            ),
+            (
+                f"Olha o salto silencioso da inteligência artificial em {title.lower()}. "
+                f"Enquanto todo mundo olha para servidores gigantes, a computação local no bolso já entrega velocidade real e autonomia sem mensalidade. "
+                f"Quem dominar essas ferramentas agora sai muito na frente no trabalho e nos projetos pessoais. "
+                f"Qual tarefa você automatizaria primeiro no seu celular? Deixa nos comentários!"
+            ),
+            (
+                f"O jogo da inteligência artificial mudou com {title.lower()}, e pouca gente percebeu o tamanho disso. "
+                f"Rodar modelos otimizados direto no dispositivo corta latência, protege sua privacidade e elimina gargalos de conexão. "
+                f"Na prática, o aparelho que você já tem na mão vira um estúdio completo de produtividade. "
+                f"Você prefere ferramentas locais ou na nuvem? Comenta aqui!"
+            ),
+        ]
     elif is_finance:
-        body = (
-            f"O maior vazamento no orçamento quase nunca aparece numa compra gigante, e sim no piloto automático da rotina. "
-            f"Ao analisar {title.lower()}, fica claro como pequenas taxas recorrentes e decisões por impulso somam um valor alto no fim do ano. "
-            f"Trocar dois hábitos caros por regras simples libera caixa todos os meses sem cortar o que realmente importa. "
-            f"Qual gasto invisível você cortou primeiro? Deixa nos comentários e me siga para mais dicas práticas!"
-        )
+        variants = [
+            (
+                f"O maior vazamento no orçamento quase nunca aparece numa compra gigante, e sim no piloto automático da rotina. "
+                f"Ao analisar {title.lower()}, fica claro como pequenas taxas recorrentes e decisões por impulso somam um valor alto no fim do ano. "
+                f"Trocar dois hábitos caros por regras simples libera caixa todos os meses sem cortar o que realmente importa. "
+                f"Qual gasto invisível você cortou primeiro? Deixa nos comentários!"
+            ),
+            (
+                f"Muita gente trabalha dobrado e não vê o dinheiro sobrar por causa de um erro silencioso ligado a {title.lower()}. "
+                f"Quando você coloca os números lado a lado, descobre que pequenos ajustes de alocação valem mais do que promessas milagrosas. "
+                f"Organizar reservas e cortar juros invisíveis muda seu patamar financeiro em poucos meses. "
+                f"Você já aplica essa regra na sua conta? Comenta aqui embaixo!"
+            ),
+            (
+                f"Existe uma diferença clara entre ganhar mais e construir patrimônio de verdade em {title.lower()}. "
+                f"Quem observa os ciclos de juros e fluxo de caixa sabe que proteção vem antes da rentabilidade extrema. "
+                f"Com disciplina semanal e metas objetivas, o efeito composto começa a trabalhar a seu favor. "
+                f"Qual é sua meta financeira para este ano? Conta nos comentários!"
+            ),
+        ]
     elif "psico" in horizon or "saude" in horizon:
-        body = (
-            f"Você já reparou por que o seu cérebro reage antes mesmo de você pensar direito? "
-            f"Pesquisas ligadas a {title.lower()} mostram como pequenos estímulos da rotina drenam sua atenção e energia logo cedo. "
-            f"Ao ajustar dois hábitos simples nos primeiros vinte minutos do dia, você recupera o foco, reduz a ansiedade e rende muito mais. "
-            f"Testa essa mudança amanhã mesmo e me conta nos comentários!"
-        )
+        variants = [
+            (
+                f"Você já reparou por que o seu cérebro reage antes mesmo de você pensar direito? "
+                f"Pesquisas ligadas a {title.lower()} mostram como pequenos estímulos da rotina drenam sua atenção e energia logo cedo. "
+                f"Ao ajustar dois hábitos simples nos primeiros vinte minutos do dia, você recupera o foco e rende muito mais. "
+                f"Testa essa mudança amanhã mesmo e me conta nos comentários!"
+            ),
+            (
+                f"A maioria das pessoas tenta resolver cansaço mental com mais cafeína, quando o ponto real está em {title.lower()}. "
+                f"Quando o ambiente dispara micro-distrações o tempo todo, sua clareza cognitiva despenca sem você notar. "
+                f"Criar blocos curtos de foco profundo devolve controle emocional e produtividade real. "
+                f"Qual hábito mais rouba sua atenção hoje? Comenta aqui!"
+            ),
+        ]
     elif "anime" in horizon or "entretenimento" in horizon or "cultura" in horizon:
-        body = (
-            f"Pouca gente notou esse detalhe escondido, mas os fãs já estão debatendo {title.lower()} no mundo todo. "
-            f"Se você olhar com atenção para a construção dessa cena, existe uma pista clara que conecta os eventos anteriores e muda o peso do próximo episódio. "
-            f"É exatamente esse tipo de detalhe oculto que transforma uma cena comum na maior teoria da temporada. "
-            f"Você também percebeu essa referência? Comenta sua teoria aqui embaixo!"
-        )
+        variants = [
+            (
+                f"Pouca gente notou esse detalhe escondido, mas os fãs já estão debatendo {title.lower()} no mundo todo. "
+                f"Se você olhar com atenção para a construção dessa cena, existe uma pista clara que conecta os eventos anteriores e muda o peso do próximo episódio. "
+                f"É exatamente esse tipo de detalhe oculto que transforma uma cena comum na maior teoria da temporada. "
+                f"Você também percebeu essa referência? Comenta sua teoria aqui embaixo!"
+            ),
+            (
+                f"A comunidade inteira voltou a analisar {title.lower()} depois que um detalhe visual passou despercebido na primeira exibição. "
+                f"Quando ligamos essa pista aos arcos antigos da obra, fica claro que o autor preparou essa virada há muito tempo. "
+                f"Agora resta saber qual será o impacto imediato nos próximos capítulos. "
+                f"Qual personagem vai surpreender mais daqui pra frente? Deixa seu palpite!"
+            ),
+        ]
     elif "ciencia" in horizon or "mundo" in horizon:
-        body = (
-            f"Olha o impacto real disso que acabou de chamar atenção em {title.lower()}. "
-            f"Enquanto muita gente olha apenas para a manchete superficial, os dados mostram uma mudança importante nos bastidores que afeta tecnologia, economia e nosso dia a dia nos próximos anos. "
-            f"Vale acompanhar de perto como esse cenário evolui a partir desta semana. "
-            f"O que você acha dessa virada? Deixa sua opinião nos comentários!"
-        )
+        variants = [
+            (
+                f"Olha o impacto real disso que acabou de chamar atenção em {title.lower()}. "
+                f"Enquanto muita gente olha apenas para a manchete superficial, os dados mostram uma mudança importante nos bastidores que afeta tecnologia e economia. "
+                f"Vale acompanhar de perto como esse cenário evolui a partir desta semana. "
+                f"O que você acha dessa virada? Deixa sua opinião nos comentários!"
+            ),
+            (
+                f"Os bastidores de {title.lower()} revelam uma transformação que pouca gente colocou no radar até agora. "
+                f"Segundo os relatórios mais recentes, os desdobramentos práticos já começam a aparecer nos próximos meses. "
+                f"Entender essa movimentação cedo ajuda a enxergar para onde o mundo está indo. "
+                f"Qual é a sua leitura sobre esse cenário? Comenta aqui!"
+            ),
+        ]
     else:
-        body = (
-            f"Esse assunto está chamando atenção agora por um motivo bem direto: {title.lower()}, segundo destaque de {source}. "
-            f"O ponto mais importante é como um detalhe que parecia pequeno muda completamente a leitura do cenário atual e o que vem pela frente. "
-            f"E você, o que pensa sobre isso? Comenta sua visão aqui embaixo e acompanhe os próximos vídeos!"
-        )
+        variants = [
+            (
+                f"Esse assunto está chamando atenção agora por um motivo bem direto: {title.lower()}, segundo destaque de {source}. "
+                f"O ponto mais importante é como um detalhe que parecia pequeno muda completamente a leitura do cenário atual e o que vem pela frente. "
+                f"E você, o que pensa sobre isso? Comenta sua visão aqui embaixo!"
+            ),
+            (
+                f"Por trás do que {source} destacou sobre {title.lower()}, existe uma lição prática que vale observar de perto. "
+                f"Quando o contexto completo aparece, fica fácil entender por que tanta gente está debatendo esse tema hoje. "
+                f"Deixe sua opinião nos comentários e acompanhe os próximos vídeos!"
+            ),
+        ]
+
+    body = variants[spoke_idx % len(variants)]
     clean_hook = hook.strip(" .!?:").capitalize()
-    return humanize_ptbr_script(f"{clean_hook}. {body}")
+    final_script = immunize_spoken_script(humanize_ptbr_script(f"{clean_hook}. {body}"), title=title)
+    mahoraga.record_speech_turn(niche_key, spoke["id"], title, final_script)
+    return final_script
 
 

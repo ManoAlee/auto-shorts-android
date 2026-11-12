@@ -27,6 +27,7 @@ from .evolution import EvolutionStore
 from .highlights import detect_highlights, heal_proper_nouns_and_asr
 from .gameplay import discover_dynamic_visual_queries, ensure_gameplay_library, fetch_gameplay_clip, list_gameplay_clips
 from .horizon_radar import _ptbr_headline, build_horizon_spoken_script, fetch_horizon_trends
+from .mahoraga import MahoragaEngine
 from .narrator import (
     DEFAULT_STYLE_KEY,
     VOICE_STYLES,
@@ -396,6 +397,44 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
         )
         _JOB_STATE.update({"running": False, "last_status": done_msg, "last_result": res})
     except Exception as exc:
+        mahoraga = MahoragaEngine(out_dir / "shorts_evolution.db")
+        mahoraga.adapt_to_phenomenon(
+            phenomenon="autopilot_cycle_failure",
+            niche=active_niche,
+            trigger_detail=str(exc)[:220],
+            counter_action="Advancing niche rotation & triggering resilient fallback",
+            resolved=False,
+        )
+        cfg["runs_completed"] = int(cfg.get("runs_completed", 0)) + 1
+        _save_scheduler_cfg(out_dir, cfg)
+        if active_niche != "noticias_mundiais":
+            try:
+                _set_job_progress(2, 5, f"2/5 Mahoraga contra-adaptando ({active_niche} -> noticias_mundiais)...", 45)
+                fb_res = produce_world_news_short(
+                    out_dir=out_dir,
+                    topic="world",
+                    auto_publish=bool(cfg.get("auto_publish", True)),
+                    use_llm=is_llm_configured(),
+                )
+                if bool(cfg.get("auto_publish", True)):
+                    _auto_crosspost_channels(fb_res)
+                mahoraga.adapt_to_phenomenon(
+                    phenomenon="autopilot_cycle_recovered",
+                    niche=active_niche,
+                    trigger_detail=str(exc)[:180],
+                    counter_action="Counter-adapted via resilient multi-scene world_news fallback",
+                    resolved=True,
+                )
+                _set_job_progress(5, 5, "5/5 Mahoraga recuperou ciclo com noticias_mundiais!", 100)
+                _JOB_STATE.update({
+                    "running": False,
+                    "last_status": f"Mahoraga adaptou falha em {active_niche} e concluiu via noticias_mundiais!",
+                    "last_error": "",
+                    "last_result": fb_res,
+                })
+                return
+            except Exception:
+                pass
         _JOB_STATE.update({"running": False, "last_status": "Falha no piloto automatico", "last_error": str(exc)})
 
 
@@ -817,7 +856,15 @@ def make_handler(out_dir: Path):
                 st = dict(_JOB_STATE)
                 if st.get("running") and st.get("started_at"):
                     st["elapsed_sec"] = round(max(0.0, time.time() - float(st["started_at"])), 1)
+                try:
+                    st["mahoraga"] = MahoragaEngine(out_dir / "shorts_evolution.db").get_status_summary()
+                except Exception:
+                    st["mahoraga"] = {"mode": "MAHORAGA_8_SPOKE_ACTIVE", "wheel_turns": 0}
                 self._send_json(200, st)
+                return
+
+            if parsed.path == "/api/mahoraga":
+                self._send_json(200, MahoragaEngine(out_dir / "shorts_evolution.db").get_status_summary())
                 return
 
             if parsed.path == "/api/autopublish/plan":
