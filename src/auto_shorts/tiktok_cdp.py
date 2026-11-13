@@ -371,25 +371,30 @@ def publish_pack_to_tiktok_cdp(
             cdp.call("DOM.setFileInputFiles", {"nodeId": file_node_id, "files": [str(mp4.resolve())]})
             time.sleep(10.0)
 
-            # Wait for caption editor and set sanitized caption
-            js_caption = json.dumps(caption)
+            # Wait for caption editor and set sanitized single-line caption via CDP Input (avoids crashing Draft.js)
+            safe_caption = " ".join(caption.split())[:2200]
+            has_ed = False
             for _ in range(12):
-                has_ed = cdp.eval_js("Boolean(document.querySelector('[contenteditable=\"true\"]'))")
+                has_ed = bool(cdp.eval_js("Boolean(document.querySelector('[contenteditable=\"true\"]'))"))
                 if has_ed:
                     break
                 time.sleep(2.0)
 
-            cdp.eval_js(f"""
-            (() => {{
-                const ed = document.querySelector('[contenteditable="true"]');
-                if (!ed) return false;
-                ed.focus();
-                document.execCommand('selectAll', false, null);
-                document.execCommand('insertText', false, {js_caption});
-                return true;
-            }})()
-            """)
-            time.sleep(2.0)
+            if has_ed and safe_caption:
+                cdp.eval_js("""
+                (() => {
+                    const ed = document.querySelector('[contenteditable="true"]');
+                    if (!ed) return false;
+                    ed.focus();
+                    return true;
+                })()
+                """)
+                cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
+                cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
+                cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
+                cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
+                cdp.call("Input.insertText", {"text": safe_caption})
+                time.sleep(2.0)
 
             # Wait up to 90s for Post/Publicar button to become enabled and click
             posted = False
