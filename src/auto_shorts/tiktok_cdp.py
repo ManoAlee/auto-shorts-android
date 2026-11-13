@@ -343,20 +343,25 @@ def publish_pack_to_tiktok_cdp(
                     })
 
             cdp.call("Page.navigate", {"url": "https://www.tiktok.com/tiktokstudio/upload?from=webapp"})
-            time.sleep(5.0)
-            _sync_live_cookies(cdp, out_dir)
-            cur_url = str(cdp.eval_js("window.location.href") or "")
-            if "/login" in cur_url.lower():
-                return {
-                    "status": "login_required",
-                    "reason": "Sessao do TikTok Studio Web nao autenticada. Salve o cookie sessionid via /api/tiktok/cdp/cookies.",
-                    "current_url": cur_url,
-                }
+            cur_url = ""
+            file_node_id = 0
+            for _ in range(18):
+                time.sleep(1.5)
+                cur_url = str(cdp.eval_js("window.location.href") or "")
+                if "/login" in cur_url.lower():
+                    return {
+                        "status": "login_required",
+                        "reason": "Sessao do TikTok Studio Web nao autenticada. Salve o cookie sessionid via /api/tiktok/cdp/cookies.",
+                        "current_url": cur_url,
+                    }
+                doc = cdp.call("DOM.getDocument", {"depth": -1})
+                root_id = doc["root"]["nodeId"]
+                inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
+                file_node_id = int(inp.get("nodeId") or 0)
+                if file_node_id:
+                    break
 
-            doc = cdp.call("DOM.getDocument", {"depth": -1})
-            root_id = doc["root"]["nodeId"]
-            inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
-            file_node_id = int(inp.get("nodeId") or 0)
+            _sync_live_cookies(cdp, out_dir)
             if not file_node_id:
                 return {"status": "error", "reason": "Campo input[type=file] nao encontrado no TikTok Studio Web.", "current_url": cur_url}
 
@@ -364,10 +369,16 @@ def publish_pack_to_tiktok_cdp(
                 return {"status": "cdp_dry_run_ready", "current_url": cur_url, "caption_preview": caption[:80]}
 
             cdp.call("DOM.setFileInputFiles", {"nodeId": file_node_id, "files": [str(mp4.resolve())]})
-            time.sleep(8.0)
+            time.sleep(10.0)
 
-            # Set caption into contenteditable editor if present
+            # Wait for caption editor and set sanitized caption
             js_caption = json.dumps(caption)
+            for _ in range(12):
+                has_ed = cdp.eval_js("Boolean(document.querySelector('[contenteditable=\"true\"]'))")
+                if has_ed:
+                    break
+                time.sleep(2.0)
+
             cdp.eval_js(f"""
             (() => {{
                 const ed = document.querySelector('[contenteditable="true"]');
@@ -380,13 +391,17 @@ def publish_pack_to_tiktok_cdp(
             """)
             time.sleep(2.0)
 
-            # Wait up to 45s for Post/Publicar button to become enabled and click
+            # Wait up to 90s for Post/Publicar button to become enabled and click
             posted = False
-            for _ in range(15):
+            for _ in range(30):
                 clicked = cdp.eval_js("""
                 (() => {
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    const target = btns.find(b => /^(post|publicar)$/i.test((b.innerText || '').trim()) && !b.disabled);
+                    const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+                    const target = btns.find(b => {
+                        const txt = (b.innerText || '').trim();
+                        const dis = b.disabled || b.getAttribute('aria-disabled') === 'true' || b.dataset.disabled === 'true';
+                        return /^(post|publicar)$/i.test(txt) && !dis;
+                    });
                     if (!target) return false;
                     target.click();
                     return true;
