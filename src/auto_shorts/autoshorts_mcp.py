@@ -198,7 +198,7 @@ def _is_tiktok_configured(od: Path) -> bool:
     mode = os.getenv("TIKTOK_PUBLISH_MODE", "").strip().lower()
     if mode == "cdp":
         from .tiktok_cdp import get_tiktok_cdp_status
-        return bool(get_tiktok_cdp_status(od).get("ready_for_cdp"))
+        return bool(get_tiktok_cdp_status(od).get("ready_to_publish"))
     return False
 
 

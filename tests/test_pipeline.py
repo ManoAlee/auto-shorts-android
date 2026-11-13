@@ -2609,8 +2609,27 @@ def test_mcp_registry_cache_and_tiktok_batch_tools(tmp_path, monkeypatch):
 
     monkeypatch.setenv("TIKTOK_PUBLISH_MODE", "cdp")
     monkeypatch.delenv("TIKTOK_ACCESS_TOKEN", raising=False)
-    monkeypatch.setattr(tiktok_cdp, "get_tiktok_cdp_status", lambda od: {"ready_for_cdp": True})
+    monkeypatch.setattr(tiktok_cdp, "get_tiktok_cdp_status", lambda od: {"ready_to_publish": True})
     assert mcp._is_tiktok_configured(tmp_path) is True
+
+
+def test_tiktok_caption_algorithm_optimization():
+    from auto_shorts.tiktok_cdp import _build_tiktok_caption
+
+    pack = {
+        "niche": "entretenimento_animes",
+        "title": "Gojo vs Sukuna: O Momento Mais Insano",
+        "caption": "Gojo vs Sukuna\nVideo original: https://www.youtube.com/watch?v=abc123\n#reels #reelsbrasil #shorts",
+    }
+    cap = _build_tiktok_caption(pack, "fallback")
+    assert "https://" not in cap
+    assert "#reels" not in cap.lower()
+    assert "#shorts" not in cap.lower()
+    assert "#animes" in cap
+    assert "#fyp" in cap
+    assert "#tiktokbrasil" in cap
+    assert "Comenta" in cap
+
 
 
 

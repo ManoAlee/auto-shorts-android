@@ -253,11 +253,23 @@ def _launch_chromium(out_dir: Path, port: int, headless: bool = True) -> subproc
         raise RuntimeError("Chromium nao encontrado. No Termux rode: pkg install -y x11-repo chromium")
     prof = out_dir / "tiktok_chrome_profile"
     prof.mkdir(parents=True, exist_ok=True)
+    for lock_name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        lock_p = prof / lock_name
+        if lock_p.exists() or lock_p.is_symlink():
+            try:
+                lock_p.unlink()
+            except OSError:
+                pass
     args = [
         chrome,
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
+        "--renderer-process-limit=1",
+        "--disable-background-networking",
+        "--disable-extensions",
+        "--disable-sync",
+        "--mute-audio",
         "--no-first-run",
         "--no-default-browser-check",
         f"--remote-debugging-port={port}",
@@ -308,6 +320,40 @@ def _inject_cookies(cdp: CDPClient, out_dir: Path) -> None:
             })
 
 
+_TIKTOK_NICHE_HASHTAGS: Dict[str, List[str]] = {
+    "entretenimento_animes": ["#animes", "#animebrasil", "#otaku", "#fyp", "#tiktokbrasil"],
+    "noticias_mundiais": ["#noticias", "#curiosidades", "#brasil", "#fyp", "#tiktokbrasil"],
+    "ia_tech": ["#inteligenciaartificial", "#tecnologia", "#ia", "#fyp", "#tiktokbrasil"],
+    "financas": ["#financas", "#dinheiro", "#investimentos", "#fyp", "#tiktokbrasil"],
+    "podcast": ["#podcast", "#cortespodcast", "#cortes", "#fyp", "#tiktokbrasil"],
+    "saude_fitness": ["#saude", "#fitness", "#treino", "#fyp", "#tiktokbrasil"],
+    "desenvolvimento_pessoal": ["#mentalidade", "#motivacao", "#desenvolvimentopessoal", "#fyp", "#tiktokbrasil"],
+    "concursos": ["#estudos", "#concursos", "#dicasdeestudo", "#fyp", "#tiktokbrasil"],
+}
+_TIKTOK_DEFAULT_HASHTAGS = ["#curiosidades", "#fatos", "#cortes", "#fyp", "#tiktokbrasil"]
+
+
+def _build_tiktok_caption(pack: Dict[str, Any], fallback_stem: str) -> str:
+    """Build a TikTok-algorithm-optimized caption (SEO hook, no external/competing tags, CTA, 5 niche hashtags)."""
+    import re
+    from .publisher import _sanitize_publish_caption
+
+    title = _sanitize_publish_caption(str(pack.get("title") or pack.get("hook_title") or fallback_stem))
+    raw_cap = _sanitize_publish_caption(str(pack.get("caption") or title or fallback_stem))
+    # Remove outbound YouTube/IG links and competing platform hashtags penalized on TikTok
+    cleaned = re.sub(r"https?://\S+", "", raw_cap)
+    cleaned = re.sub(r"(?i)v[ií]deo original\s*:\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)#(reels|reelsbrasil|shorts|youtubeshorts|instagram)\b", "", cleaned)
+    cleaned = " ".join(cleaned.split())
+    # Remove any remaining inline hashtags so we append a clean 5-tag TikTok block
+    body_no_tags = " ".join(re.sub(r"#\S+", "", cleaned).split())
+    core = (body_no_tags or title or fallback_stem)[:240].rstrip(" ,;:-")
+    cta = "Comenta sua opiniao e salva pra ver depois!"
+    niche = str(pack.get("niche") or "geral").strip().lower()
+    tags = _TIKTOK_NICHE_HASHTAGS.get(niche, _TIKTOK_DEFAULT_HASHTAGS)
+    return f"{core} | {cta} {' '.join(tags)}"[:2200]
+
+
 def _publish_single_in_cdp(
     cdp: CDPClient,
     mp4: Path,
@@ -316,15 +362,13 @@ def _publish_single_in_cdp(
     dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Upload and publish one MP4 inside an already-open, cookie-injected CDP session."""
-    from .publisher import _sanitize_publish_caption
-
     pack_path = mp4.with_suffix(".publish.json")
     pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
     existing = pack.get("tiktok") or {}
     if not force and existing.get("publish_id"):
         return {**existing, "status": "already_published_tiktok", "skipped": True, "file": mp4.name}
 
-    caption = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
+    caption = _build_tiktok_caption(pack, mp4.stem)
     cdp.call("Page.navigate", {"url": "https://www.tiktok.com/tiktokstudio/upload?from=webapp"})
 
     cur_url = ""
