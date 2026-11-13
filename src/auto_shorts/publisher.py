@@ -489,6 +489,10 @@ def publish_pack_to_youtube(
     if not force and existing_yt.get("video_id"):
         return {**existing_yt, "status": "already_published_youtube", "skipped": True}
 
+    if os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower() == "cdp":
+        from .youtube_cdp import publish_pack_to_youtube_cdp
+        return publish_pack_to_youtube_cdp(mp4, privacy_status=(privacy_status or "PUBLIC"), force=force)
+
     ass_cand = mp4.parent / f"_narrate_{mp4.stem}" / f"{mp4.stem}.ass"
     from .validator import audit_short_end_to_end
 

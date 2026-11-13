@@ -963,6 +963,11 @@ def make_handler(out_dir: Path):
                 self._send_json(200, get_tiktok_cdp_status(out_dir))
                 return
 
+            if parsed.path == "/api/youtube/cdp/status":
+                from .youtube_cdp import get_youtube_cdp_status
+                self._send_json(200, get_youtube_cdp_status(out_dir))
+                return
+
             if parsed.path == "/api/animes/search":
                 qs = urllib.parse.parse_qs(parsed.query)
                 q = (qs.get("q") or [""])[0].strip()
@@ -1308,6 +1313,15 @@ def make_handler(out_dir: Path):
                     self._send_json(400, {"ok": False, "message": "Informe 'sessionid' ou lista 'cookies'."})
                     return
                 self._send_json(200, save_tiktok_cookies(out_dir, cookies))
+                return
+
+            if parsed.path == "/api/youtube/cdp/cookies":
+                from .youtube_cdp import save_youtube_cookies
+                cookies = body.get("cookies")
+                if not isinstance(cookies, list) or not cookies:
+                    self._send_json(400, {"ok": False, "message": "Informe lista 'cookies' do YouTube Studio (.youtube.com / .google.com)."})
+                    return
+                self._send_json(200, save_youtube_cookies(out_dir, cookies))
                 return
 
             if parsed.path == "/api/gdrive/episodes":

@@ -2631,6 +2631,52 @@ def test_tiktok_caption_algorithm_optimization():
     assert "Comenta" in cap
 
 
+def test_youtube_cdp_cookies_batch_idempotency_and_mcp(tmp_path, monkeypatch):
+    import json as _json
+    from auto_shorts import autoshorts_mcp as mcp
+    from auto_shorts import smart_autopublish as sa
+    from auto_shorts import youtube_cdp
+
+    saved = youtube_cdp.save_youtube_cookies(tmp_path, [{"name": "SID", "value": "yt_sid_123", "domain": ".youtube.com"}])
+    assert saved["ok"] is True
+    assert saved["has_auth_cookies"] is True
+
+    st = youtube_cdp.get_youtube_cdp_status(tmp_path)
+    assert st["has_auth_cookies"] is True
+    assert st["cookies_saved"] == 1
+
+    meta = youtube_cdp._build_youtube_cdp_metadata({"title": "Teste Curto", "caption": "Resumo do video"}, "fallback")
+    assert meta["title"] == "Teste Curto"
+    assert "#Shorts" in meta["description"]
+
+    mp4_done = tmp_path / "yt_done.mp4"
+    mp4_done.write_bytes(b"0" * 500)
+    mp4_done.with_suffix(".publish.json").write_text(
+        _json.dumps({"youtube": {"video_id": "yt123", "mode": "cdp"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: True)
+    skipped = youtube_cdp.publish_pack_to_youtube_cdp(mp4_done)
+    assert skipped["status"] == "already_published_youtube"
+    assert skipped["skipped"] is True
+
+    batch = youtube_cdp.publish_batch_to_youtube_cdp([mp4_done], max_videos=3, out_dir=tmp_path)
+    assert batch["status"] == "batch_complete"
+    assert batch["skipped_count"] == 1
+    assert batch["published_count"] == 0
+
+    mcp._REGISTRY_CACHE.clear()
+    reg = mcp._build_internal_registry(tmp_path)
+    assert "youtube.cdp_status" in reg
+    assert "youtube.publish_batch" in reg
+
+    monkeypatch.setenv("YOUTUBE_PUBLISH_MODE", "cdp")
+    monkeypatch.delenv("YT_CLIENT_ID", raising=False)
+    monkeypatch.setattr(youtube_cdp, "get_youtube_cdp_status", lambda od: {"ready_to_publish": True})
+    assert mcp._is_youtube_configured(tmp_path) is True
+
+
+
 
 
 

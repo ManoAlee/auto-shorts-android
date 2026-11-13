@@ -202,10 +202,19 @@ def _is_tiktok_configured(od: Path) -> bool:
     return False
 
 
+def _is_youtube_configured(od: Path) -> bool:
+    if bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN")):
+        return True
+    if os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower() == "cdp":
+        from .youtube_cdp import get_youtube_cdp_status
+        return bool(get_youtube_cdp_status(od).get("ready_to_publish"))
+    return False
+
+
 def _tool_autopublish_plan(out_dir: Optional[Path] = None) -> Dict[str, Any]:
     from .smart_autopublish import get_autopublish_plan
     od = out_dir or _default_out_dir()
-    yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    yt_ready = _is_youtube_configured(od)
     tt_ready = _is_tiktok_configured(od)
     ig_ready = _is_instagram_configured()
     return get_autopublish_plan(od, youtube_ready=yt_ready, tiktok_ready=tt_ready, instagram_ready=ig_ready)
@@ -220,10 +229,33 @@ def _tool_autopublish_run(
 ) -> Dict[str, Any]:
     from .smart_autopublish import run_smart_publish_cycle
     od = out_dir or _default_out_dir()
-    yt_ready = youtube and bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    yt_ready = youtube and _is_youtube_configured(od)
     tt_ready = tiktok and _is_tiktok_configured(od)
     ig_ready = instagram and _is_instagram_configured()
     return run_smart_publish_cycle(od, youtube_ready=yt_ready, tiktok_ready=tt_ready, instagram_ready=ig_ready, force=force)
+
+
+def _tool_youtube_publish_batch(
+    filenames: Optional[List[str]] = None,
+    privacy_status: str = "PUBLIC",
+    altered_content: bool = False,
+    max_videos: int = 3,
+    force: bool = False,
+    dry_run: bool = False,
+    out_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    from .youtube_cdp import publish_batch_to_youtube_cdp
+    od = out_dir or _default_out_dir()
+    targets = [(od / Path(fn).name) for fn in filenames] if filenames else sorted(od.glob("*.mp4"))
+    return publish_batch_to_youtube_cdp(
+        targets,
+        privacy_status=privacy_status,
+        altered_content=altered_content,
+        force=force,
+        max_videos=max_videos,
+        dry_run=dry_run,
+        out_dir=od,
+    )
 
 
 def _tool_tiktok_publish_batch(
@@ -453,6 +485,38 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
             "description": "Refresh and persist live .tiktok.com session cookies via native Chromium CDP.",
             "inputSchema": {"type": "object", "properties": {}},
             "handler": lambda a: __import__("auto_shorts.tiktok_cdp", fromlist=["keepalive_tiktok_cdp"]).keepalive_tiktok_cdp(od),
+        },
+        "youtube.cdp_status": {
+            "category": "publish",
+            "offline": True,
+            "description": "Check native Chromium CDP readiness, profile, and YouTube Studio session cookies.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "handler": lambda a: __import__("auto_shorts.youtube_cdp", fromlist=["get_youtube_cdp_status"]).get_youtube_cdp_status(od),
+        },
+        "youtube.publish_batch": {
+            "category": "publish",
+            "offline": False,
+            "description": "Publish multiple pending MP4 Shorts to YouTube Studio Web in one warm Chromium CDP session (no API quota).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filenames": {"type": "array", "items": {"type": "string"}},
+                    "privacy_status": {"type": "string", "default": "PUBLIC"},
+                    "altered_content": {"type": "boolean", "default": False},
+                    "max_videos": {"type": "integer", "default": 3},
+                    "force": {"type": "boolean", "default": False},
+                    "dry_run": {"type": "boolean", "default": False},
+                },
+            },
+            "handler": lambda a: _tool_youtube_publish_batch(
+                filenames=a.get("filenames"),
+                privacy_status=str(a.get("privacy_status", "PUBLIC")),
+                altered_content=bool(a.get("altered_content", False)),
+                max_videos=int(a.get("max_videos", 3)),
+                force=bool(a.get("force", False)),
+                dry_run=bool(a.get("dry_run", False)),
+                out_dir=od,
+            ),
         },
     }
 
