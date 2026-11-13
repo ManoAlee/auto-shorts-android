@@ -472,14 +472,24 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
 
 
 def _is_youtube_configured() -> bool:
-    return bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+    if bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN")):
+        return True
+    if os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower() == "cdp":
+        from .youtube_cdp import get_youtube_cdp_status
+        return bool(get_youtube_cdp_status(Path(__file__).resolve().parents[2] / "output").get("ready_to_publish"))
+    return False
 
 
 def _is_tiktok_configured() -> bool:
-    return bool(
+    if bool(
         os.getenv("TIKTOK_ACCESS_TOKEN", "").strip()
         or (os.getenv("TIKTOK_CLIENT_KEY", "").strip() and os.getenv("TIKTOK_CLIENT_SECRET", "").strip() and os.getenv("TIKTOK_REFRESH_TOKEN", "").strip())
-    )
+    ):
+        return True
+    if os.getenv("TIKTOK_PUBLISH_MODE", "").strip().lower() == "cdp":
+        from .tiktok_cdp import get_tiktok_cdp_status
+        return bool(get_tiktok_cdp_status(Path(__file__).resolve().parents[2] / "output").get("ready_to_publish"))
+    return False
 
 
 def _is_instagram_configured() -> bool:
@@ -599,7 +609,7 @@ def _flush_pending_publishes(out_dir: Path, force: bool = False) -> bool:
     msgs = []
     for ch in ("instagram", "tiktok", "youtube"):
         r = res.get(ch) or {}
-        if r.get("status") in ("published", "published_instagram", "published_tiktok_inbox", "published_tiktok_direct"):
+        if r.get("status") in ("published", "published_instagram", "published_tiktok_inbox", "published_tiktok_direct", "published_tiktok_cdp", "published_youtube_cdp"):
             msgs.append(f"{ch.title()}: {r.get('filename')}")
     if msgs:
         _JOB_STATE["last_status"] = "Publicacao inteligente: " + " | ".join(msgs)
