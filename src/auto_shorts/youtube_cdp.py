@@ -131,6 +131,8 @@ def _launch_yt_chromium(out_dir: Path, port: int, headless: bool = True) -> subp
         "--mute-audio",
         "--no-first-run",
         "--no-default-browser-check",
+        "--window-size=1280,900",
+        "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         f"--remote-debugging-port={port}",
         f"--user-data-dir={prof}",
     ]
@@ -190,7 +192,7 @@ def _publish_single_yt_in_cdp(
         return {**existing, "status": "already_published_youtube", "skipped": True, "file": mp4.name}
 
     meta = _build_youtube_cdp_metadata(pack, mp4.stem)
-    cdp.call("Page.navigate", {"url": "https://studio.youtube.com"})
+    cdp.call("Page.navigate", {"url": "https://www.youtube.com/upload"})
 
     cur_url = ""
     file_node_id = 0
