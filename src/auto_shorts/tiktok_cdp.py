@@ -206,6 +206,22 @@ def save_tiktok_cookies(out_dir: Path, cookies: List[Dict[str, Any]]) -> Dict[st
     return {"ok": True, "saved_count": len(cleaned), "has_sessionid": any(c["name"] == "sessionid" for c in cleaned)}
 
 
+def _sync_live_cookies(cdp: CDPClient, out_dir: Path) -> int:
+    """Pull refreshed .tiktok.com cookies from Chromium back into tiktok_cookies.json."""
+    try:
+        res = cdp.call("Network.getAllCookies")
+        all_ck = [
+            c for c in (res.get("cookies") or [])
+            if isinstance(c, dict) and "tiktok.com" in str(c.get("domain") or "")
+        ]
+        if any(c.get("name") == "sessionid" and c.get("value") for c in all_ck):
+            save_tiktok_cookies(out_dir, all_ck)
+            return len(all_ck)
+    except Exception:
+        pass
+    return 0
+
+
 def get_tiktok_cdp_status(out_dir: Path) -> Dict[str, Any]:
     """Return readiness of native Chromium CDP TikTok Studio Web automation."""
     chrome = find_chromium_binary()
@@ -328,6 +344,7 @@ def publish_pack_to_tiktok_cdp(
 
             cdp.call("Page.navigate", {"url": "https://www.tiktok.com/tiktokstudio/upload?from=webapp"})
             time.sleep(5.0)
+            _sync_live_cookies(cdp, out_dir)
             cur_url = str(cdp.eval_js("window.location.href") or "")
             if "/login" in cur_url.lower():
                 return {
@@ -384,6 +401,7 @@ def publish_pack_to_tiktok_cdp(
                 return {"status": "error", "reason": "Botao Post/Publicar nao ficou habilitado a tempo."}
 
             time.sleep(6.0)
+            _sync_live_cookies(cdp, out_dir)
             pub_id = f"cdp:{int(time.time())}"
             tt_info = {"publish_id": pub_id, "mode": "cdp", "published_at": int(time.time())}
             pack["tiktok"] = tt_info
