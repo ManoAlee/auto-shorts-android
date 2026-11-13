@@ -2538,6 +2538,34 @@ def test_autoshorts_adaptive_mcp_offline_and_codemode(tmp_path):
     assert tel_data["tools_telemetry"]["system.health"]["calls"] >= 2
 
 
+def test_tiktok_cdp_cookies_status_and_idempotency(tmp_path, monkeypatch):
+    import json as _json
+    from auto_shorts import smart_autopublish as sa
+    from auto_shorts.tiktok_cdp import get_tiktok_cdp_status, publish_pack_to_tiktok_cdp, save_tiktok_cookies
+
+    res = save_tiktok_cookies(tmp_path, [{"name": "sessionid", "value": "abc123"}])
+    assert res["ok"] is True
+    assert res["has_sessionid"] is True
+    st = get_tiktok_cdp_status(tmp_path)
+    assert st["has_sessionid"] is True
+    assert st["cookies_saved"] == 1
+
+    mp4 = tmp_path / "tt_clip.mp4"
+    mp4.write_bytes(b"0" * 1000)
+    mp4.with_suffix(".publish.json").write_text(
+        _json.dumps({"tiktok": {"publish_id": "cdp:999", "mode": "cdp"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: True)
+    skipped = publish_pack_to_tiktok_cdp(mp4)
+    assert skipped["status"] == "already_published_tiktok"
+    assert skipped["skipped"] is True
+
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: False)
+    deferred = publish_pack_to_tiktok_cdp(mp4)
+    assert deferred["reason"] == "wifi_only_no_wifi"
+
+
 
 
 

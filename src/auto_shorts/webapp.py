@@ -958,6 +958,11 @@ def make_handler(out_dir: Path):
                 self._send_json(200, {"ok": True, "transport": "streamable-http", "initialize": init_resp.get("result", {})})
                 return
 
+            if parsed.path == "/api/tiktok/cdp/status":
+                from .tiktok_cdp import get_tiktok_cdp_status
+                self._send_json(200, get_tiktok_cdp_status(out_dir))
+                return
+
             if parsed.path == "/api/animes/search":
                 qs = urllib.parse.parse_qs(parsed.query)
                 q = (qs.get("q") or [""])[0].strip()
@@ -1292,6 +1297,17 @@ def make_handler(out_dir: Path):
                     self._send_json(202, {"ok": True})
                 else:
                     self._send_json(200, resp)
+                return
+
+            if parsed.path == "/api/tiktok/cdp/cookies":
+                from .tiktok_cdp import save_tiktok_cookies
+                cookies = body.get("cookies")
+                if not isinstance(cookies, list) and body.get("sessionid"):
+                    cookies = [{"name": "sessionid", "value": str(body["sessionid"]).strip(), "domain": ".tiktok.com", "path": "/"}]
+                if not isinstance(cookies, list) or not cookies:
+                    self._send_json(400, {"ok": False, "message": "Informe 'sessionid' ou lista 'cookies'."})
+                    return
+                self._send_json(200, save_tiktok_cookies(out_dir, cookies))
                 return
 
             if parsed.path == "/api/gdrive/episodes":

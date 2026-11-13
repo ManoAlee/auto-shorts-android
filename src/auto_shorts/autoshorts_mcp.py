@@ -384,6 +384,13 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
             "inputSchema": {"type": "object", "properties": {}},
             "handler": lambda a: _tool_mahoraga_state(od),
         },
+        "tiktok.cdp_status": {
+            "category": "publish",
+            "offline": True,
+            "description": "Check native Chromium CDP readiness, profile, and TikTok Web session cookies.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "handler": lambda a: __import__("auto_shorts.tiktok_cdp", fromlist=["get_tiktok_cdp_status"]).get_tiktok_cdp_status(od),
+        },
     }
 
     for yt_name, yt_spec in YT_TOOLS.items():

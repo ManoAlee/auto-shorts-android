@@ -1181,6 +1181,9 @@ def publish_pack_to_tiktok(
         return {**existing_tt, "status": "already_published_tiktok", "skipped": True}
 
     target_mode = (mode or os.getenv("TIKTOK_PUBLISH_MODE", "inbox") or "inbox").strip().lower()
+    if target_mode == "cdp":
+        from .tiktok_cdp import publish_pack_to_tiktok_cdp
+        return publish_pack_to_tiktok_cdp(mp4, force=force)
     if target_mode not in ("inbox", "direct"):
         target_mode = "inbox"
 
