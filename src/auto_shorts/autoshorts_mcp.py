@@ -518,6 +518,20 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
                 out_dir=od,
             ),
         },
+        "analytics.platforms": {
+            "category": "analytics",
+            "offline": True,
+            "description": "Compute cross-platform vault metrics, niche breakdown, and algorithm playbooks for TikTok, YouTube, and Instagram.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "handler": lambda a: __import__("auto_shorts.platform_analytics", fromlist=["build_cross_platform_analytics"]).build_cross_platform_analytics(od),
+        },
+        "trends.global": {
+            "category": "analytics",
+            "offline": False,
+            "description": "Fetch live global trends from Google Trends BR/US, X/Twitter viral feeds, Reddit, and Hacker News.",
+            "inputSchema": {"type": "object", "properties": {"niche": {"type": "string", "default": "all"}}},
+            "handler": lambda a: __import__("auto_shorts.platform_analytics", fromlist=["fetch_global_trends_radar"]).fetch_global_trends_radar(niche=str(a.get("niche", "all"))),
+        },
     }
 
     for yt_name, yt_spec in YT_TOOLS.items():

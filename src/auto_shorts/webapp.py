@@ -968,6 +968,28 @@ def make_handler(out_dir: Path):
                 self._send_json(200, get_youtube_cdp_status(out_dir))
                 return
 
+            if parsed.path == "/api/analytics/platforms":
+                from .platform_analytics import build_cross_platform_analytics
+                self._send_json(200, build_cross_platform_analytics(out_dir))
+                return
+
+            if parsed.path == "/api/trends/global":
+                from .platform_analytics import fetch_global_trends_radar
+                qs = urllib.parse.parse_qs(parsed.query)
+                niche = (qs.get("niche") or ["all"])[0]
+                self._send_json(200, fetch_global_trends_radar(niche=niche))
+                return
+
+            if parsed.path == "/analytics":
+                from .analytics_ui import render_analytics_dashboard_html
+                html = render_analytics_dashboard_html().encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(html)))
+                self.end_headers()
+                self._safe_write(html)
+                return
+
             if parsed.path == "/api/animes/search":
                 qs = urllib.parse.parse_qs(parsed.query)
                 q = (qs.get("q") or [""])[0].strip()

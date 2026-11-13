@@ -2676,6 +2676,49 @@ def test_youtube_cdp_cookies_batch_idempotency_and_mcp(tmp_path, monkeypatch):
     assert mcp._is_youtube_configured(tmp_path) is True
 
 
+def test_cross_platform_analytics_trends_and_a11y_ui(tmp_path, monkeypatch):
+    import json as _json
+    from auto_shorts import autoshorts_mcp as mcp
+    from auto_shorts import platform_analytics as pa
+    from auto_shorts.analytics_ui import render_analytics_dashboard_html
+
+    mp4 = tmp_path / "sample.mp4"
+    mp4.write_bytes(b"0" * 1024)
+    mp4.with_suffix(".publish.json").write_text(
+        _json.dumps({
+            "niche": "ia_tech",
+            "visual_audit": {"approved": True, "quality_score": 92},
+            "algorithm": {"algo_score": 98},
+            "validation": {"duration": 41.0},
+            "tiktok": {"publish_id": "cdp:1"},
+        }),
+        encoding="utf-8",
+    )
+
+    rep = pa.build_cross_platform_analytics(tmp_path)
+    assert rep["summary"]["total_packs"] == 1
+    assert rep["platforms"]["tiktok"]["published"] == 1
+    assert rep["platforms"]["youtube"]["pending"] == 1
+    assert rep["platforms"]["instagram"]["pending"] == 1
+    assert len(rep["recommendations"]) >= 2
+
+    monkeypatch.setattr(pa, "_fetch_text", lambda url, timeout=5.0: (_ for _ in ()).throw(RuntimeError("offline")))
+    tr = pa.fetch_global_trends_radar(niche="all")
+    assert tr["total_trends"] == 0
+    assert len(tr["sources_err"]) >= 1
+
+    html = render_analytics_dashboard_html()
+    assert 'role="tablist"' in html
+    assert 'aria-live="polite"' in html
+    assert 'href="#main-content"' in html
+
+    mcp._REGISTRY_CACHE.clear()
+    reg = mcp._build_internal_registry(tmp_path)
+    assert "analytics.platforms" in reg
+    assert "trends.global" in reg
+
+
+
 
 
 
