@@ -914,7 +914,125 @@ def publish_pack_to_instagram_reels(
 
     pack["instagram"] = ig_info
     pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
-    return {"status": "published_instagram", **ig_info}
+    audit = verify_published_post(mp4, cl=cl)
+    return {"status": "published_instagram", **ig_info, "post_publish_audit": audit}
+
+
+def verify_published_post(video_path: str | Path, cl=None) -> Dict:
+    """Validate a published video's metadata, live Instagram media_info (when client given), and unique thumbnail hash."""
+    import hashlib
+    import time
+
+    mp4 = Path(video_path)
+    pack_path = mp4.with_suffix(".publish.json")
+    pack: Dict = {}
+    if pack_path.is_file():
+        try:
+            pack = json.loads(pack_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pack = {}
+
+    warnings: List[str] = []
+    channels_ok: Dict[str, Dict] = {}
+
+    ig = pack.get("instagram") or {}
+    if ig.get("media_pk"):
+        thumb = Path(f"{mp4}.jpg")
+        thumb_hash = ig.get("thumbnail_sha256") or ""
+        if thumb.is_file() and thumb.stat().st_size > 0:
+            if not mp4.is_file() or thumb.stat().st_mtime >= (mp4.stat().st_mtime - 5.0):
+                thumb_hash = hashlib.sha256(thumb.read_bytes()).hexdigest()[:16]
+                ig["thumbnail_sha256"] = thumb_hash
+            else:
+                warnings.append("instagram_thumbnail_stale")
+        if thumb_hash and mp4.parent.is_dir():
+            for sib in mp4.parent.glob("*.publish.json"):
+                if sib == pack_path:
+                    continue
+                try:
+                    sib_ig = (json.loads(sib.read_text(encoding="utf-8")).get("instagram") or {})
+                    if sib_ig.get("thumbnail_sha256") == thumb_hash and sib_ig.get("media_pk") != ig.get("media_pk"):
+                        warnings.append(f"duplicate_thumbnail_hash:{sib.stem}")
+                        break
+                except Exception:
+                    pass
+        if cl is not None:
+            try:
+                info = cl.media_info(ig["media_pk"])
+                ig["verified"] = bool(getattr(info, "pk", "") or getattr(info, "code", ""))
+                ig["verified_at"] = int(time.time())
+            except Exception as exc:
+                ig["verified"] = False
+                warnings.append(f"instagram_live_check_failed:{exc}")
+        elif "verified" not in ig:
+            ig["verified"] = bool(ig.get("url") or ig.get("code"))
+        pack["instagram"] = ig
+        channels_ok["instagram"] = {
+            "published": True,
+            "verified": bool(ig.get("verified")),
+            "url": ig.get("url", ""),
+            "thumbnail_sha256": thumb_hash,
+        }
+
+    yt = pack.get("youtube") or {}
+    if yt.get("video_id"):
+        channels_ok["youtube"] = {
+            "published": True,
+            "verified": bool(yt.get("url")),
+            "url": yt.get("url", ""),
+        }
+
+    tt = pack.get("tiktok") or {}
+    if tt.get("publish_id"):
+        channels_ok["tiktok"] = {
+            "published": True,
+            "verified": True,
+            "publish_id": tt.get("publish_id", ""),
+        }
+
+    audit = {
+        "ok": bool(channels_ok) and not warnings,
+        "checked_at": int(time.time()),
+        "channels": channels_ok,
+        "warnings": warnings,
+    }
+    if pack_path.is_file() or pack:
+        pack["post_publish_audit"] = audit
+        try:
+            pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+    return audit
+
+
+def audit_published_vault(out_dir: Path) -> Dict:
+    """Audit all published videos in out_dir and flag missing/duplicate thumbnails or unverified posts."""
+    if not out_dir.is_dir():
+        return {"ok": True, "total_published": 0, "warnings_count": 0, "items": []}
+    items: List[Dict] = []
+    warnings_count = 0
+    for pack_file in sorted(out_dir.glob("*.publish.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            pack = json.loads(pack_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not ((pack.get("instagram") or {}).get("media_pk") or (pack.get("youtube") or {}).get("video_id") or (pack.get("tiktok") or {}).get("publish_id")):
+            continue
+        mp4 = pack_file.with_suffix("").with_suffix(".mp4")
+        audit = verify_published_post(mp4)
+        if audit.get("warnings"):
+            warnings_count += len(audit["warnings"])
+        items.append({
+            "filename": mp4.name,
+            "title": pack.get("title", mp4.stem),
+            **audit,
+        })
+    return {
+        "ok": warnings_count == 0,
+        "total_published": len(items),
+        "warnings_count": warnings_count,
+        "items": items,
+    }
 
 
 TIKTOK_SINGLE_CHUNK_MAX_BYTES = 64 * 1024 * 1024

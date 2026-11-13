@@ -41,6 +41,7 @@ from .narrator import (
 )
 from .pipeline import run_autopilot, run_pipeline
 from .publisher import (
+    audit_published_vault,
     get_youtube_channel_summary,
     optimize_existing_publish_pack,
     publish_pack_to_instagram_reels,
@@ -577,25 +578,28 @@ def _auto_crosspost_channels(result: Dict) -> None:
 
 
 def _flush_pending_publishes(out_dir: Path, force: bool = False) -> bool:
-    """Run intelligent priority-ranked auto-publishing across TikTok and YouTube."""
+    """Run intelligent priority-ranked auto-publishing across TikTok, YouTube and Instagram."""
     yt_ready = _is_youtube_configured()
     tt_ready = _is_tiktok_configured()
-    if not (yt_ready or tt_ready) or not out_dir.exists():
+    ig_ready = _is_instagram_configured()
+    if not (yt_ready or tt_ready or ig_ready) or not out_dir.exists():
         return False
 
     cycle = run_smart_publish_cycle(
         out_dir,
         youtube_ready=yt_ready,
         tiktok_ready=tt_ready,
+        instagram_ready=ig_ready,
         force=force,
         yt_publisher=publish_pack_to_youtube,
         tt_publisher=publish_pack_to_tiktok,
+        ig_publisher=publish_pack_to_instagram_reels,
     )
     res = cycle.get("results") or {}
     msgs = []
-    for ch in ("tiktok", "youtube"):
+    for ch in ("instagram", "tiktok", "youtube"):
         r = res.get(ch) or {}
-        if r.get("status") == "published":
+        if r.get("status") in ("published", "published_instagram", "published_tiktok_inbox", "published_tiktok_direct"):
             msgs.append(f"{ch.title()}: {r.get('filename')}")
     if msgs:
         _JOB_STATE["last_status"] = "Publicacao inteligente: " + " | ".join(msgs)
@@ -942,6 +946,10 @@ def make_handler(out_dir: Path):
                     "tunnel_url": url,
                     "fixed_configured": bool(os.getenv("CLOUDFLARE_TUNNEL_TOKEN", "").strip() or os.getenv("PUBLIC_STUDIO_URL", "").strip()),
                 })
+                return
+
+            if parsed.path == "/api/publish/audit":
+                self._send_json(200, audit_published_vault(out_dir))
                 return
 
             if parsed.path == "/api/animes/search":

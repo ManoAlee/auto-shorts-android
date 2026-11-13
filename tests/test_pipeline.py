@@ -2338,6 +2338,36 @@ def test_ensure_reel_thumbnail_invalidates_stale_jpg_and_prefers_fresh_cover(tmp
     assert chosen.read_bytes() == b"FRESH_9X16_COVER"
 
 
+def test_post_publish_audit_and_duplicate_thumbnail_detection(tmp_path):
+    from auto_shorts.publisher import audit_published_vault, verify_published_post
+
+    mp4_a = tmp_path / "clip_a.mp4"
+    mp4_b = tmp_path / "clip_b.mp4"
+    mp4_a.write_bytes(b"VIDEO_A")
+    mp4_b.write_bytes(b"VIDEO_B")
+
+    Path(f"{mp4_a}.jpg").write_bytes(b"SAME_BYTES")
+    Path(f"{mp4_b}.jpg").write_bytes(b"SAME_BYTES")
+
+    mp4_a.with_suffix(".publish.json").write_text(
+        json.dumps({"title": "Video A", "instagram": {"media_pk": "111", "code": "AAA", "url": "https://instagram.com/reel/AAA/"}}),
+        encoding="utf-8",
+    )
+    mp4_b.with_suffix(".publish.json").write_text(
+        json.dumps({"title": "Video B", "instagram": {"media_pk": "222", "code": "BBB", "url": "https://instagram.com/reel/BBB/"}}),
+        encoding="utf-8",
+    )
+
+    audit_a = verify_published_post(mp4_a)
+    assert audit_a["ok"] is True
+    assert audit_a["channels"]["instagram"]["thumbnail_sha256"]
+
+    vault_audit = audit_published_vault(tmp_path)
+    assert vault_audit["total_published"] == 2
+    assert vault_audit["warnings_count"] >= 1
+
+
+
 
 
 
