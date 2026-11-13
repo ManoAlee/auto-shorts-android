@@ -415,53 +415,17 @@ def run_pipeline(
                 else:
                     delivery_status = f"delivery_error: {msg}"
 
-        # Auto-backup rendered shorts to Google Drive 5TB (organized by Niche/Date + readable slug + .txt info)
-        from .downloader import build_drive_niche_folder, upload_to_rclone_as
-        import re as _re
-        uploaded_ok = False
+        # Auto-backup rendered shorts to Google Drive 5TB (if configured)
+        from .downloader import build_drive_niche_folder, upload_to_rclone
         try:
             drive_folder = build_drive_niche_folder(niche)
-            raw_slug = _re.sub(r"[^a-zA-Z0-9]+", "_", str(clip.get("title") or out_mp4.stem)).strip("_").lower()[:42]
-            base_remote = f"{drive_folder}/{raw_slug}_{out_mp4.stem}" if raw_slug else f"{drive_folder}/{out_mp4.stem}"
-            uploaded_ok = upload_to_rclone_as(out_mp4, f"{base_remote}.mp4")
+            upload_to_rclone(out_mp4, drive_folder)
             if thumb_16x9 and thumb_16x9.is_file():
-                upload_to_rclone_as(thumb_16x9, f"{base_remote}_thumb_16x9.jpg")
+                upload_to_rclone(thumb_16x9, drive_folder)
             if cover_9x16 and cover_9x16.is_file():
-                upload_to_rclone_as(cover_9x16, f"{base_remote}_cover_9x16.jpg")
-            info_txt = work_dir / f"{out_mp4.stem}_info.txt"
-            info_txt.write_text(
-                f"TITULO: {clip.get('title', '')}\n"
-                f"GANCHO: {clip.get('hook_title', '')}\n"
-                f"NICHO: {niche} | PLATAFORMA: {platform}\n"
-                f"STATUS: {delivery_status}\n\n"
-                f"LEGENDA & HASHTAGS:\n{pack.get('caption', '')}\n",
-                encoding="utf-8",
-            )
-            upload_to_rclone_as(info_txt, f"{base_remote}_info.txt")
+                upload_to_rclone(cover_9x16, drive_folder)
         except Exception:
             pass
-
-        if uploaded_ok and os.getenv("AUTO_PURGE_LOCAL_AFTER_DRIVE", "1") == "1":
-            try:
-                keep_n = max(1, int(os.getenv("MAX_LOCAL_MP4_KEEP", "3")))
-                mp4s = sorted(out_root.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
-                for old_mp4 in mp4s[keep_n:]:
-                    if old_mp4 == out_mp4 or not old_mp4.is_file():
-                        continue
-                    # Protect queued videos that haven't been posted to YouTube yet
-                    pub_meta = old_mp4.with_suffix(".publish.json")
-                    is_queued = False
-                    if pub_meta.is_file():
-                        try:
-                            meta_d = json.loads(pub_meta.read_text(encoding="utf-8"))
-                            st = str(meta_d.get("delivery_status") or "")
-                            is_queued = "queued" in st and not meta_d.get("youtube_url")
-                        except Exception:
-                            pass
-                    if not is_queued:
-                        old_mp4.unlink(missing_ok=True)
-            except Exception:
-                pass
 
         rendered.append({
             **clip,

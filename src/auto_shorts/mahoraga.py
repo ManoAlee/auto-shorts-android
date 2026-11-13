@@ -390,65 +390,15 @@ class MahoragaEngine:
             sum_clean += "."
         sum_lower_start = sum_clean[0].lower() + sum_clean[1:] if len(sum_clean) > 1 else sum_clean
 
-        templates = [
-            # Spoke I: Revelação Investigativa
-            (
-                f"Por trás do destaque sobre {title_clean}, existe um detalhe técnico que muda toda a leitura. "
-                f"Segundo os dados apurados por {source_name}, {sum_lower_start} "
-                f"Quem enxerga esse movimento nos bastidores entende por que o setor entrou em alerta. "
-                f"Qual é a sua análise sobre isso? Deixe nos comentários!"
-            ),
-            # Spoke II: Quebra de Crença
-            (
-                f"{title_clean}! "
-                f"Muita gente subestima esse ponto, mas a apuração de {source_name} mostra que {sum_lower_start} "
-                f"Na prática, isso derruba o padrão antigo e exige uma postura totalmente nova a partir de agora. "
-                f"Você concorda com essa visão? Comente aqui embaixo!"
-            ),
-            # Spoke III: Efeito Dominó
-            (
-                f"Olha o efeito dominó que acabou de começar: {title_clean}. "
-                f"{sum_clean} "
-                f"Esse levantamento de {source_name} explica por que a decisão já impacta diretamente o mercado e a tecnologia. "
-                f"Como você vê esse cenário? Comente e siga o canal!"
-            ),
-            # Spoke IV: Raio-X Técnico
-            (
-                f"{title_clean}. "
-                f"De acordo com {source_name}, {sum_lower_start} "
-                f"O ponto central aqui é simples: quem domina o fundamento resolve na raiz o que a maioria tenta remendar depois. "
-                f"Deixe sua opinião nos comentários!"
-            ),
-            # Spoke V: Dilema Estratégico
-            (
-                f"Esse tema dividiu opiniões lá fora: {title_clean}. "
-                f"Enquanto parte do mercado aposta na velocidade, o destaque de {source_name} lembra que {sum_lower_start} "
-                f"No fim das contas, a escolha entre atalho e precisão define quem sobrevive no longo prazo. "
-                f"De que lado você fica? Comente aqui!"
-            ),
-            # Spoke VI: Crônica de Impacto
-            (
-                f"Imagine construir um sistema inteiro e descobrir que o maior risco estava invisível: {title_clean}. "
-                f"{sum_clean} "
-                f"A análise publicada via {source_name} resume exatamente o desafio real de quem atua na linha de frente. "
-                f"Compartilhe sua experiência nos comentários!"
-            ),
-            # Spoke VII: Alerta de Tendência
-            (
-                f"Um sinal claro do que vem pela frente ganhou força em {source_name}: {title_clean}. "
-                f"{sum_clean} "
-                f"Essa virada antecipa uma mudança estrutural que vai pautar as próximas semanas. "
-                f"Siga o canal para acompanhar cada desdobramento!"
-            ),
-            # Spoke VIII: Anatomia do Segredo
-            (
-                f"A peça-chave para entender {title_clean} quase nunca aparece na superfície. "
-                f"Como aponta {source_name}, {sum_lower_start} "
-                f"É exatamente esse detalhe que separa um resultado mediano de uma execução impecável. "
-                f"O que você achou dessa análise? Comente aqui embaixo!"
-            ),
-        ]
-        chosen_raw = templates[spoke_idx % len(templates)]
+        # Vary only the opening cadence. The body must remain grounded in the supplied source summary;
+        # old templates added unsupported market impacts and generic claims to every story.
+        openings = (
+            f"Vamos direto ao que foi confirmado: {title_clean}.",
+            f"Olha esta notícia: {title_clean}.",
+            f"O destaque de hoje é este: {title_clean}.",
+            f"Aqui está o fato principal: {title_clean}.",
+        )
+        chosen_raw = f"{openings[spoke_idx % len(openings)]} Segundo {source_name}, {sum_lower_start}"
         final_script = immunize_spoken_script(chosen_raw, title=title_clean, summary=sum_clean)
         self.record_speech_turn(f"news_{category}", spoke["id"], title_clean, final_script)
         return final_script, spoke

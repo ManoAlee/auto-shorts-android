@@ -136,6 +136,26 @@ def _score_candidate_for_channel(mp4: Path, pack: Dict, channel: str, last_niche
     }
 
 
+def _passes_narrated_preflight(pack: Dict) -> bool:
+    """Keep generated narration out of the autopublish queue unless its script and visuals agree."""
+    if pack.get("source_type") != "narrated_original":
+        return True
+    integrity = pack.get("script_integrity") or {}
+    if float(integrity.get("coverage") or 0.0) < 0.85:
+        return False
+    niche = str(pack.get("niche") or "").strip().lower()
+    background = str(pack.get("background_style") or "").strip()
+    if niche and background:
+        try:
+            from .gameplay import NICHE_STYLE_AFFINITY
+            allowed = NICHE_STYLE_AFFINITY.get(niche)
+            if allowed and not set(background.split("+")).issubset(set(allowed)):
+                return False
+        except Exception:
+            return False
+    return True
+
+
 def rank_publish_candidates(out_dir: Path, channel: str, ledger: Optional[Dict] = None) -> List[Dict]:
     """Return validated, non-duplicate, unpublished candidates ordered by intelligence score."""
     if not out_dir.is_dir():
@@ -156,6 +176,8 @@ def rank_publish_candidates(out_dir: Path, channel: str, ledger: Optional[Dict] 
             continue
 
         if pack.get("duplicate_of") or pack.get("queued_for_auto_publish") is False:
+            continue
+        if not _passes_narrated_preflight(pack):
             continue
         if channel == "youtube" and isinstance(pack.get("youtube"), dict) and pack["youtube"].get("video_id"):
             continue

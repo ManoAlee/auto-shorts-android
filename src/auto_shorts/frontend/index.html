@@ -122,8 +122,8 @@ __INLINE_CSS__
       <div id="kpi-strip" class="kpi-grid" aria-live="polite">
         <div class="kpi-card"><div class="kpi-head"><span>TikTok &amp; YouTube</span></div><div class="kpi-val" id="kpi-channel-val">...</div><div class="kpi-sub" id="kpi-channel-sub">Consultando APIs</div></div>
         <div class="kpi-card"><div class="kpi-head"><span>Acervo &amp; Fila</span></div><div class="kpi-val" id="kpi-queue-val">...</div><div class="kpi-sub" id="kpi-queue-sub">Visao + Opus</div></div>
-        <div class="kpi-card"><div class="kpi-head"><span>Fundos UCB1</span></div><div class="kpi-val" id="kpi-bg-val">...</div><div class="kpi-sub" id="kpi-bg-sub">Multi-cena 4.2s</div></div>
-        <div class="kpi-card"><div class="kpi-head"><span>Motor IA/Voz</span></div><div class="kpi-val" id="kpi-ai-val">Kokoro PT-BR</div><div class="kpi-sub" id="kpi-ai-sub">Nuvem + Local</div></div>
+        <div class="kpi-card"><div class="kpi-head"><span>Fundos avaliados</span></div><div class="kpi-val" id="kpi-bg-val">...</div><div class="kpi-sub" id="kpi-bg-sub">UCB1 visual • nota técnica</div></div>
+        <div class="kpi-card"><div class="kpi-head"><span>Motor IA/Voz</span></div><div class="kpi-val" id="kpi-ai-val">Kokoro PT-BR</div><div class="kpi-sub" id="kpi-ai-sub">Feedback ainda não conectado</div></div>
       </div>
 
       <!-- SENTINELA INTELIGENTE GOOGLE DRIVE 5TB -->
@@ -434,6 +434,31 @@ __INLINE_CSS__
       <section id="panel-synapse" role="tabpanel" aria-labelledby="tab-synapse" class="panel" hidden>
         <h2>Engenharia Reversa, InnerTube &amp; OMEGA-SYNAPSE</h2>
         <p class="panel-lead">Extracao InnerTube Most Replayed, trace REA em C11 ELF/AST e Roda do Dharma (10 defesas).</p>
+        <h3>Aprendizado com desempenho real</h3>
+        <div id="learning-overview" class="diag-grid" aria-live="polite">Carregando cobertura de feedback...</div>
+        <form id="learning-feedback-form" novalidate>
+          <div class="grid">
+            <div>
+              <label for="learning-clip-id">Vídeo gerado</label>
+              <select id="learning-clip-id" name="clip_id" required></select>
+            </div>
+            <div>
+              <label for="learning-views">Visualizações</label>
+              <input id="learning-views" name="views" type="number" min="0" step="1" required />
+            </div>
+            <div>
+              <label for="learning-watch">Retenção média (%)</label>
+              <input id="learning-watch" name="avg_watch_pct" type="number" min="0" max="500" step="0.1" value="0" />
+            </div>
+          </div>
+          <div class="grid">
+            <div><label for="learning-likes">Curtidas</label><input id="learning-likes" name="likes" type="number" min="0" step="1" value="0" /></div>
+            <div><label for="learning-shares">Compartilhamentos</label><input id="learning-shares" name="shares" type="number" min="0" step="1" value="0" /></div>
+            <div><label for="learning-saves">Salvamentos</label><input id="learning-saves" name="saves" type="number" min="0" step="1" value="0" /></div>
+          </div>
+          <div class="actions"><button type="submit" class="btn btn-primary" id="btn-learning-feedback">Registrar métricas</button></div>
+          <p id="learning-feedback-message" role="status" aria-live="polite"></p>
+        </form>
         <div id="synapse-overview-grid" class="diag-grid" aria-live="polite">Carregando Synapse...</div>
 
         <h3 style="margin-top:18px;">1. Heatmap YouTube InnerTube (Most Replayed)</h3>
@@ -632,6 +657,10 @@ __INLINE_CSS__
     <button type="button" class="mobile-nav-btn" data-tab-idx="4">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span>Synapse</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-tab-idx="5">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.74.67l-.05.07h-3.4l-.05-.07a1.7 1.7 0 0 0-1.74-.67l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 0 0 9.6 15l-.08-.04v-3.4l.08-.04a1.7 1.7 0 0 0-.34-1.88L9.2 9.58l1.7-2.94.08.02a1.7 1.7 0 0 0 1.74-.67l.05-.07h3.4l.05.07a1.7 1.7 0 0 0 1.74.67l.08-.02 1.7 2.94-.06.06A1.7 1.7 0 0 0 19.4 11l.08.04v3.4z"/></svg>
+      <span>Sistema</span>
     </button>
   </nav>
 

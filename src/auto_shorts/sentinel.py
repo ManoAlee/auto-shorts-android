@@ -181,6 +181,14 @@ class DriveSentinelEngine:
         except Exception as exc:
             with self._lock:
                 self._state["last_error"] = f"Erro listando Drive: {exc}"
+                self._state["mode"] = "gdrive_error"
+                self._state["last_action"] = "Drive indisponível; ciclo pausado para evitar tratar falha como pasta vazia."
+                self._state["active_episode"] = None
+                self._persist_state()
+            return
+
+        with self._lock:
+            self._state["last_error"] = ""
 
         if pending_episodes:
             target_ep = pending_episodes[0]
@@ -313,10 +321,7 @@ class DriveSentinelEngine:
                 auto_publish=True,
             )
 
-            num_clips = sum(
-                len((r.get("result") or {}).get("clips") or [])
-                for r in (res.get("runs") or [])
-            ) or len(res.get("clips") or [])
+            num_clips = len(res.get("clips") or [])
             with self._lock:
                 self._state["last_auto_pull_ts"] = time.time()
                 self._state["web_animes_pulled_count"] = int(self._state.get("web_animes_pulled_count", 0)) + 1
@@ -366,7 +371,8 @@ class DriveSentinelEngine:
             out_file = fb.get("output")
             if out_file and Path(out_file).is_file():
                 try:
-                    upload_to_rclone(Path(out_file), "gdrive:Shorts_Finalizados")
+                    from .downloader import build_drive_niche_folder
+                    upload_to_rclone(Path(out_file), build_drive_niche_folder("noticias_mundiais"))
                 except Exception:
                     pass
 

@@ -297,9 +297,10 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         clean_cap = re.sub(r"\n{3,}", "\n\n", clean_cap).strip()
         raw_sum = sanitize_repetitive_text(heal_proper_nouns_and_asr(str(pack.get("clip_summary") or "")))
         if not raw_sum and clean_cap:
-            raw_sum = sanitize_repetitive_text(clean_cap.split("Fonte / Referencia:")[0][:220])
+            raw_sum = _extract_summary_from_caption(clean_cap)
         items.append({
             "filename": mp4.name,
+            "clip_id": pack.get("clip_id"),
             "size_mb": round(mp4.stat().st_size / (1024 * 1024), 2),
             "title": heal_proper_nouns_and_asr(str(pack.get("title", mp4.name))),
             "hook_title": heal_proper_nouns_and_asr(str(pack.get("hook_title", ""))),
@@ -320,6 +321,24 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
             "instagram": pack.get("instagram"),
         })
     return rank_feed_for_channel(items)
+
+
+def _extract_summary_from_caption(caption: str) -> str:
+    """Extract only the actual spoken summary; never show title, source, CTA and hashtags as a summary."""
+    text = str(caption or "").strip()
+    patterns = (
+        r"(?is)Sobre este corte:\s*(.*?)(?=\n\s*\n(?:Fonte\s*/\s*Refer[eê]ncia:|Comenta|#)|\Z)",
+        r"(?is)Resumo da not[ií]cia internacional:\s*(.*?)(?=\n\s*\n(?:Fonte original|Comenta|#)|\Z)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            summary = sanitize_repetitive_text(heal_proper_nouns_and_asr(match.group(1)))
+            if summary:
+                if len(summary) > 340:
+                    summary = summary[:340].rsplit(" ", 1)[0]
+                return summary
+    return ""
 
 
 def _probe_local_llm() -> Dict:
@@ -936,7 +955,12 @@ def make_handler(out_dir: Path):
                     },
                     "gameplay_count": len(list_gameplay_clips(out_dir)),
                     "background_evolution": evo_rows,
+                    "learning": EvolutionStore(out_dir / "shorts_evolution.db").learning_status(candidate_limit=1),
                 })
+                return
+
+            if parsed.path == "/api/learning/status":
+                self._send_json(200, EvolutionStore(out_dir / "shorts_evolution.db").learning_status(candidate_limit=40))
                 return
 
             if parsed.path == "/api/scheduler":
@@ -1173,7 +1197,7 @@ def make_handler(out_dir: Path):
                         "count": len(episodes),
                     })
                 except Exception as exc:
-                    self._send_json(200, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
+                    self._send_json(503, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
                 return
 
             if parsed.path == "/api/gdrive/status":
@@ -1370,7 +1394,7 @@ def make_handler(out_dir: Path):
                         "count": len(episodes),
                     })
                 except Exception as exc:
-                    self._send_json(200, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
+                    self._send_json(503, {"ok": False, "error": str(exc), "episodes": [], "count": 0})
                 return
 
             if parsed.path == "/api/gdrive/status":
@@ -1818,6 +1842,32 @@ def make_handler(out_dir: Path):
                     max_output_mb=float(body.get("max_output_mb") or os.getenv("STORAGE_MAX_MB", "1200")),
                 )
                 self._send_json(200, res)
+                return
+
+            if parsed.path == "/api/learning/feedback":
+                try:
+                    clip_id = body.get("clip_id")
+                    views = body.get("views")
+                    likes = body.get("likes", 0)
+                    shares = body.get("shares", 0)
+                    saves = body.get("saves", 0)
+                    for field, value in (("clip_id", clip_id), ("views", views), ("likes", likes), ("shares", shares), ("saves", saves)):
+                        if isinstance(value, bool) or not isinstance(value, int):
+                            raise ValueError(f"{field} precisa ser um número inteiro")
+                    avg_watch_pct = body.get("avg_watch_pct", 0)
+                    if isinstance(avg_watch_pct, bool) or not isinstance(avg_watch_pct, (int, float)):
+                        raise ValueError("avg_watch_pct precisa ser um número")
+                    reward = EvolutionStore(out_dir / "shorts_evolution.db").record_feedback(
+                        clip_id=clip_id,
+                        views=views,
+                        avg_watch_pct=avg_watch_pct,
+                        likes=likes,
+                        shares=shares,
+                        saves=saves,
+                    )
+                    self._send_json(200, {"ok": True, "clip_id": clip_id, "reward": reward})
+                except (TypeError, ValueError) as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
                 return
 
             if parsed.path == "/api/ai/chat":

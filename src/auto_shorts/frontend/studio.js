@@ -130,7 +130,10 @@
       if (bIdx === idx) btn.setAttribute('aria-current', 'page');
       else btn.removeAttribute('aria-current');
     });
-    if (tabs[idx] && tabs[idx].id === 'tab-equipe') loadTeamAndPlanner();
+    if (tabs[idx] && tabs[idx].id === 'tab-equipe') {
+      loadTeamAndPlanner();
+      loadCharactersAndAnimeLab();
+    }
     if (tabs[idx] && tabs[idx].id === 'tab-videos') loadVideos();
     if (tabs[idx] && tabs[idx].id === 'tab-synapse') loadSynapseStatus();
     if (tabs[idx] && tabs[idx].id === 'tab-sistema') loadSystemDiag();
@@ -320,7 +323,7 @@
     if (keys.tiktok && ttReadyList.length > 0) {
       const top = ttReadyList[0];
       const sc = top.opus_scorecard ? top.opus_scorecard.opus_score : '--';
-      insightEl.textContent = ttReadyList.length + ' Short(s) aprovados aguardando TikTok • Melhor: "' + String(top.title || top.filename).slice(0, 44) + '" (Opus ' + sc + '/100)';
+      insightEl.textContent = ttReadyList.length + ' Short(s) aprovados aguardando TikTok • Maior nota técnica: "' + String(top.title || top.filename).slice(0, 44) + '" (' + sc + '/100; não é métrica de audiência)';
       actBtn.textContent = 'Disparar Proximo Inteligente';
       _copilotFn = () => withBusyBtn(actBtn, 'Publicando...', async () => {
         const r = await fetch('/api/autopublish/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) });
@@ -460,17 +463,18 @@
       const elBgV = document.getElementById('kpi-bg-val');
       const elBgS = document.getElementById('kpi-bg-sub');
       if (elBgV && elBgS) {
-        elBgV.textContent = (d.gameplay_count || 0) + ' fundos UCB1';
+        elBgV.textContent = (d.gameplay_count || 0) + ' fundos avaliados';
         const topScore = evo.length ? Number(evo[0].avg_quality ?? evo[0].avg_score ?? 0) : 0;
         elBgS.textContent = evo.length
-          ? ('Top: ' + evo[0].style + (topScore > 0 ? (' (' + Math.round(topScore) + '/100)') : ''))
-          : 'Troca multi-cena 4.2s';
+          ? ('UCB1 visual • top: ' + evo[0].style + (topScore > 0 ? (' (' + Math.round(topScore) + '/100 técnico)') : ''))
+          : 'Multi-cena • aguardando avaliações';
       }
       const elAiV = document.getElementById('kpi-ai-val');
       const elAiS = document.getElementById('kpi-ai-sub');
       if (elAiV && elAiS) {
         elAiV.textContent = (d.tts_engine || 'Kokoro PT-BR').split('(')[0].trim();
-        elAiS.textContent = (keys.openrouter || keys.gemini) ? 'IA Nuvem + Opus 5D' : 'Heuristica Offline';
+        const learning = d.learning || {};
+        elAiS.textContent = (Number(learning.measured_clips || 0) + '/' + Number(learning.total_clips || 0) + ' com métricas reais • nota técnica ≠ audiência');
       }
       updateCopilotInsight();
     } catch (e) {}
@@ -1307,12 +1311,12 @@
       if (opus && typeof opus.opus_score === 'number') {
         const opRow = document.createElement('div');
         opRow.className = 'opus-score-row';
-        opRow.innerHTML = '<span>Opus Score</span><strong>' + opus.opus_score + '/100</strong>';
+        opRow.innerHTML = '<span>Nota técnica</span><strong>' + opus.opus_score + '/100</strong>';
         card.appendChild(opRow);
 
         const trk = document.createElement('div');
         trk.className = 'opus-mini-track';
-        trk.title = 'Opus Runbook Score: ' + opus.opus_score + '/100';
+        trk.title = 'Nota automática de qualidade técnica; não representa visualizações ou retenção.';
         const fl = document.createElement('div');
         fl.className = 'opus-mini-fill';
         fl.style.width = Math.max(5, Math.min(100, opus.opus_score)) + '%';
@@ -1933,9 +1937,19 @@
   async function loadCharactersAndAnimeLab() {
     const cGrid = document.getElementById('characters-bible-grid');
     const tGrid = document.getElementById('anime-techniques-grid');
+    const showLoadMessage = (container, message, className = 'empty-state') => {
+      if (!container) return;
+      const notice = document.createElement('p');
+      notice.className = className;
+      notice.setAttribute('role', 'status');
+      notice.textContent = message;
+      container.replaceChildren(notice);
+    };
     if (cGrid) {
       try {
-        const cData = await (await fetch('/api/characters')).json();
+        const response = await fetch('/api/character/list');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const cData = await response.json();
         cGrid.innerHTML = '';
         (cData.characters || []).forEach((ch) => {
           const card = document.createElement('div');
@@ -1949,11 +1963,16 @@
           `;
           cGrid.appendChild(card);
         });
-      } catch (e) {}
+        if (!cGrid.children.length) showLoadMessage(cGrid, 'A Bíblia ainda não tem personagens cadastrados.');
+      } catch (e) {
+        showLoadMessage(cGrid, `Não foi possível carregar os personagens. ${e.message}`, 'load-error');
+      }
     }
     if (tGrid) {
       try {
-        const tData = await (await fetch('/api/anime-lab/techniques')).json();
+        const response = await fetch('/api/anime-lab/techniques');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const tData = await response.json();
         tGrid.innerHTML = '';
         (tData.techniques || []).forEach((tk) => {
           const card = document.createElement('div');
@@ -1965,7 +1984,10 @@
           `;
           tGrid.appendChild(card);
         });
-      } catch (e) {}
+        if (!tGrid.children.length) showLoadMessage(tGrid, 'Nenhuma técnica disponível no momento.');
+      } catch (e) {
+        showLoadMessage(tGrid, `Não foi possível carregar as técnicas. ${e.message}`, 'load-error');
+      }
     }
   }
 
@@ -1990,7 +2012,6 @@
         grid.dataset.loaded = '1';
       } catch (e) {}
     }
-    loadCharactersAndAnimeLab();
   }
 
   document.getElementById('brief-form').addEventListener('submit', (e) => {
@@ -2041,6 +2062,45 @@
     const box = document.getElementById('synapse-immunities-box');
     if (!ov || !box) return;
     const d = await (await fetch('/api/synapse/status')).json();
+    const learning = await (await fetch('/api/learning/status')).json();
+    const learningBox = document.getElementById('learning-overview');
+    const clipSelect = document.getElementById('learning-clip-id');
+    if (learningBox) {
+      learningBox.replaceChildren();
+      const measured = Number(learning.measured_clips || 0);
+      const total = Number(learning.total_clips || 0);
+      [
+        ['Métricas reais', measured + ' de ' + total + ' vídeos'],
+        ['Ainda sem dados', String(learning.pending_feedback || 0) + ' vídeos'],
+        ['Nota mostrada no acervo', 'Qualidade técnica estimada, não audiência'],
+      ].forEach(([label, value]) => {
+        const cell = document.createElement('div');
+        cell.className = 'diag-box';
+        const strong = document.createElement('strong');
+        strong.textContent = label;
+        const span = document.createElement('span');
+        span.textContent = value;
+        cell.append(strong, span);
+        learningBox.appendChild(cell);
+      });
+    }
+    if (clipSelect) {
+      const selected = clipSelect.value;
+      clipSelect.replaceChildren();
+      (learning.candidates || []).forEach((candidate) => {
+        const option = document.createElement('option');
+        option.value = String(candidate.id);
+        option.textContent = '#' + candidate.id + ' · ' + (candidate.hook_title || candidate.output_path || 'Vídeo gerado');
+        clipSelect.appendChild(option);
+      });
+      if (selected && Array.from(clipSelect.options).some((opt) => opt.value === selected)) clipSelect.value = selected;
+      if (!clipSelect.options.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Todos os vídeos recentes já têm métricas';
+        clipSelect.appendChild(option);
+      }
+    }
     const bin = d.native_binary || {};
     ov.innerHTML = '';
     [
@@ -2069,6 +2129,33 @@
       box.appendChild(card);
     });
   }
+
+  const learningForm = document.getElementById('learning-feedback-form');
+  if (learningForm) learningForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(learningForm);
+    const payload = Object.fromEntries(formData.entries());
+    ['clip_id', 'views', 'likes', 'shares', 'saves'].forEach((key) => { payload[key] = Number(payload[key] || 0); });
+    payload.avg_watch_pct = Number(payload.avg_watch_pct || 0);
+    const message = document.getElementById('learning-feedback-message');
+    try {
+      const response = await fetch('/api/learning/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível salvar as métricas.');
+      if (message) message.textContent = 'Métricas registradas. O motor agora pode comparar este vídeo com os próximos.';
+      learningForm.reset();
+      const watch = document.getElementById('learning-watch');
+      if (watch) watch.value = '0';
+      await loadSynapseStatus();
+      await loadChannelTelemetry();
+    } catch (err) {
+      if (message) message.textContent = 'Erro ao registrar: ' + err.message;
+    }
+  });
 
   document.getElementById('synapse-innertube-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2136,7 +2223,7 @@
       ['FFmpeg / Whisper', (d.tools.ffmpeg ? 'FFmpeg OK' : 'Sem FFmpeg') + ' • ' + (d.tools.whisper ? 'Whisper OK' : 'Sem Whisper')],
       ['Voz TTS', d.tts_engine || 'Kokoro PT-BR'],
       ['SoC & IA Offline', (oa.arch || 'CPU') + ' • ' + isa + (oa.total_ram_gb ? (' • ' + oa.total_ram_gb + ' GB RAM') : '')],
-      ['Modelo Local / Tier', (oa.active_model || 'Heuristica') + (oa.recommended_tier ? (' (' + oa.recommended_tier.label + ')') : '')],
+      ['IA no aparelho', (oa.llama_server_online ? 'Modelo em execução: ' + (oa.active_model || 'LLM local') : (oa.local_model_available ? 'GGUF instalado, inferência sob demanda' : 'Sem modelo local instalado')) + (oa.recommended_tier ? (' • perfil recomendado: ' + oa.recommended_tier.label) : '')],
     ].forEach(([k, val]) => {
       const cell = document.createElement('div');
       cell.className = 'diag-box';

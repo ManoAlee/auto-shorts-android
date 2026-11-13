@@ -104,6 +104,50 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pm_alex",
         direction="Sintese StyleTTS 2 local PT-BR natural sem robotizacao.",
     ),
+    "dublador_sukuna": VoiceStyle(
+        key="dublador_sukuna",
+        label="Dublador Sukuna (Jujutsu Kaisen) — Voz Grave, Imponente e Sombria PT-BR",
+        voice="pt-BR-AntonioNeural",
+        rate="+0%",
+        pitch="+0Hz",
+        openai_voice="onyx",
+        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
+        kokoro_voice="pm_santa",
+        direction="Voz extremamente imponente, grave, sombria e aterrorizante de vilão soberano de anime (Ryomen Sukuna).",
+    ),
+    "dublador_gojo": VoiceStyle(
+        key="dublador_gojo",
+        label="Dublador Satoru Gojo (Jujutsu Kaisen) — Voz Confiante, Sedutora e Poderosa PT-BR",
+        voice="en-US-BrianMultilingualNeural",
+        rate="+2%",
+        pitch="+0Hz",
+        openai_voice="ash",
+        elevenlabs_voice="ErXwobaYiN019PkySvjV",
+        kokoro_voice="pm_alex",
+        direction="Voz descontraída, carismática, sedutora e inabalavelmente confiante do feiticeiro mais forte (Satoru Gojo).",
+    ),
+    "dublador_goku": VoiceStyle(
+        key="dublador_goku",
+        label="Dublador Goku (Dragon Ball Z) — Voz Heróica, Enérgica e Amigável PT-BR (Wendel Bezerra)",
+        voice="pt-BR-AntonioNeural",
+        rate="+4%",
+        pitch="+0Hz",
+        openai_voice="echo",
+        elevenlabs_voice="ErXwobaYiN019PkySvjV",
+        kokoro_voice="pm_alex",
+        direction="Voz empolgada, pura, vibrante e heroica de protagonista guerreiro saiyajin (Goku dublado em português).",
+    ),
+    "dublador_naruto": VoiceStyle(
+        key="dublador_naruto",
+        label="Dublador Naruto Uzumaki — Voz Determinada, Rascante e Jovem PT-BR (Úrsula Bezerra)",
+        voice="pt-BR-ThalitaMultilingualNeural",
+        rate="+3%",
+        pitch="+0Hz",
+        openai_voice="nova",
+        elevenlabs_voice="EXAVITQu4vr4xnSDxMaL",
+        kokoro_voice="pf_dora",
+        direction="Voz jovem, enérgica, determinada, vibrante e cheia de garra de ninja protagonista (Naruto dublado em português).",
+    ),
     "anime_hype": VoiceStyle(
         key="anime_hype",
         label="Narrador Geek Épico (Curiosidades & Teorias de Anime)",
@@ -161,7 +205,7 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
     ),
 }
 
-DEFAULT_STYLE_KEY = "narrador_pro"
+DEFAULT_STYLE_KEY = "thalita_hd"
 
 _PTBR_DIACRITICS = {
     "voce": "você",
@@ -238,7 +282,7 @@ def _prepare_speech_text(text: str) -> str:
         r"\bIA\b": "inteligência artificial",
         r"\bEUA\b": "Estados Unidos",
         r"\bSTF\b": "Supremo Tribunal Federal",
-        r"\bPIB\b": "Píbe",
+        r"\bPIB\b": "produto interno bruto",
         r"\bKPI\b": "indicador",
     }
     for pat, repl in acronym_map.items():
@@ -317,6 +361,21 @@ def _build_weighted_srt(script_text: str, audio_duration: float, max_words: int 
         lines.append(f"{idx}\n{_format_srt_time(cursor)} --> {_format_srt_time(end)}\n{group_text}\n")
         cursor = end
     return "\n".join(lines)
+
+
+def _script_subtitle_coverage(script_text: str, srt_text: str) -> Dict[str, float | int]:
+    """Measure whether generated captions cover the full narration script."""
+    def count_words(text: str) -> int:
+        return len(re.findall(r"\b[\wÀ-ÿ]+\b", text or ""))
+
+    expected = count_words(script_text)
+    parsed = parse_srt(srt_text)
+    actual = sum(count_words(str(seg.get("text") or "")) for seg in parsed.get("segments", []))
+    return {
+        "script_words": expected,
+        "subtitle_words": actual,
+        "coverage": round(min(1.0, actual / expected), 4) if expected else 0.0,
+    }
 
 
 def _probe_media_duration(media_path: Path, fallback_words: int = 10) -> float:
@@ -615,6 +674,13 @@ def _split_tts_chunks(text: str, max_chars: int = 210) -> List[str]:
     return chunks or [clean[:max_chars]]
 
 
+def _kokoro_base_speed(style: VoiceStyle) -> float:
+    """Respect each voice preset's rate while staying above the Termux ONNX speed floor."""
+    match = re.search(r"([+-]?\d+(?:\.\d+)?)%", str(style.rate or ""))
+    rate_pct = float(match.group(1)) if match else 0.0
+    return min(1.12, max(1.0, 1.0 + rate_pct / 100.0))
+
+
 def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool:
     """Local offline StyleTTS2 synthesis via thewh1teagle/kokoro-onnx (PT-BR pm_alex / pf_dora)."""
     paths = _resolve_kokoro_paths()
@@ -657,7 +723,7 @@ def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool
 
         kokoro.sess = _SafeSess()
         _KOKORO_INSTANCES[cache_key] = kokoro
-    base_speed = 1.05 if "+" in style.rate else 1.01
+    base_speed = _kokoro_base_speed(style)
     chunks = _split_tts_chunks(text, max_chars=185)
     audio_parts: List[object] = []
     sample_rate = 24000
@@ -712,7 +778,16 @@ def _synthesize_kokoro_onnx(text: str, out_mp3: Path, style: VoiceStyle) -> bool
         if len(part) > 0:
             audio_parts.append(np.asarray(part, dtype=np.float32))
             if idx < len(chunks) - 1:
-                pause_sec = 0.22 if c_str.endswith(("...", "?", "!")) else 0.14
+                if c_str.endswith(("...", "…")):
+                    pause_sec = 0.30
+                elif c_str.endswith(("?", "!")):
+                    pause_sec = 0.24
+                elif c_str.endswith((".", ";", ":")):
+                    pause_sec = 0.18
+                elif c_str.endswith(","):
+                    pause_sec = 0.10
+                else:
+                    pause_sec = 0.08
                 audio_parts.append(np.zeros(int(sample_rate * pause_sec), dtype=np.float32))
     if not audio_parts:
         return False
@@ -798,6 +873,15 @@ def active_tts_engine_label() -> str:
     if _resolve_kokoro_paths() is not None:
         return "Kokoro-82M PT-BR Offline (Natural)"
     return "Edge Multilingual HD + Trim de Silencio (Dica: rode install_kokoro_ptbr.sh)"
+
+
+def active_voice_label(style_key: str, engine_label: Optional[str] = None) -> str:
+    """Report the voice identifier actually passed to the active synthesis engine."""
+    style = VOICE_STYLES.get(style_key, VOICE_STYLES[DEFAULT_STYLE_KEY])
+    engine = engine_label or active_tts_engine_label()
+    if engine.startswith("Kokoro-"):
+        return style.kokoro_voice
+    return style.voice
 
 
 def synthesize_narration(
@@ -934,7 +1018,9 @@ def list_clean_backgrounds(out_dir: Path) -> List[str]:
     return out_list
 
 
-def resolve_background_video(bg_video: str | Path, out_dir: Path) -> Tuple[Path, bool]:
+def resolve_background_video(
+    bg_video: str | Path, out_dir: Path, niche: str = "geral", topic: str = ""
+) -> Tuple[Path, bool]:
     """Resolve background video, rotating cached gameplays cleanly without repeating."""
     from .gameplay import pick_gameplay_segment
 
@@ -948,7 +1034,11 @@ def resolve_background_video(bg_video: str | Path, out_dir: Path) -> Tuple[Path,
         may_have_subs = "_short_" in p.name or p.name.startswith(("narrado_", "narrated_"))
         return p, may_have_subs
 
-    picked = pick_gameplay_segment(out_dir, auto_download=(raw_str.lower() == "gameplay"))
+    picked = pick_gameplay_segment(
+        out_dir,
+        auto_download=(raw_str.lower() == "gameplay"),
+        seed_style=niche,
+    )
     if picked is not None:
         return picked[0], False
 
@@ -1066,9 +1156,17 @@ def _build_multiscene_broll(
         from .gameplay import _extract_style_tag, _is_segment_visually_bright, list_gameplay_clips, probe_video_duration
         import random
 
+        allowed_styles = None
+        if niche:
+            try:
+                from .gameplay import NICHE_STYLE_AFFINITY
+                allowed_styles = set(NICHE_STYLE_AFFINITY.get(niche, [])) or None
+            except Exception:
+                allowed_styles = None
         clips = [
             c for c in sorted(list_gameplay_clips(out_root), key=lambda p: p.name)
             if c.is_file() and c.stat().st_size > 50_000 and b"ftyp" in c.read_bytes()[:64]
+            and (allowed_styles is None or _extract_style_tag(c) in allowed_styles)
         ]
         others = [c for c in clips if c != primary_bg and _is_segment_visually_bright(c, 5.0)]
         if not others:
@@ -1170,11 +1268,20 @@ def build_narrated_short(
     mp3_path, srt_path = synthesize_narration(
         script_text, work_dir, style_key=style_key, stem=out_path.stem, humanize=humanize
     )
-    parsed = parse_srt(srt_path.read_text(encoding="utf-8"))
+    srt_text = srt_path.read_text(encoding="utf-8")
+    script_integrity = _script_subtitle_coverage(script_text, srt_text)
+    if script_integrity["coverage"] < 0.85:
+        raise RuntimeError(
+            "Narração/legenda incompleta: cobertura de "
+            f"{script_integrity['subtitle_words']}/{script_integrity['script_words']} palavras."
+        )
+    parsed = parse_srt(srt_text)
     audio_dur = _probe_media_duration(mp3_path, fallback_words=len(script_text.split()))
     duration = max(4.0, audio_dur, float(parsed.get("duration") or 0.0)) + 0.35
 
-    resolved_bg, bg_has_subs = resolve_background_video(bg_video, out_path.parent)
+    resolved_bg, bg_has_subs = resolve_background_video(
+        bg_video, out_path.parent, niche=niche, topic=hook_title or script_text[:80]
+    )
     bg_style_used = ""
     if str(bg_video or "auto").strip().lower() in {"auto", "gameplay"}:
         from .gameplay import _extract_style_tag, pick_evolving_background
@@ -1194,6 +1301,7 @@ def build_narrated_short(
                 out_path.parent, resolved_bg, bg_style_used, duration, work_dir,
                 width=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["width"]),
                 height=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["height"]),
+                niche=niche,
             )
             if multi_bg != resolved_bg:
                 resolved_bg = multi_bg
@@ -1358,8 +1466,9 @@ def build_narrated_short(
         "thumbnail_16x9": str(thumb_16x9) if thumb_16x9.is_file() else None,
         "cover_9x16": str(cover_9x16) if cover_9x16.is_file() else None,
         "validation": validation,
+        "script_integrity": script_integrity,
         "tts_engine": active_tts_engine_label(),
-        "voice": VOICE_STYLES.get(style_key, VOICE_STYLES[DEFAULT_STYLE_KEY]).voice,
+        "voice": active_voice_label(style_key, active_tts_engine_label()),
         "background_style": bg_style_used or "custom",
     }
     from .validator import audit_short_end_to_end

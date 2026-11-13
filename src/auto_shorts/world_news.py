@@ -24,6 +24,19 @@ def _clean_text(raw: str) -> str:
     return " ".join(txt.split()).strip()
 
 
+_SHOPPING_PROMO_TERMS = (
+    "cupom", "desconto", "em oferta", "oferta antecipada", "para comprar",
+    "modelos para comprar", "guia de compra", "guia de compras", "black friday",
+    "black november", "menor preço em oferta", "melhor tv de", "melhores smart tvs",
+)
+
+
+def _is_commercial_roundup(story: Dict) -> bool:
+    """Keep product roundups and affiliate promotions out of the breaking-news feed."""
+    text = f"{story.get('title', '')} {story.get('summary', '')}".lower()
+    return any(term in text for term in _SHOPPING_PROMO_TERMS)
+
+
 def _http_get_text(url: str, timeout: float = 8.0) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "AutoShorts-WorldNews/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -194,6 +207,8 @@ def fetch_world_news_headlines(
     }
     match_terms = topic_aliases.get(q, (q,)) if q else ()
     for row in collected:
+        if _is_commercial_roundup(row):
+            continue
         key = row["title"].lower()
         if key in seen:
             continue
@@ -323,28 +338,11 @@ def build_brazil_news_story_pack(
     if pt_summary and pt_title and pt_summary.lower().startswith(pt_title.lower()):
         pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
 
-    # Guarantee a substantive, non-duplicate journalistic summary when feed metadata was bare
+    # A headline alone is not enough evidence for a news script. Never pad it with invented context.
     if not pt_summary or len(pt_summary) < 35 or pt_summary.lower() == pt_title.lower():
-        if "tech" in category or "ia" in category or any(w in pt_title.lower() for w in ("software", "ia", "chip", "sistema", "codigo", "código", "dados", "tecnologia")):
-            pt_summary = (
-                "Engenheiros e especialistas apontam que o crescimento da complexidade nos sistemas modernos exige "
-                "arquitetura enxuta, testes rigorosos e validação contínua para evitar falhas críticas em produção."
-            )
-        elif "econ" in category or "finan" in category:
-            pt_summary = (
-                "Analistas de mercado destacam que a mudança altera o fluxo de capital, pressiona taxas de juros "
-                "e exige atenção redobrada de investidores e empresas nos próximos meses."
-            )
-        elif "ciencia" in category or "espaco" in category:
-            pt_summary = (
-                "Os novos dados coletados pelos pesquisadores abrem caminho para experimentos inéditos "
-                "e mudam a compreensão científica sobre o fenômeno."
-            )
-        else:
-            pt_summary = (
-                f"O levantamento divulgado por {source_name} detalha os bastidores dessa decisão "
-                "e mostra como os desdobramentos afetam diretamente o cenário internacional."
-            )
+        raise ValueError(
+            f"Notícia descartada: {source_name} não forneceu um resumo verificável para '{pt_title}'."
+        )
 
     hook_banner = _build_complete_news_hook(pt_title)
     short_title = pt_title[:76].rsplit(" ", 1)[0] if len(pt_title) > 76 else pt_title
@@ -365,7 +363,9 @@ def build_brazil_news_story_pack(
         prompt = (
             "Você é jornalista de plantão internacional adaptando notícias reais para o público do Brasil em Shorts (35-45s).\n"
             f"Fonte: {source_name}\nManchete em PT-BR: {pt_title}\nResumo em PT-BR: {pt_summary}\n"
-            "Regras: fale como brasileiro natural, ritmo urgente e claro, explique em 1 frase por que isso importa para o Brasil, ZERO invenção de fatos.\n"
+            "Regras: português brasileiro natural e claro; use apenas fatos explícitos na manchete e no resumo; "
+            "não invente consequências, especialistas, números, prazos ou impacto no Brasil. Se o impacto local "
+            "não estiver na fonte, diga que ainda não foi informado. Preserve incertezas e atribua afirmações à fonte.\n"
             "Responda SOMENTE JSON válido:\n"
             '{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS SEM CORTAR FRASE","roteiro":"texto falado 70 a 105 palavras"}'
         )
@@ -374,7 +374,7 @@ def build_brazil_news_story_pack(
             m_start, m_end = raw.find("{"), raw.rfind("}")
             if m_start != -1 and m_end > m_start:
                 data = json.loads(raw[m_start:m_end + 1])
-                if isinstance(data, dict) and data.get("roteiro") and len(str(data["roteiro"]).split()) >= 25:
+                if isinstance(data, dict) and data.get("roteiro") and 35 <= len(str(data["roteiro"]).split()) <= 105:
                     script = humanize_ptbr_script(str(data["roteiro"]))
                 if data.get("seo_title") and str(data["seo_title"]).strip().lower() not in {"string", "max 80 chars"}:
                     seo_title = str(data["seo_title"]).strip()[:90]
@@ -639,8 +639,18 @@ def produce_world_news_short(
     if not headlines:
         raise RuntimeError("Nenhuma noticia mundial retornada pelas Public APIs neste momento.")
 
-    picked = next((h for h in headlines if h["id"] not in seen_ids), headlines[0])
-    pack = build_brazil_news_story_pack(picked, use_llm=use_llm)
+    candidates = [h for h in headlines if h["id"] not in seen_ids] or headlines
+    pack = None
+    rejected: List[str] = []
+    for picked in candidates:
+        try:
+            pack = build_brazil_news_story_pack(picked, use_llm=use_llm)
+            break
+        except ValueError as exc:
+            rejected.append(str(exc))
+    if pack is None:
+        detail = " ".join(rejected[:2])
+        raise RuntimeError(f"Nenhuma notícia tinha resumo suficiente para narrar com segurança. {detail}")
 
     ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_mp4 = out_root / f"mundo_br_{ts}.mp4"

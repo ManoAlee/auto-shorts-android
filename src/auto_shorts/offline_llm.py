@@ -26,12 +26,40 @@ _UNCLOSED_THINK_RE = re.compile(r"<(?:think|\|?thought\|?)>.*$", re.IGNORECASE |
 
 # Model tiers matching Local-LLM-AI & OfflineLLM device RAM guidelines
 GGUF_MODEL_TIERS = [
-    {"id": "qwen3-0.6b-pocket", "label": "Qwen 3 0.6B Pocket Turbo", "min_ram_gb": 2.0, "size_mb": 390},
-    {"id": "qwen2.5-1.5b-q4", "label": "Qwen 2.5 1.5B Instruct Q4_K_M", "min_ram_gb": 4.0, "size_mb": 1120},
-    {"id": "smollm2-1.7b-q4", "label": "SmolLM2 1.7B Instruct", "min_ram_gb": 4.0, "size_mb": 1180},
-    {"id": "gemma-4-e2b-it", "label": "Gemma 4 E2B Instruct (Vision/OCR)", "min_ram_gb": 6.0, "size_mb": 2590},
-    {"id": "qwen3-4b-reasoning", "label": "Qwen 3 4B Hybrid Reasoning", "min_ram_gb": 8.0, "size_mb": 2660},
+    {"id": "qwen3-0.6b-pocket", "label": "Qwen 3 0.6B Pocket Turbo", "min_ram_gb": 2.0, "size_mb": 390, "filename_hint": "qwen3-0.6b"},
+    {"id": "qwen2.5-1.5b-q4", "label": "Qwen 2.5 1.5B Instruct Q4_K_M", "min_ram_gb": 4.0, "size_mb": 1120, "filename_hint": "qwen2.5-1.5b"},
+    {"id": "smollm2-1.7b-q4", "label": "SmolLM2 1.7B Instruct", "min_ram_gb": 4.0, "size_mb": 1180, "filename_hint": "smollm2-1.7b"},
+    {"id": "gemma-4-e2b-it", "label": "Gemma 4 E2B Instruct (Vision/OCR)", "min_ram_gb": 6.0, "size_mb": 2590, "filename_hint": "gemma-4-e2b"},
+    {"id": "qwen3-4b-reasoning", "label": "Qwen 3 4B Hybrid Reasoning", "min_ram_gb": 8.0, "size_mb": 2660, "filename_hint": "qwen3-4b"},
 ]
+
+
+def recommend_local_model_tier(total_ram_gb: float, avail_ram_gb: float, installed_models: List[Dict]) -> Dict:
+    """Choose the strongest RAM-safe tier, preferring an installed model that fits current headroom."""
+    total = max(0.0, float(total_ram_gb or 0.0))
+    available = max(0.0, float(avail_ram_gb or 0.0))
+    if total == 0:
+        total = 4.0
+    if available == 0:
+        available = max(0.0, total - 1.5)
+    eligible = []
+    for tier in GGUF_MODEL_TIERS:
+        if total and total < tier["min_ram_gb"]:
+            continue
+        # Leave space for the context/KV cache and Python/Android runtime beyond GGUF weights.
+        estimated_runtime_gb = (tier["size_mb"] / 1024.0) * 1.35 + 0.35
+        if available and available < estimated_runtime_gb:
+            continue
+        eligible.append(tier)
+    if not eligible:
+        eligible = [GGUF_MODEL_TIERS[0]]
+
+    installed_names = [str(model.get("name") or "").lower() for model in installed_models]
+    for tier in reversed(eligible):
+        hint = tier.get("filename_hint", "")
+        if hint and any(hint in name for name in installed_names):
+            return tier
+    return eligible[-1]
 
 
 def strip_reasoning_tags(text: str) -> str:
@@ -88,12 +116,6 @@ def detect_android_llm_capabilities(models_dir: Optional[Path] = None, llama_url
             except OSError:
                 continue
 
-    tier = GGUF_MODEL_TIERS[0]
-    eff_ram = total_ram_gb if total_ram_gb > 0 else 4.0
-    for cand in GGUF_MODEL_TIERS:
-        if eff_ram >= cand["min_ram_gb"]:
-            tier = cand
-
     llama_online = False
     active_model = ""
     try:
@@ -115,10 +137,13 @@ def detect_android_llm_capabilities(models_dir: Optional[Path] = None, llama_url
         "has_fast_gemm": any(k in isa_detected for k in ("asimddp", "dotprod", "i8mm")),
         "total_ram_gb": total_ram_gb,
         "avail_ram_gb": avail_ram_gb,
-        "recommended_tier": tier,
+        "recommended_tier": recommend_local_model_tier(total_ram_gb, avail_ram_gb, ggufs),
         "gguf_models": ggufs,
         "llama_server_online": llama_online,
-        "active_model": active_model or (ggufs[0]["name"] if ggufs else "offline-heuristic"),
+        # An installed GGUF is not an active model unless a llama endpoint serves it.
+        "active_model": active_model or "offline-heuristic",
+        "installed_models": [m["name"] for m in ggufs],
+        "local_model_available": bool(ggufs),
     }
 
 
@@ -173,7 +198,7 @@ def benchmark_local_llm(llama_url: str = "http://127.0.0.1:8080") -> Dict:
         "tokens_per_sec": 0.0,
         "recommended_tier": caps["recommended_tier"],
         "isa_features": caps["isa_features"],
-        "note": "llama-server desligado; usando pipeline heuristico instantaneo + nuvem gratis.",
+        "note": "llama-server desligado; esta medição cobre somente a CPU, não mede inferência do GGUF.",
     }
 
 

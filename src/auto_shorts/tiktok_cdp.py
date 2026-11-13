@@ -339,7 +339,7 @@ def _build_tiktok_caption(pack: Dict[str, Any], fallback_stem: str) -> str:
     from .publisher import _sanitize_publish_caption
 
     title = _sanitize_publish_caption(str(pack.get("title") or pack.get("hook_title") or fallback_stem))
-    raw_cap = _sanitize_publish_caption(str(pack.get("caption") or title or fallback_stem))
+    raw_cap = _sanitize_publish_caption(str(pack.get("tiktok_caption") or pack.get("caption") or title or fallback_stem))
     # Remove outbound YouTube/IG links and competing platform hashtags penalized on TikTok
     cleaned = re.sub(r"https?://\S+", "", raw_cap)
     cleaned = re.sub(r"(?i)v[ií]deo original\s*:\s*", "", cleaned)

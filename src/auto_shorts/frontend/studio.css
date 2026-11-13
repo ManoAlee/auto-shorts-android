@@ -634,7 +634,7 @@ dialog.inspector-dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-f
   background: var(--nav-mobile-bg); backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) 4px;
-  grid-template-columns: repeat(5, 1fr); gap: 2px;
+  grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px;
 }
 .mobile-nav-btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
@@ -683,4 +683,32 @@ dialog.inspector-dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-f
   .toast-stack { bottom: 84px; left: 12px; right: 12px; max-width: none; }
   dialog.inspector-dialog { margin: auto 12px 12px 12px; width: calc(100vw - 24px); max-height: 86vh; }
   .mobile-nav { display: grid; }
+}
+
+@media (max-width: 600px) {
+  /* On phones, the fixed six-item navigation is the primary tab control. */
+  aside.side-rail { display: none; }
+  .studio-shell { padding-left: 8px; padding-right: 8px; }
+  .masthead-top { flex-direction: column; align-items: stretch; gap: 10px; }
+  .header-controls {
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px auto auto;
+    gap: 6px;
+  }
+  .search-wrap { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .btn-quick-create { justify-content: center; padding-left: 12px; padding-right: 12px; }
+  .mobile-nav-btn { min-width: 0; font-size: 0.66rem; line-height: 1.1; }
+  .mobile-nav-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

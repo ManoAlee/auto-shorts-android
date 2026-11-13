@@ -155,6 +155,15 @@ class EvolutionStore:
         shares: int = 0,
         saves: int = 0,
     ) -> float:
+        if isinstance(clip_id, bool) or not isinstance(clip_id, int) or clip_id <= 0:
+            raise ValueError("clip_id must be a positive integer")
+        for field, value in (("views", views), ("likes", likes), ("shares", shares), ("saves", saves)):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0 or value > 1_000_000_000_000:
+                raise ValueError(f"{field} must be an integer between 0 and 1000000000000")
+        if isinstance(avg_watch_pct, bool) or not isinstance(avg_watch_pct, (int, float)):
+            raise ValueError("avg_watch_pct must be a number between 0 and 500")
+        if not math.isfinite(float(avg_watch_pct)) or not 0 <= float(avg_watch_pct) <= 500:
+            raise ValueError("avg_watch_pct must be a number between 0 and 500")
         reward = compute_reward(views=views, avg_watch_pct=avg_watch_pct, shares=shares, saves=saves, likes=likes)
         with self._connect() as conn:
             exists = conn.execute("SELECT 1 FROM clip_runs WHERE id = ?", (clip_id,)).fetchone()
@@ -169,6 +178,42 @@ class EvolutionStore:
             )
         return reward
 
+    def learning_status(self, candidate_limit: int = 40) -> Dict:
+        """Return real-feedback coverage and recent clips that still need metrics."""
+        safe_limit = max(1, min(100, int(candidate_limit)))
+        with self._connect() as conn:
+            total_clips = int(conn.execute("SELECT COUNT(*) FROM clip_runs").fetchone()[0])
+            measured_clips = int(conn.execute("SELECT COUNT(DISTINCT clip_id) FROM clip_metrics").fetchone()[0])
+            avg_reward_row = conn.execute(
+                """
+                SELECT AVG(m.reward)
+                FROM clip_metrics m
+                WHERE m.id = (
+                    SELECT MAX(m2.id) FROM clip_metrics m2 WHERE m2.clip_id = m.clip_id
+                )
+                """
+            ).fetchone()
+            candidates = conn.execute(
+                """
+                SELECT r.id, r.created_at, r.output_path, r.hook_title, r.niche,
+                       r.platform, r.duration_sec, r.predicted_score
+                FROM clip_runs r
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM clip_metrics m WHERE m.clip_id = r.id
+                )
+                ORDER BY r.id DESC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+        return {
+            "total_clips": total_clips,
+            "measured_clips": measured_clips,
+            "pending_feedback": max(0, total_clips - measured_clips),
+            "avg_latest_reward": round(float(avg_reward_row[0] or 0.0), 4),
+            "candidates": [dict(row) for row in candidates],
+        }
+
     def recommend_layout(self, niche: str, candidates: Optional[List[str]] = None) -> str:
         """Select layout using UCB1 exploration/exploitation over recorded rewards."""
         arms = candidates or ["blur_bg", "center_crop", "split_top_bottom"]
@@ -178,6 +223,7 @@ class EvolutionStore:
                 SELECT r.layout AS arm, COUNT(m.id) AS n, AVG(m.reward) AS avg_reward
                 FROM clip_runs r
                 JOIN clip_metrics m ON m.clip_id = r.id
+                    AND m.id = (SELECT MAX(m2.id) FROM clip_metrics m2 WHERE m2.clip_id = r.id)
                 WHERE r.niche = ?
                 GROUP BY r.layout
                 """,
@@ -211,6 +257,7 @@ class EvolutionStore:
                 SELECT r.hook_title, r.duration_bucket, r.layout, m.views, m.avg_watch_pct, m.reward
                 FROM clip_runs r
                 JOIN clip_metrics m ON m.clip_id = r.id
+                    AND m.id = (SELECT MAX(m2.id) FROM clip_metrics m2 WHERE m2.clip_id = r.id)
                 WHERE r.niche = ?
                 ORDER BY m.reward DESC
                 LIMIT ?

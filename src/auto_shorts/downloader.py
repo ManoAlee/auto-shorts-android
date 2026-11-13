@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -58,7 +59,14 @@ def is_gdrive_url(url: str) -> bool:
 def is_rclone_target(target: str) -> bool:
     """Check if target is an rclone remote path (e.g. 'gdrive:animes/ep01.mp4')."""
     t = str(target or "").strip()
-    return ":" in t and not t.startswith(("http://", "https://", "file://")) and not (len(t) > 2 and t[1:3] == ":\\")
+    if not t or t.startswith(("http://", "https://", "file://")) or (len(t) > 2 and t[1:3] == ":\\"):
+        return False
+    remote, sep, path = t.partition(":")
+    if not sep or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", remote) or not path or path.startswith("/"):
+        return False
+    if any(ord(ch) < 32 for ch in path) or any(part in {".", ".."} for part in path.split("/")):
+        return False
+    return True
 
 
 def download_from_gdrive(url: str, work_dir: Path) -> Path:
@@ -93,6 +101,8 @@ def download_from_rclone(remote_path: str, work_dir: Path) -> Path:
     rclone_bin = shutil.which("rclone")
     if not rclone_bin:
         raise RuntimeError("rclone não está instalado no sistema.")
+    if not is_rclone_target(remote_path):
+        raise ValueError("Caminho remoto inválido. Use remote:pasta/arquivo, sem '..'.")
     cmd = [rclone_bin, "copyto", remote_path, str(out_target), "--stats", "5s", "-P"]
     proc = subprocess.run(cmd, check=False)
     if proc.returncode == 0 and out_target.is_file() and out_target.stat().st_size > 1000:
@@ -108,6 +118,8 @@ def upload_to_rclone(local_path: Path, remote_folder: str) -> bool:
     rclone_bin = shutil.which("rclone")
     if not rclone_bin or not local_path.is_file():
         return False
+    if not is_rclone_target(remote_folder):
+        raise ValueError("Pasta remota inválida. Use remote:pasta, sem '..'.")
     cmd = [rclone_bin, "copy", str(local_path), remote_folder]
     proc = subprocess.run(cmd, check=False)
     return proc.returncode == 0
@@ -118,6 +130,8 @@ def upload_to_rclone_as(local_path: Path, remote_file_path: str) -> bool:
     rclone_bin = shutil.which("rclone")
     if not rclone_bin or not local_path.is_file():
         return False
+    if not is_rclone_target(remote_file_path):
+        raise ValueError("Destino remoto inválido. Use remote:pasta/arquivo, sem '..'.")
     cmd = [rclone_bin, "copyto", str(local_path), remote_file_path]
     proc = subprocess.run(cmd, check=False)
     return proc.returncode == 0
@@ -156,11 +170,13 @@ def list_gdrive_episodes(folder: str = "gdrive:Animes_Para_Cortar") -> List[str]
     """List pending anime video files in Google Drive folder."""
     rclone_bin = shutil.which("rclone")
     if not rclone_bin:
-        return []
+        raise RuntimeError("rclone não está instalado no sistema.")
+    if not is_rclone_target(folder):
+        raise ValueError("Pasta do Drive inválida. Use remote:pasta, sem '..'.")
     cmd = [rclone_bin, "lsf", folder]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        return []
+        raise RuntimeError(f"rclone lsf falhou (código {proc.returncode}); verifique conexão, autenticação e pasta remota.")
     valid_exts = {".mp4", ".mkv", ".webm", ".avi", ".mov"}
     files = []
     for line in proc.stdout.splitlines():
@@ -175,6 +191,8 @@ def move_gdrive_episode(source_remote_path: str, dest_folder: str = "gdrive:Anim
     rclone_bin = shutil.which("rclone")
     if not rclone_bin or not str(source_remote_path).strip():
         return False
+    if not is_rclone_target(source_remote_path) or not is_rclone_target(dest_folder):
+        raise ValueError("Origem ou destino remoto inválido; caminhos '..' não são permitidos.")
     fname = Path(source_remote_path).name
     dest_path = f"{dest_folder.rstrip('/')}/{fname}"
     cmd = [rclone_bin, "moveto", source_remote_path, dest_path]

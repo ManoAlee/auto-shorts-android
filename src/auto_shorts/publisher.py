@@ -515,8 +515,8 @@ def publish_pack_to_youtube(
         pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
         raise RuntimeError(f"Video reprovado na validacao e auto-auditoria visual: {'; '.join(audit['reject_reasons'])}")
 
-    title = str(pack.get("title") or mp4.stem.replace("_", " ").title()).strip()[:95]
-    caption = _sanitize_publish_caption(str(pack.get("caption") or f"{title}\n\n#Shorts #Brasil"))
+    title = str(pack.get("youtube_title") or pack.get("title") or mp4.stem.replace("_", " ").title()).strip()[:95]
+    caption = _sanitize_publish_caption(str(pack.get("youtube_description") or pack.get("caption") or f"{title}\n\n#Shorts #Brasil"))
     if "#shorts" not in caption.lower():
         caption = f"{caption}\n#Shorts".strip()
     tags = pack.get("hashtags") or ["#Shorts", "#Brasil"]
@@ -740,7 +740,7 @@ def _sanitize_publish_caption(raw: str) -> str:
 
 def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
     """Format an Instagram Reels caption with a DM-share CTA and focused hashtags."""
-    base = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or fallback_stem))
+    base = _sanitize_publish_caption(str(pack.get("instagram_caption") or pack.get("caption") or pack.get("title") or fallback_stem))
     if not base:
         base = fallback_stem
 
@@ -1207,7 +1207,7 @@ def publish_pack_to_tiktok(
 
     if target_mode == "direct":
         endpoint = TIKTOK_DIRECT_INIT_URL
-        caption = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
+        caption = _sanitize_publish_caption(str(pack.get("tiktok_caption") or pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
         priv = (privacy_level or os.getenv("TIKTOK_PRIVACY_LEVEL", "SELF_ONLY") or "SELF_ONLY").strip()
         payload = {
             "post_info": {

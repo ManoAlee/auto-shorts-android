@@ -705,9 +705,20 @@ def _build_clip_title(source_title: str, hook_title: str, part_num: int, niche: 
         if hook_title and hook_title != "PRESTA ATENCAO NISSO" and len(hook_title) >= 6:
             hook_pretty = hook_title.title()
             if hook_pretty.lower() not in clean_src.lower():
-                combo = f"{clean_src}: {hook_pretty}!{suffix}"
-                return combo[:90]
-        return f"{clean_src} — Cena Épica Dublada!{suffix}"[:90]
+                tail = f": {hook_pretty}!{suffix}"
+                max_source = max(24, 90 - len(tail))
+                source_cut = clean_src[:max_source]
+                if len(clean_src) > max_source:
+                    source_cut = source_cut.rsplit(" ", 1)[0]
+                return f"{source_cut.rstrip(' -:,.!?;')}{tail}"[:90]
+        fallback = f"{clean_src} — Cena Épica Dublada!{suffix}"
+        if len(fallback) <= 90:
+            return fallback
+        max_source = max(24, 90 - len(f" — Cena Épica Dublada!{suffix}"))
+        source_cut = clean_src[:max_source]
+        if len(clean_src) > max_source:
+            source_cut = source_cut.rsplit(" ", 1)[0]
+        return f"{source_cut.rstrip(' -:,.!?;')} — Cena Épica Dublada!{suffix}"[:90]
 
     if clean_src and not _looks_english_title(clean_src):
         base = clean_src[: 90 - len(suffix)].rstrip(" -|:")

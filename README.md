@@ -5,7 +5,7 @@
 [![CI](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml/badge.svg)](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Android Termux aarch64](https://img.shields.io/badge/Android-Termux%20aarch64-3DDC84?logo=android&logoColor=white)](scripts/install_termux.sh)
-[![Tests 76 Passing](https://img.shields.io/badge/Tests-76%20Passing-059669)](#verification--testing)
+[![Tests 101 Passing](https://img.shields.io/badge/Tests-101%20Passing-059669)](#verification--testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Autonomous 9:16 Vertical Video Factory engineered for Android (`Termux aarch64`) & Windows Desktop**  
@@ -186,6 +186,8 @@ auto-shorts-android/
 - [Nichos, Retenção e Monetização no Brasil](docs/ESTUDO_NICHOS_MONETIZACAO_BRASIL.md)
 - [Entrega, Portais e Evolução](docs/ESTUDO_ENTREGA_PORTAIS_E_EVOLUCAO.md)
 - [Ferramentas Open-Source de Referência](docs/FERRAMENTAS_GITHUB_OPENSOURCE.md)
+- [IA Local e Integração Google Drive no Termux](docs/IA_E_GOOGLE_DRIVE_NO_TERMUX.md)
+- [Qualidade de Voz, Vídeo e Publicação Automática](docs/QUALIDADE_VIDEO_VOZ_E_AUTOPILOT.md)
 
 ---
 

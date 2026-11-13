@@ -458,7 +458,8 @@ def test_anime_release_radar_parses_anilist(monkeypatch):
 
 def test_male_voice_default_non_overlapping_subtitles_and_tts_cascade(tmp_path, monkeypatch):
     # Default styles must be natural PT-BR male voice (never female by default).
-    assert VOICE_STYLES[DEFAULT_STYLE_KEY].voice == "pt-BR-AntonioNeural"
+    assert DEFAULT_STYLE_KEY == "thalita_hd"
+    assert VOICE_STYLES[DEFAULT_STYLE_KEY].kokoro_voice == "pf_dora"
     assert VOICE_STYLES["storyteller"].voice == "pt-BR-AntonioNeural"
 
     # Overlapping SRT cues must flatten into non-overlapping ASS Dialogue lines.

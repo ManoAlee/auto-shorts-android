@@ -12,10 +12,7 @@ _VTT_TIME_RE = re.compile(
 )
 _INLINE_WORD_TIME_RE = re.compile(r"<(?:(\d{1,2}):)?(\d{2}):(\d{2})\.(\d{3})>")
 _TAG_RE = re.compile(r"<[^>]+>")
-_BRACKET_NOISE_RE = re.compile(
-    r"\[[^\]]*(?:__+|m[úu]sica|abertura|encerramento|aplausos|risos|music|applause|sound|efeito|ru[íi]do)[^\]]*\]|\[[^\]]*\]",
-    re.IGNORECASE,
-)
+_BRACKET_NOISE_RE = re.compile(r"\[\s*(?:__+|música|musica|aplausos|risos|music|applause)\s*\]", re.IGNORECASE)
 
 
 def _to_seconds(hours: str | None, minutes: str, seconds: str, millis: str) -> float:

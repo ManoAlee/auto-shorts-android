@@ -167,9 +167,9 @@ def _build_youtube_cdp_metadata(pack: Dict[str, Any], fallback_stem: str) -> Dic
     """Prepare YouTube Shorts SEO title (<=100 chars) and description with #Shorts."""
     from .publisher import _sanitize_publish_caption
 
-    title = _sanitize_publish_caption(str(pack.get("title") or pack.get("hook_title") or fallback_stem))
+    title = _sanitize_publish_caption(str(pack.get("youtube_title") or pack.get("title") or pack.get("hook_title") or fallback_stem))
     title = " ".join(title.split())[:95] or fallback_stem[:95]
-    desc = _sanitize_publish_caption(str(pack.get("caption") or title))
+    desc = _sanitize_publish_caption(str(pack.get("youtube_description") or pack.get("caption") or title))
     if "#shorts" not in desc.lower():
         desc = f"{desc}\n\n#Shorts".strip()
     return {"title": title, "description": desc[:4800]}

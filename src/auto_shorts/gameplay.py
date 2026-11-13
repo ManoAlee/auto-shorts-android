@@ -50,8 +50,8 @@ GAMEPLAY_QUERIES: Dict[str, List[str]] = {
 }
 
 NICHE_STYLE_AFFINITY: Dict[str, List[str]] = {
-    "noticias_mundiais": ["drone_cinema", "urban_rain", "subway", "minecraft", "gta_ramp"],
-    "ia_tech": ["space_cosmos", "urban_rain", "minecraft", "beamng", "gta_ramp"],
+    "noticias_mundiais": ["drone_cinema", "urban_rain"],
+    "ia_tech": ["space_cosmos", "urban_rain", "drone_cinema"],
     "financas": ["finance_minimal", "drone_cinema", "gta_ramp", "subway", "minecraft"],
     "desenvolvimento_pessoal": ["urban_rain", "drone_cinema", "satisfying", "minecraft", "subway"],
     "saude_fitness": ["fitness_motion", "drone_cinema", "satisfying", "subway", "minecraft"],
@@ -274,8 +274,13 @@ def pick_evolving_background(
         return None
 
     store = EvolutionStore(Path(out_dir) / "shorts_evolution.db")
-    chosen_style = store.select_evolving_background_style(niche, existing_styles, last_style=last_style)
-    style_clips = [c for c in clips if _extract_style_tag(c) == chosen_style] or clips
+    # Keep the UCB1 choice inside the niche affinity set. A visually active clip
+    # can still be editorially wrong (for example, Subway Surfers under a tech alert).
+    eligible_styles = [s for s in existing_styles if s in preferred_for_niche]
+    if not eligible_styles:
+        return None
+    chosen_style = store.select_evolving_background_style(niche, eligible_styles, last_style=last_style)
+    style_clips = [c for c in clips if _extract_style_tag(c) == chosen_style]
     last_file = last_name.split("|")[0]
     fresh_clips = [c for c in style_clips if c.name != last_file] or style_clips
     chosen = random.choice(fresh_clips)
