@@ -2367,6 +2367,58 @@ def test_post_publish_audit_and_duplicate_thumbnail_detection(tmp_path):
     assert vault_audit["warnings_count"] >= 1
 
 
+def test_smart_autopublish_mutex_prevents_duplicate_and_respects_wifi_only(tmp_path, monkeypatch):
+    import threading
+    import time
+    from auto_shorts import smart_autopublish as sa
+
+    mp4 = tmp_path / "unique_clip.mp4"
+    mp4.write_bytes(b"ftypmp42" + b"0" * 60_000)
+    mp4.with_suffix(".publish.json").write_text(
+        json.dumps(
+            {
+                "title": "Video Unico",
+                "niche": "ia_tech",
+                "validation": {"valid": True, "duration": 30.0, "width": 720, "height": 1280},
+                "visual_audit": {"approved": True, "quality_score": 90.0},
+                "queued_for_auto_publish": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    def slow_ig_pub(path):
+        calls.append(path.name)
+        time.sleep(0.15)
+        pack = json.loads(path.with_suffix(".publish.json").read_text(encoding="utf-8"))
+        pack["instagram"] = {"media_pk": "555", "code": "UNIQ", "url": "https://instagram.com/reel/UNIQ/"}
+        path.with_suffix(".publish.json").write_text(json.dumps(pack), encoding="utf-8")
+        return {"status": "published_instagram", "media_pk": "555", "code": "UNIQ"}
+
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: True)
+    t1 = threading.Thread(
+        target=sa.run_smart_publish_cycle,
+        kwargs={"out_dir": tmp_path, "youtube_ready": False, "tiktok_ready": False, "instagram_ready": True, "ig_publisher": slow_ig_pub},
+    )
+    t2 = threading.Thread(
+        target=sa.run_smart_publish_cycle,
+        kwargs={"out_dir": tmp_path, "youtube_ready": False, "tiktok_ready": False, "instagram_ready": True, "ig_publisher": slow_ig_pub},
+    )
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    assert calls == ["unique_clip.mp4"]
+
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: False)
+    blocked = sa.run_smart_publish_cycle(tmp_path, youtube_ready=False, tiktok_ready=False, instagram_ready=True, ig_publisher=slow_ig_pub)
+    assert blocked["dispatched"] is False
+    assert blocked["results"]["instagram"]["reason"] == "wifi_only_no_wifi"
+
+
+
 
 
 

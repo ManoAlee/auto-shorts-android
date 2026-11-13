@@ -3,6 +3,9 @@
 import datetime as _dt
 import json
 import os
+import socket
+import struct
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -232,6 +235,32 @@ def get_autopublish_plan(
     return {"date": ledger["date"], "channels": plan, "recent_history": ledger["history"][-8:]}
 
 
+_AUTOPUBLISH_LOCK = threading.Lock()
+
+
+def is_wifi_connected() -> bool:
+    """Return True unless WIFI_ONLY=1 (or Termux default) detects no active wlan0/wlan1 IPv4."""
+    raw = os.getenv("WIFI_ONLY", "").strip().lower()
+    on_termux = os.path.isdir("/data/data/com.termux")
+    enforce = raw in ("1", "true", "yes") or (on_termux and raw not in ("0", "false", "no"))
+    if not enforce:
+        return True
+    try:
+        import fcntl
+    except ImportError:
+        return True
+    for iface in ("wlan0", "wlan1"):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            fcntl.ioctl(sock.fileno(), 0x8915, struct.pack("256s", iface[:15].encode()))
+            return True
+        except OSError:
+            continue
+        finally:
+            sock.close()
+    return False
+
+
 def run_smart_publish_cycle(
     out_dir: Path,
     youtube_ready: bool,
@@ -244,7 +273,38 @@ def run_smart_publish_cycle(
     ig_publisher: Optional[Callable[[Path], Dict]] = None,
 ) -> Dict:
     """Select the highest-scoring, niche-diverse Short per ready channel, heal SEO, and publish."""
+    with _AUTOPUBLISH_LOCK:
+        return _run_smart_publish_cycle_locked(
+            out_dir,
+            youtube_ready=youtube_ready,
+            tiktok_ready=tiktok_ready,
+            instagram_ready=instagram_ready,
+            force=force,
+            now=now,
+            yt_publisher=yt_publisher,
+            tt_publisher=tt_publisher,
+            ig_publisher=ig_publisher,
+        )
+
+
+def _run_smart_publish_cycle_locked(
+    out_dir: Path,
+    youtube_ready: bool,
+    tiktok_ready: bool,
+    instagram_ready: bool = False,
+    force: bool = False,
+    now: Optional[float] = None,
+    yt_publisher: Optional[Callable[[Path], Dict]] = None,
+    tt_publisher: Optional[Callable[[Path], Dict]] = None,
+    ig_publisher: Optional[Callable[[Path], Dict]] = None,
+) -> Dict:
     ts = time.time() if now is None else float(now)
+    if not is_wifi_connected():
+        return {
+            "dispatched": False,
+            "results": {ch: {"status": "deferred", "reason": "wifi_only_no_wifi"} for ch in CHANNELS},
+            "plan": get_autopublish_plan(out_dir, youtube_ready=youtube_ready, tiktok_ready=tiktok_ready, instagram_ready=instagram_ready, now=ts),
+        }
     ledger = load_publish_ledger(out_dir)
     yt_fn = yt_publisher or publish_pack_to_youtube
     tt_fn = tt_publisher or publish_pack_to_tiktok
