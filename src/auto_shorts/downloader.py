@@ -321,6 +321,8 @@ def transcribe_with_whisper_cpp(
             "-m", str(resolved_model),
             "-f", str(wav_path),
             "-l", language,
+            "-mc", "0",
+            "-sns",
             "--prompt", domain_prompt,
             "-osrt", "-ojf",
             "-of", str(out_prefix),

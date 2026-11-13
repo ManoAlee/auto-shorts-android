@@ -27,7 +27,8 @@ def build_publish_pack(
     """Create platform-ready metadata (real title, rich PT-BR description, hashtags, CTA)."""
     hook = clip.get("hook_title") or clip.get("title") or "Destaque"
     title = clip.get("title") or hook
-    summary = str(clip.get("clip_summary") or "").strip()
+    from .highlights import sanitize_repetitive_text
+    summary = sanitize_repetitive_text(str(clip.get("clip_summary") or "").strip())
     retention_cta = get_retention_profile(platform).reels_cta_hint
     cta = clip.get("cta_line") or retention_cta
     niche_tags = {
@@ -703,9 +704,21 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
 
 def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
     """Format an Instagram Reels caption with a DM-share CTA and focused hashtags."""
+    import re
+    from .highlights import sanitize_repetitive_text
+
     base = str(pack.get("caption") or pack.get("title") or fallback_stem).strip()
     if not base:
         base = fallback_stem
+
+    # Heal legacy .publish.json captions that contain Whisper repetition loops in "Sobre este corte:"
+    def _clean_summary_block(match: re.Match) -> str:
+        body = sanitize_repetitive_text(match.group(1))
+        return f"Sobre este corte:\n{body}\n" if body else ""
+
+    base = re.sub(r"Sobre este corte:\n(.*?)(?:\n\n|\Z)", _clean_summary_block, base, flags=re.DOTALL)
+    base = re.sub(r"\n{3,}", "\n\n", base).strip()
+
     lower = base.lower()
     if "manda" not in lower and "envie" not in lower and "compartilh" not in lower:
         base = f"{base}\n\n📩 Manda pra um amigo que precisa ver isso!"

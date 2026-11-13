@@ -1572,6 +1572,18 @@ def test_instagram_caption_idempotency_and_auto_highlight(tmp_path, monkeypatch)
     assert "Manda pra um amigo" in cap
     assert "#reels" in cap
 
+    from auto_shorts.highlights import sanitize_repetitive_text
+    assert sanitize_repetitive_text("Oito é um jeito que " + ("oito é que " * 15)) == ""
+    healed_cap = _build_instagram_caption(
+        {
+            "caption": "Titulo Real\n\nSobre este corte:\n" + ("O que é isso? " * 12) + "\n\nFonte / Referencia:\nCanal"
+        },
+        "fallback",
+    )
+    assert "Titulo Real" in healed_cap
+    assert "Sobre este corte:" not in healed_cap
+    assert "O que é isso?" not in healed_cap
+
     mp4 = tmp_path / "clip.mp4"
     mp4.write_bytes(b"ftypmp42" + b"0" * 100)
     pack_path = mp4.with_suffix(".publish.json")

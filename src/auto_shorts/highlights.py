@@ -464,17 +464,40 @@ def _clean_source_title(raw_title: str) -> str:
     return heal_proper_nouns_and_asr(cleaned)
 
 
+def sanitize_repetitive_text(text: str) -> str:
+    """Strip Whisper decoding repetition loops (e.g. 'O que e isso? O que e isso? ...')."""
+    cleaned = " ".join(str(text or "").split()).strip()
+    if not cleaned:
+        return ""
+    # Collapse consecutive repeated phrases of 1-10 words repeated 3+ times
+    cleaned = re.sub(
+        r"(?i)\b((?:\S+\s+){0,9}\S+?)(?:\s+\1){2,}\b",
+        r"\1",
+        cleaned,
+    )
+    # Also collapse punctuation-separated repeated clauses (e.g. "O que é isso? O que é isso? ...")
+    cleaned = re.sub(
+        r"(?i)(.{4,40}?[.!?]+)\s*(?:\1\s*){2,}",
+        r"\1",
+        cleaned,
+    )
+    words = re.findall(r"[a-zA-ZÀ-ÿ0-9]+", cleaned.lower())
+    if len(words) >= 10 and (len(set(words)) / len(words)) < 0.35:
+        return ""
+    return cleaned.strip()
+
+
 def _build_clip_summary(texts: List[str], max_chars: int = 340) -> str:
     """Join clip transcript lines into a clean, readable PT-BR summary."""
     seen = set()
     ordered: List[str] = []
     for raw in texts:
-        line = heal_proper_nouns_and_asr(" ".join(str(raw).split()).strip())
+        line = sanitize_repetitive_text(heal_proper_nouns_and_asr(" ".join(str(raw).split()).strip()))
         if not line or line.lower() in seen:
             continue
         seen.add(line.lower())
         ordered.append(line)
-    joined = " ".join(ordered)
+    joined = sanitize_repetitive_text(" ".join(ordered))
     if joined and joined[0].islower():
         joined = joined[0].upper() + joined[1:]
     if len(joined) <= max_chars:
