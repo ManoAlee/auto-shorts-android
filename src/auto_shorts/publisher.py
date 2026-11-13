@@ -700,10 +700,46 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
     return pack
 
 
+def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
+    """Format an Instagram Reels caption with a DM-share CTA and focused hashtags."""
+    base = str(pack.get("caption") or pack.get("title") or fallback_stem).strip()
+    if not base:
+        base = fallback_stem
+    lower = base.lower()
+    if "manda" not in lower and "envie" not in lower and "compartilh" not in lower:
+        base = f"{base}\n\n📩 Manda pra um amigo que precisa ver isso!"
+    if "#" not in base:
+        base = f"{base}\n\n#reels #animes #curiosidades #noticias #shorts"
+    return base[:2000]
+
+
+def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Cortes & Animes") -> Dict:
+    """Share a published Reel to Story and append it to an Instagram Highlight."""
+    story = cl.media_share_to_story(media_pk)
+    story_pk = str(getattr(story, "pk", "") or getattr(story, "id", "") or "")
+    if not story_pk:
+        return {"status": "story_pk_missing"}
+    uid = str(getattr(cl, "user_id", "") or "")
+    existing_pk = ""
+    if uid:
+        for hl in cl.user_highlights(uid):
+            if str(getattr(hl, "title", "")).strip() == title.strip():
+                existing_pk = str(getattr(hl, "pk", "") or "")
+                break
+    if existing_pk:
+        hl = cl.highlight_add_stories(existing_pk, [story_pk])
+        return {"status": "highlight_appended", "highlight_pk": existing_pk, "story_pk": story_pk, "title": title}
+    hl = cl.highlight_create(title, [story_pk])
+    return {"status": "highlight_created", "highlight_pk": str(getattr(hl, "pk", "")), "story_pk": story_pk, "title": title}
+
+
 def publish_pack_to_instagram_reels(
     video_path: str | Path,
     username: Optional[str] = None,
     password: Optional[str] = None,
+    auto_highlight: Optional[bool] = None,
+    highlight_title: Optional[str] = None,
+    force: bool = False,
 ) -> Dict:
     """Publish a validated vertical Short as an Instagram Reel via instagrapi when credentials exist."""
     mp4 = Path(video_path)
@@ -717,12 +753,21 @@ def publish_pack_to_instagram_reels(
 
     pack_path = mp4.with_suffix(".publish.json")
     pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.is_file() else {}
-    caption = str(pack.get("caption") or pack.get("title") or mp4.stem)[:2000]
+    existing_ig = pack.get("instagram") or {}
+    if not force and existing_ig.get("media_pk"):
+        return {"status": "already_published_instagram", **existing_ig}
+
+    caption = _build_instagram_caption(pack, mp4.stem)
 
     from instagrapi import Client  # type: ignore
 
     cl = Client()
+    cl.delay_range = [1, 3]
     sess_file = mp4.parent / ".ig_session.json"
+    if not sess_file.is_file():
+        shared_sess = Path("output/.ig_session.json")
+        if shared_sess.is_file():
+            sess_file = shared_sess
     if sess_file.is_file():
         try:
             cl.load_settings(str(sess_file))
@@ -734,9 +779,23 @@ def publish_pack_to_instagram_reels(
     except Exception:
         pass
     media = cl.clip_upload(mp4, caption)
+    media_pk = str(getattr(media, "pk", ""))
     code = getattr(media, "code", "") or ""
     ig_url = f"https://www.instagram.com/reel/{code}/" if code else ""
-    ig_info = {"media_pk": str(getattr(media, "pk", "")), "code": code, "url": ig_url}
+    ig_info: Dict = {"media_pk": media_pk, "code": code, "url": ig_url}
+
+    do_highlight = (
+        auto_highlight
+        if auto_highlight is not None
+        else os.getenv("IG_AUTO_HIGHLIGHT", "1").strip().lower() not in {"0", "false", "no"}
+    )
+    if do_highlight and media_pk:
+        hl_title = (highlight_title or os.getenv("IG_HIGHLIGHT_TITLE", "🔥 Cortes & Animes")).strip() or "🔥 Cortes & Animes"
+        try:
+            ig_info["highlight"] = _auto_add_reel_to_highlight(cl, media_pk, title=hl_title)
+        except Exception as exc:
+            ig_info["highlight"] = {"status": "highlight_error", "error": str(exc)}
+
     pack["instagram"] = ig_info
     pack_path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"status": "published_instagram", **ig_info}

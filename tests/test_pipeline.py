@@ -1561,6 +1561,66 @@ def test_github_upgrades_karaoke_kf_face_crop_innertube_and_instagram_reels(tmp_
     assert ig["status"] == "skipped_unconfigured"
 
 
+def test_instagram_caption_idempotency_and_auto_highlight(tmp_path, monkeypatch):
+    import json
+    import sys
+    import types
+    from auto_shorts.publisher import _build_instagram_caption, publish_pack_to_instagram_reels
+
+    cap = _build_instagram_caption({"title": "Noticia de Anime"}, "fallback")
+    assert "Noticia de Anime" in cap
+    assert "Manda pra um amigo" in cap
+    assert "#reels" in cap
+
+    mp4 = tmp_path / "clip.mp4"
+    mp4.write_bytes(b"ftypmp42" + b"0" * 100)
+    pack_path = mp4.with_suffix(".publish.json")
+    pack_path.write_text(json.dumps({"title": "Anime Ep"}, ensure_ascii=False), encoding="utf-8")
+
+    created_highlights = []
+
+    class FakeClient:
+        user_id = "999"
+
+        def __init__(self):
+            self.delay_range = None
+
+        def load_settings(self, path):
+            pass
+
+        def login(self, u, p):
+            pass
+
+        def dump_settings(self, path):
+            pass
+
+        def clip_upload(self, path, caption):
+            return types.SimpleNamespace(pk="111222", code="ABC123")
+
+        def media_share_to_story(self, media_pk):
+            return types.SimpleNamespace(pk="777888")
+
+        def user_highlights(self, uid):
+            return []
+
+        def highlight_create(self, title, story_ids):
+            created_highlights.append((title, story_ids))
+            return types.SimpleNamespace(pk="555666")
+
+    fake_mod = types.SimpleNamespace(Client=FakeClient)
+    monkeypatch.setitem(sys.modules, "instagrapi", fake_mod)
+
+    res1 = publish_pack_to_instagram_reels(mp4, username="u", password="p", auto_highlight=True, highlight_title="Animes")
+    assert res1["status"] == "published_instagram"
+    assert res1["media_pk"] == "111222"
+    assert res1["highlight"]["status"] == "highlight_created"
+    assert created_highlights == [("Animes", ["777888"])]
+
+    res2 = publish_pack_to_instagram_reels(mp4, username="u", password="p")
+    assert res2["status"] == "already_published_instagram"
+    assert res2["media_pk"] == "111222"
+
+
 def test_opus_pro_caption_hold_signalstats_and_runbook_scorecard(tmp_path):
     from auto_shorts.re_engine import get_synapse_overview, score_short_opus_runbook
     from auto_shorts.subtitles import generate_ass_subtitles
