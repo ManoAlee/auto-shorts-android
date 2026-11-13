@@ -396,13 +396,21 @@ def publish_pack_to_tiktok_cdp(
             for _ in range(30):
                 clicked = cdp.eval_js("""
                 (() => {
-                    const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-                    const target = btns.find(b => {
+                    const dismiss = Array.from(document.querySelectorAll('button, [role="button"]')).find(b => {
                         const txt = (b.innerText || '').trim();
-                        const dis = b.disabled || b.getAttribute('aria-disabled') === 'true' || b.dataset.disabled === 'true';
-                        return /^(post|publicar)$/i.test(txt) && !dis;
+                        return /^(got it|entendi)$/i.test(txt) && !b.disabled;
+                    });
+                    if (dismiss) { dismiss.click(); }
+                    const byE2e = document.querySelector('[data-e2e="post_video_button"]');
+                    const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+                    const target = byE2e || btns.find(b => {
+                        const txt = (b.innerText || '').trim();
+                        return /^(post|publicar)$/i.test(txt);
                     });
                     if (!target) return false;
+                    const dis = target.disabled || target.getAttribute('aria-disabled') === 'true' || target.getAttribute('data-disabled') === 'true';
+                    if (dis) return false;
+                    target.scrollIntoView({block: 'center'});
                     target.click();
                     return true;
                 })()
@@ -411,6 +419,25 @@ def publish_pack_to_tiktok_cdp(
                     posted = True
                     break
                 time.sleep(3.0)
+
+            if posted:
+                # Handle optional confirmation modal (e.g. "Post now" / "Continue") and wait for redirect
+                for _ in range(10):
+                    time.sleep(2.0)
+                    cdp.eval_js("""
+                    (() => {
+                        const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+                        const confirm = btns.find(b => {
+                            const txt = (b.innerText || '').trim();
+                            const dis = b.disabled || b.getAttribute('aria-disabled') === 'true';
+                            return /^(post now|publicar agora|continue)$/i.test(txt) && !dis;
+                        });
+                        if (confirm) confirm.click();
+                    })()
+                    """)
+                    url_now = cdp.eval_js("location.href") or ""
+                    if "/upload" not in url_now:
+                        break
 
             if not posted:
                 return {"status": "error", "reason": "Botao Post/Publicar nao ficou habilitado a tempo."}
