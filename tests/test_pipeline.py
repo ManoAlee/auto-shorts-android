@@ -2316,6 +2316,29 @@ def test_youtube_and_tiktok_idempotency_and_caption_sanitization(tmp_path, monke
     assert tt_res["skipped"] is True
 
 
+def test_ensure_reel_thumbnail_invalidates_stale_jpg_and_prefers_fresh_cover(tmp_path):
+    import os
+    from auto_shorts.publisher import _ensure_reel_thumbnail
+
+    mp4 = tmp_path / "short_01_instagram_reels.mp4"
+    stale_jpg = tmp_path / "short_01_instagram_reels.mp4.jpg"
+    fresh_cover = tmp_path / "short_01_instagram_reels_cover_9x16.jpg"
+
+    stale_jpg.write_bytes(b"OLD_THUMB_BYTES")
+    os.utime(stale_jpg, (1000.0, 1000.0))
+
+    mp4.write_bytes(b"NEW_MP4_BYTES")
+    os.utime(mp4, (2000.0, 2000.0))
+
+    fresh_cover.write_bytes(b"FRESH_9X16_COVER")
+    os.utime(fresh_cover, (2001.0, 2001.0))
+
+    chosen = _ensure_reel_thumbnail(mp4)
+    assert chosen is not None
+    assert chosen.read_bytes() == b"FRESH_9X16_COVER"
+
+
+
 
 
 

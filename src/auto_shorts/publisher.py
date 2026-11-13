@@ -788,11 +788,48 @@ def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Destaques"
 
 
 def _ensure_reel_thumbnail(mp4: Path) -> Optional[Path]:
-    """Generate a JPEG cover thumbnail via ffmpeg so instagrapi does not require moviepy."""
+    """Return a fresh, video-specific JPEG cover thumbnail for Instagram Reels."""
+    import shutil
+
     thumb = Path(f"{mp4}.jpg")
-    if thumb.is_file() and thumb.stat().st_size > 0:
+    mp4_mtime = mp4.stat().st_mtime
+
+    # Prefer the freshly generated 9:16 cover for THIS exact MP4 when newer than the video.
+    cover_9 = mp4.with_name(f"{mp4.stem}_cover_9x16.jpg")
+    if cover_9.is_file() and cover_9.stat().st_size > 0 and cover_9.stat().st_mtime >= (mp4_mtime - 5.0):
+        try:
+            shutil.copy2(cover_9, thumb)
+            return thumb
+        except OSError:
+            return cover_9
+
+    # Only reuse an existing .mp4.jpg if it was generated for this version of the MP4.
+    if thumb.is_file() and thumb.stat().st_size > 0 and thumb.stat().st_mtime >= mp4_mtime:
         return thumb
-    for seek in ("00:00:01", "00:00:00"):
+
+    if thumb.is_file():
+        try:
+            thumb.unlink()
+        except OSError:
+            pass
+
+    seek_targets = ["00:00:04", "00:00:02", "00:00:01", "00:00:00"]
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(mp4)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        dur = float((probe.stdout or "").strip() or 0.0)
+        if dur > 4.0:
+            ts = max(2.0, min(12.0, dur * 0.22))
+            seek_targets = [f"{ts:.2f}", "00:00:02", "00:00:01", "00:00:00"]
+    except Exception:
+        pass
+
+    for seek in seek_targets:
         try:
             proc = subprocess.run(
                 ["ffmpeg", "-y", "-ss", seek, "-i", str(mp4), "-frames:v", "1", "-update", "1", "-q:v", "2", str(thumb)],
