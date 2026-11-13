@@ -535,9 +535,21 @@ def _build_news_over_gameplay_video(
             req = urllib.request.Request(image_url, headers={"User-Agent": "AutoShorts-WorldNews/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 raw = resp.read()
-            if len(raw) > 2048:
-                img_path.write_bytes(raw)
-                has_thumb = True
+            is_img = (
+                raw.startswith(b"\xff\xd8\xff")
+                or raw.startswith(b"\x89PNG\r\n\x1a\n")
+                or (raw.startswith(b"RIFF") and b"WEBP" in raw[:16])
+                or raw.startswith(b"GIF8")
+            )
+            if len(raw) > 2048 and is_img:
+                raw_path = work_dir / "news_card_raw"
+                raw_path.write_bytes(raw)
+                conv = subprocess.run(
+                    ["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw_path), "-frames:v", "1", str(img_path)],
+                    check=False,
+                    timeout=15,
+                )
+                has_thumb = conv.returncode == 0 and img_path.is_file() and img_path.stat().st_size > 512
         except Exception:
             has_thumb = False
 
@@ -593,8 +605,11 @@ def _build_news_over_gameplay_video(
         "-c:a", "aac", "-b:a", "96k", "-ar", "44100",
         str(out_bg),
     ])
-    if subprocess.run(cmd, check=False).returncode == 0 and out_bg.is_file():
-        return out_bg
+    try:
+        if subprocess.run(cmd, check=False, timeout=180).returncode == 0 and out_bg.is_file():
+            return out_bg
+    except subprocess.TimeoutExpired:
+        return None
     return None
 
 

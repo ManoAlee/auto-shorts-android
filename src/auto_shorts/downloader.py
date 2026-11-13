@@ -113,6 +113,35 @@ def upload_to_rclone(local_path: Path, remote_folder: str) -> bool:
     return proc.returncode == 0
 
 
+def upload_to_rclone_as(local_path: Path, remote_file_path: str) -> bool:
+    """Upload a local file to an exact remote path on Google Drive via rclone copyto."""
+    rclone_bin = shutil.which("rclone")
+    if not rclone_bin or not local_path.is_file():
+        return False
+    cmd = [rclone_bin, "copyto", str(local_path), remote_file_path]
+    proc = subprocess.run(cmd, check=False)
+    return proc.returncode == 0
+
+
+def build_drive_niche_folder(niche: str) -> str:
+    """Return a clean organized Google Drive subfolder path: gdrive:Shorts_Finalizados/<Nicho>/<YYYY-MM-DD>."""
+    import time as _time
+    mapping = {
+        "entretenimento_animes": "Animes",
+        "ia_tech": "Tech_IA",
+        "noticias_mundiais": "Noticias_Tech",
+        "financas": "Financas",
+        "podcast": "Podcasts",
+        "saude_fitness": "Saude_Fitness",
+        "desenvolvimento_pessoal": "Desenvolvimento",
+        "concursos": "Concursos",
+        "gameplay": "Gameplay",
+    }
+    niche_dir = mapping.get(str(niche or "").strip().lower(), "Geral")
+    day_dir = _time.strftime("%Y-%m-%d")
+    return f"gdrive:Shorts_Finalizados/{niche_dir}/{day_dir}"
+
+
 def refresh_gdrive_token() -> bool:
     """Automatically refresh Google Drive OAuth2 token so it never expires."""
     rclone_bin = shutil.which("rclone")
@@ -241,41 +270,6 @@ def download_video_and_subs(
     return video_path, (sub_candidates[0] if sub_candidates else None)
 
 
-def _probe_video_duration(video_path: Path) -> float:
-    try:
-        proc = subprocess.run(
-            [
-                "ffprobe", "-v", "error", "-show_entries", "format=duration",
-                "-of", "default=nw=1:nk=1", str(video_path),
-            ],
-            capture_output=True, text=True, check=False, timeout=10,
-        )
-        return float((proc.stdout or "0").strip())
-    except Exception:
-        return 0.0
-
-
-def _offset_whisper_json(json_path: Path, offset_sec: float) -> None:
-    if offset_sec <= 0.1 or not json_path.is_file():
-        return
-    try:
-        data = json.loads(json_path.read_text(encoding="utf-8-sig"))
-        offset_ms = int(round(offset_sec * 1000.0))
-        for item in data.get("transcription", []):
-            offs = item.get("offsets")
-            if isinstance(offs, dict):
-                offs["from"] = int(offs.get("from", 0)) + offset_ms
-                offs["to"] = int(offs.get("to", 0)) + offset_ms
-            for tok in item.get("tokens", []):
-                t_offs = tok.get("offsets")
-                if isinstance(t_offs, dict):
-                    t_offs["from"] = int(t_offs.get("from", 0)) + offset_ms
-                    t_offs["to"] = int(t_offs.get("to", 0)) + offset_ms
-        json_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    except Exception:
-        pass
-
-
 def transcribe_with_whisper_cpp(
     video_path: Path,
     work_dir: Path,
@@ -303,22 +297,13 @@ def transcribe_with_whisper_cpp(
     if not resolved_model.exists():
         raise FileNotFoundError(f"Whisper GGML model not found at {resolved_model}")
 
-    total_dur = _probe_video_duration(video_path)
-    # Skip opening theme/recap (first ~2m40s) on full episodes / long videos (> 6 mins)
-    start_offset = 160.0 if total_dur > 360.0 else 0.0
-
     wav_path = work_dir / "audio_16k.wav"
-    ffmpeg_cmd = ["ffmpeg", "-y", "-loglevel", "error"]
-    if start_offset > 0:
-        ffmpeg_cmd.extend(["-ss", f"{start_offset:.1f}"])
-    ffmpeg_cmd.extend(["-i", str(video_path)])
+    ffmpeg_cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-i", str(video_path),
+    ]
     if os.getenv("WHISPER_FULL", "0") != "1":
-        max_sec = int(os.getenv("WHISPER_MAX_SEC", "420" if total_dur > 360.0 else "240"))
-        ffmpeg_cmd.extend(["-t", str(max_sec)])
-    elif total_dur > 360.0:
-        # Leave out the final ~100s ending credits when doing full-episode transcription
-        usable_dur = max(120.0, total_dur - start_offset - 100.0)
-        ffmpeg_cmd.extend(["-t", f"{usable_dur:.1f}"])
+        ffmpeg_cmd.extend(["-t", str(int(os.getenv("WHISPER_MAX_SEC", "240")))])
     ffmpeg_cmd.extend([
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(wav_path),
@@ -327,8 +312,8 @@ def transcribe_with_whisper_cpp(
 
     out_prefix = work_dir / "whisper_out"
     domain_prompt = (
-        "Português do Brasil. Jujutsu Kaisen, Sukuna, Gojo, Solo Leveling, Demon Slayer, Tanjiro, "
-        "One Piece, Luffy, Zoro, Chainsaw Man, Attack on Titan, Yu Yu Hakusho, Yusuke, batalha, poder."
+        "Português do Brasil. One Piece, Luffy, Zoro, Brook, Imu-sama, Haki, Akuma no Mi, "
+        "Jujutsu Kaisen, Sukuna, Gojo, Solo Leveling, Naruto, Bleach, análise, capítulo, fatídico."
     )
     subprocess.run(
         [
@@ -345,7 +330,6 @@ def transcribe_with_whisper_cpp(
 
     json_out = Path(f"{out_prefix}.json")
     if json_out.exists():
-        _offset_whisper_json(json_out, start_offset)
         return json_out
     srt_out = Path(f"{out_prefix}.srt")
     if srt_out.exists():
