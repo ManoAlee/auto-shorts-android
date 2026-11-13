@@ -2220,6 +2220,52 @@ def test_drive_sentinel_lifecycle_and_telemetry(tmp_path):
     sentinel.stop()
 
 
+def test_tools_validate_smart_autopublish_instagram_and_vault_sanitization(tmp_path):
+    import json
+    from auto_shorts.smart_autopublish import run_smart_publish_cycle
+    from auto_shorts.webapp import list_generated_videos, validate_system_tools
+
+    mp4 = tmp_path / "vault_clip.mp4"
+    mp4.write_bytes(b"ftypmp42" + b"0" * 60_000)
+    pack = {
+        "title": "Noticia Tech",
+        "niche": "ia_tech",
+        "caption": "Noticia Tech\n\nSobre este corte:\n" + ("O que é isso? " * 12) + "\n\nFonte / Referencia:\nCanal",
+        "hashtags": ["#tech", "#ia", "#reels"],
+        "validation": {"valid": True, "duration": 42.0, "width": 720, "height": 1280},
+        "visual_audit": {"approved": True, "quality_score": 88.0},
+        "queued_for_auto_publish": True,
+    }
+    mp4.with_suffix(".publish.json").write_text(json.dumps(pack, ensure_ascii=False), encoding="utf-8")
+
+    vids = list_generated_videos(tmp_path)
+    assert len(vids) == 1
+    assert "O que é isso?" not in vids[0]["caption"]
+    assert "O que é isso?" not in vids[0]["clip_summary"]
+    assert vids[0]["instagram"] is None
+
+    diag = validate_system_tools(tmp_path)
+    assert "binaries" in diag and "channels" in diag and "vault" in diag
+    assert diag["vault"]["total_videos"] == 1
+
+    ig_calls = []
+
+    def fake_ig_pub(path):
+        ig_calls.append(path.name)
+        return {"status": "published_instagram", "media_pk": "998877", "code": "IGTEST", "url": "https://www.instagram.com/reel/IGTEST/"}
+
+    cycle = run_smart_publish_cycle(
+        tmp_path,
+        youtube_ready=False,
+        tiktok_ready=False,
+        instagram_ready=True,
+        ig_publisher=fake_ig_pub,
+    )
+    assert ig_calls == ["vault_clip.mp4"]
+    assert cycle["results"]["instagram"]["status"] == "published_instagram"
+    assert cycle["results"]["instagram"]["media_pk"] == "998877"
+
+
 
 
 

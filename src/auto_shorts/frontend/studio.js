@@ -1175,9 +1175,12 @@
       const card = document.createElement('article');
       card.className = 'video-card';
 
-      // Top Quick Controls (Checkbox + Fast Delete Button)
+      // 1. Media Stage first with floating quick-select, delete & duration chip
+      const stage = document.createElement('div');
+      stage.className = 'video-stage';
+
       const topBar = document.createElement('div');
-      topBar.className = 'card-top-controls';
+      topBar.className = 'video-stage-top';
 
       const chkLabel = document.createElement('label');
       chkLabel.className = 'card-chk-wrap';
@@ -1208,12 +1211,11 @@
         card.style.transform = 'scale(0.97)';
         card.style.transition = 'all 180ms ease';
         try {
-          const res = await fetch('/api/delete', {
+          await fetch('/api/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: v.filename }),
           });
-          const d = await res.json();
           _selectedVideos.delete(v.filename);
           _videosCache = _videosCache.filter((item) => item.filename !== v.filename);
           renderVideosGrid();
@@ -1226,67 +1228,88 @@
         }
       });
       topBar.appendChild(btnQuickDel);
-      card.appendChild(topBar);
+      stage.appendChild(topBar);
 
+      const vid = document.createElement('video');
+      vid.controls = true;
+      vid.preload = 'metadata';
+      vid.src = '/media/' + encodeURIComponent(v.filename);
+      stage.appendChild(vid);
+
+      if (v.validation && v.validation.duration) {
+        const secs = Math.round(Number(v.validation.duration) || 0);
+        const mm = Math.floor(secs / 60);
+        const ss = String(secs % 60).padStart(2, '0');
+        const durChip = document.createElement('span');
+        durChip.className = 'video-dur-chip';
+        durChip.textContent = mm + ':' + ss;
+        stage.appendChild(durChip);
+      }
+      card.appendChild(stage);
+
+      // 2. Bold 2-line Clamped Title
       const h3 = document.createElement('h3');
+      h3.className = 'video-title-clamped';
       h3.textContent = v.title || v.filename;
       card.appendChild(h3);
 
+      // 3. Compact Platform & Highlight Pills
       const badges = document.createElement('div');
       badges.className = 'telemetry-strip';
       const visOk = v.visual_audit ? !!v.visual_audit.approved : !!(v.validation && v.validation.valid);
       const statusPill = document.createElement('span');
       statusPill.className = visOk ? 'pill pill-ok' : 'pill pill-err';
       statusPill.textContent = visOk
-        ? ('Pronto' + (v.validation && v.validation.duration ? (' • ' + v.validation.duration + 's') : ''))
+        ? 'Pronto'
         : ('Reprovado: ' + ((v.visual_audit && v.visual_audit.reject_reasons && v.visual_audit.reject_reasons[0]) || 'verificar'));
       badges.appendChild(statusPill);
-
-      const ttPill = document.createElement('span');
-      if (v.tiktok && v.tiktok.publish_id) {
-        ttPill.className = 'pill pill-tt';
-        ttPill.textContent = 'TikTok: ' + (v.tiktok.mode || 'inbox').toUpperCase();
-        badges.appendChild(ttPill);
-      } else if (visOk) {
-        ttPill.className = 'pill';
-        ttPill.textContent = 'TikTok: Pronto';
-        badges.appendChild(ttPill);
-      }
 
       if (v.youtube && v.youtube.url) {
         const ytPill = document.createElement('span');
         ytPill.className = 'pill pill-yt';
-        ytPill.textContent = 'YouTube: OK';
+        ytPill.textContent = 'YT: OK';
         badges.appendChild(ytPill);
       }
 
-      if (v.hook_title) {
-        const hkBadge = document.createElement('span');
-        hkBadge.className = 'pill pill-tt';
-        hkBadge.textContent = '🎯 ' + v.hook_title;
-        badges.appendChild(hkBadge);
+      if (v.tiktok && v.tiktok.publish_id) {
+        const ttPill = document.createElement('span');
+        ttPill.className = 'pill pill-tt';
+        ttPill.textContent = 'TT: ' + (v.tiktok.mode || 'inbox').toUpperCase();
+        badges.appendChild(ttPill);
+      } else if (visOk) {
+        const ttPill = document.createElement('span');
+        ttPill.className = 'pill';
+        ttPill.textContent = 'TT: Pronto';
+        badges.appendChild(ttPill);
       }
 
-      const opus = v.opus_scorecard;
-      if (opus) {
-        const opPill = document.createElement('span');
-        opPill.className = opus.opus_score >= 70 ? 'pill pill-info' : 'pill';
-        opPill.textContent = 'Opus ' + opus.opus_score + '/100';
-        badges.appendChild(opPill);
+      if (v.instagram && v.instagram.media_pk) {
+        const igPill = document.createElement('span');
+        igPill.className = 'pill pill-ig';
+        igPill.textContent = 'IG: OK';
+        badges.appendChild(igPill);
+        if (v.instagram.highlight && (v.instagram.highlight.status === 'highlight_created' || v.instagram.highlight.status === 'highlight_appended')) {
+          const hlPill = document.createElement('span');
+          hlPill.className = 'pill pill-hl';
+          hlPill.textContent = 'Destaque';
+          badges.appendChild(hlPill);
+        }
+      } else if (visOk) {
+        const igPill = document.createElement('span');
+        igPill.className = 'pill';
+        igPill.textContent = 'IG: Pronto';
+        badges.appendChild(igPill);
       }
       card.appendChild(badges);
 
-      if (v.clip_summary) {
-        const sumEl = document.createElement('p');
-        sumEl.style.fontSize = '0.82rem';
-        sumEl.style.color = 'var(--ink-muted)';
-        sumEl.style.margin = '6px 0 8px 0';
-        sumEl.style.lineHeight = '1.4';
-        sumEl.textContent = String(v.clip_summary).slice(0, 175) + (String(v.clip_summary).length > 175 ? '...' : '');
-        card.appendChild(sumEl);
-      }
-
+      // 4. Opus Score row + mini progress bar
+      const opus = v.opus_scorecard;
       if (opus && typeof opus.opus_score === 'number') {
+        const opRow = document.createElement('div');
+        opRow.className = 'opus-score-row';
+        opRow.innerHTML = '<span>Opus Score</span><strong>' + opus.opus_score + '/100</strong>';
+        card.appendChild(opRow);
+
         const trk = document.createElement('div');
         trk.className = 'opus-mini-track';
         trk.title = 'Opus Runbook Score: ' + opus.opus_score + '/100';
@@ -1297,12 +1320,15 @@
         card.appendChild(trk);
       }
 
-      const vid = document.createElement('video');
-      vid.controls = true;
-      vid.preload = 'metadata';
-      vid.src = '/media/' + encodeURIComponent(v.filename);
-      card.appendChild(vid);
+      // 5. Clean 2-line Clamped Summary
+      if (v.clip_summary) {
+        const sumEl = document.createElement('p');
+        sumEl.className = 'video-summary-clamped';
+        sumEl.textContent = String(v.clip_summary);
+        card.appendChild(sumEl);
+      }
 
+      // 6. Collapsible SEO / Caption Fold
       if (v.caption || v.thumb_16x9) {
         const det = document.createElement('details');
         det.className = 'meta-fold';
@@ -1318,13 +1344,33 @@
         card.appendChild(det);
       }
 
+      // 7. Clean Bottom Action Bar: Postar IG + Postar TT + Legenda + Inspecionar
       const acts = document.createElement('div');
       acts.className = 'actions';
+      if (visOk && !(v.instagram && v.instagram.media_pk)) {
+        const btnFastIg = document.createElement('button');
+        btnFastIg.type = 'button';
+        btnFastIg.className = 'btn btn-instagram btn-sm';
+        btnFastIg.textContent = 'Postar IG';
+        btnFastIg.addEventListener('click', () => withBusyBtn(btnFastIg, 'Postando IG...', async () => {
+          const r = await fetch('/api/publish-instagram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename }) });
+          const d = await r.json();
+          if (d.url || d.media_pk) {
+            showToast('Publicado no Instagram Reels!' + (d.highlight && d.highlight.title ? (' + Destaque ' + d.highlight.title) : ''), 'ok');
+            await loadVideos();
+            await loadChannelTelemetry();
+          } else {
+            showToast(d.reason || d.message || d.status || 'Erro ao postar IG', 'err');
+          }
+        }));
+        acts.appendChild(btnFastIg);
+      }
+
       if (visOk && !(v.tiktok && v.tiktok.publish_id)) {
         const btnFastTt = document.createElement('button');
         btnFastTt.type = 'button';
         btnFastTt.className = 'btn btn-tiktok btn-sm';
-        btnFastTt.textContent = 'Postar TikTok';
+        btnFastTt.textContent = 'Postar TT';
         btnFastTt.addEventListener('click', () => withBusyBtn(btnFastTt, 'Enviando TT...', async () => {
           const r = await fetch('/api/publish-tiktok', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: v.filename, mode: 'inbox' }) });
           const d = await r.json();
@@ -1343,11 +1389,11 @@
         const btnCopyCap = document.createElement('button');
         btnCopyCap.type = 'button';
         btnCopyCap.className = 'btn btn-secondary btn-sm';
-        btnCopyCap.title = 'Copiar título e hashtags para colar no TikTok';
-        btnCopyCap.textContent = '📋 Legenda';
+        btnCopyCap.title = 'Copiar título e hashtags';
+        btnCopyCap.textContent = '📋';
         btnCopyCap.addEventListener('click', async () => {
           const ok = await copyTextToClipboard(v.caption);
-          showToast(ok ? 'Legenda e hashtags copiadas! Abra o TikTok e cole no campo "Adicionar descrição".' : 'Erro ao copiar legenda.', ok ? 'ok' : 'err');
+          showToast(ok ? 'Legenda e hashtags copiadas!' : 'Erro ao copiar legenda.', ok ? 'ok' : 'err');
         });
         acts.appendChild(btnCopyCap);
       }
@@ -1356,7 +1402,7 @@
       btnInspect.type = 'button';
       btnInspect.className = 'btn btn-primary btn-sm';
       btnInspect.style.flex = '1';
-      btnInspect.textContent = 'Inspecionar & Publicar';
+      btnInspect.textContent = 'Inspecionar';
       btnInspect.addEventListener('click', () => openShortInspector(v, btnInspect));
       acts.appendChild(btnInspect);
       card.appendChild(acts);

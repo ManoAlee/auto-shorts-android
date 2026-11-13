@@ -17,6 +17,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import importlib.util
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -25,7 +26,7 @@ from .anime_trends import get_releasing_anime_radar
 from .comfyui_client import get_comfyui_url, is_comfyui_reachable
 from .config import LOUDNORM_FILTER, METADATA_SCRUB, NICHES, PLATFORMS, load_dotenv_file
 from .evolution import EvolutionStore
-from .highlights import detect_highlights, heal_proper_nouns_and_asr
+from .highlights import detect_highlights, heal_proper_nouns_and_asr, sanitize_repetitive_text
 from .higgsfield import is_higgsfield_configured
 from .gameplay import discover_dynamic_visual_queries, ensure_gameplay_library, fetch_gameplay_clip, list_gameplay_clips
 from .horizon_radar import _ptbr_headline, build_horizon_spoken_script, fetch_horizon_trends
@@ -269,15 +270,26 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         thumb_16 = mp4.with_name(f"{mp4.stem}_thumb_16x9.jpg")
         validation = pack.get("validation")
         algo = score_short_for_youtube_algorithm(pack, validation, mp4.name)
+        raw_cap = heal_proper_nouns_and_asr(str(pack.get("caption", "")))
+        clean_cap = re.sub(
+            r"Sobre este corte:\n(.*?)(?:\n\n|\Z)",
+            lambda m: (f"Sobre este corte:\n{sanitize_repetitive_text(m.group(1))}\n" if sanitize_repetitive_text(m.group(1)) else ""),
+            raw_cap,
+            flags=re.DOTALL,
+        )
+        clean_cap = re.sub(r"\n{3,}", "\n\n", clean_cap).strip()
+        raw_sum = sanitize_repetitive_text(heal_proper_nouns_and_asr(str(pack.get("clip_summary") or "")))
+        if not raw_sum and clean_cap:
+            raw_sum = sanitize_repetitive_text(clean_cap.split("Fonte / Referencia:")[0][:220])
         items.append({
             "filename": mp4.name,
             "size_mb": round(mp4.stat().st_size / (1024 * 1024), 2),
             "title": heal_proper_nouns_and_asr(str(pack.get("title", mp4.name))),
             "hook_title": heal_proper_nouns_and_asr(str(pack.get("hook_title", ""))),
-            "clip_summary": heal_proper_nouns_and_asr(str(pack.get("clip_summary") or pack.get("caption", "")[:220])),
+            "clip_summary": raw_sum,
             "virality_reason": str(pack.get("virality_reason", "")),
             "hashtags": pack.get("hashtags", []),
-            "caption": heal_proper_nouns_and_asr(str(pack.get("caption", ""))),
+            "caption": clean_cap,
             "thumb_16x9": thumb_16.name if thumb_16.is_file() else None,
             "validation": validation,
             "visual_audit": pack.get("visual_audit"),
@@ -288,6 +300,7 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
             "opus_scorecard": score_short_opus_runbook(pack, validation=validation),
             "youtube": pack.get("youtube"),
             "tiktok": pack.get("tiktok"),
+            "instagram": pack.get("instagram"),
         })
     return rank_feed_for_channel(items)
 
@@ -452,13 +465,71 @@ def _is_tiktok_configured() -> bool:
     )
 
 
+def _is_instagram_configured() -> bool:
+    return bool(
+        (os.getenv("IG_USERNAME", "").strip() and os.getenv("IG_PASSWORD", "").strip())
+        or (os.getenv("IG_USER_ID", "").strip() and os.getenv("IG_ACCESS_TOKEN", "").strip() and os.getenv("REELS_PUBLIC_BASE_URL", "").strip())
+    )
+
+
+def validate_system_tools(out_dir: Path) -> Dict:
+    """Probe binaries, Python adapters, AI backends, and social channels for real readiness."""
+    bins = {
+        "ffmpeg": bool(shutil.which("ffmpeg")),
+        "ffprobe": bool(shutil.which("ffprobe")),
+        "yt_dlp": bool(shutil.which("yt-dlp")),
+        "whisper_cli": bool(shutil.which("whisper-cli") or shutil.which("main")),
+        "rclone": bool(shutil.which("rclone")),
+    }
+    packages = {
+        "instagrapi": importlib.util.find_spec("instagrapi") is not None,
+        "pillow": importlib.util.find_spec("PIL") is not None,
+    }
+    ig_session = (out_dir / ".ig_session.json").is_file()
+    llm_probe = _probe_local_llm()
+    channels = {
+        "youtube": {"configured": _is_youtube_configured()},
+        "tiktok": {"configured": _is_tiktok_configured()},
+        "instagram": {
+            "configured": _is_instagram_configured(),
+            "session_cached": ig_session,
+            "auto_highlight": os.getenv("IG_AUTO_HIGHLIGHT", "1").strip().lower() not in {"0", "false", "no"},
+            "highlight_title": os.getenv("IG_HIGHLIGHT_TITLE", "🔥 Destaques").strip() or "🔥 Destaques",
+        },
+    }
+    vids = list_generated_videos(out_dir) if out_dir.is_dir() else []
+    ig_posted = sum(1 for v in vids if (v.get("instagram") or {}).get("media_pk"))
+    tt_posted = sum(1 for v in vids if (v.get("tiktok") or {}).get("publish_id"))
+    yt_posted = sum(1 for v in vids if (v.get("youtube") or {}).get("video_id") or (v.get("youtube") or {}).get("url"))
+    core_ok = bins["ffmpeg"] and bins["ffprobe"] and bins["yt_dlp"]
+    return {
+        "ok": core_ok,
+        "binaries": bins,
+        "packages": packages,
+        "channels": channels,
+        "ai": {
+            "llm_configured": is_llm_configured(),
+            "local_llm": llm_probe,
+            "comfyui_reachable": is_comfyui_reachable(timeout_sec=1.0),
+            "higgsfield_configured": is_higgsfield_configured(),
+        },
+        "vault": {
+            "total_videos": len(vids),
+            "instagram_published": ig_posted,
+            "tiktok_published": tt_posted,
+            "youtube_published": yt_posted,
+        },
+    }
+
+
 def _auto_crosspost_channels(result: Dict) -> None:
-    """Publish validated pipeline output(s) to both TikTok and YouTube when configured."""
+    """Publish validated pipeline output(s) to TikTok, YouTube, and Instagram when configured."""
     if not isinstance(result, dict):
         return
     yt_ready = _is_youtube_configured()
     tt_ready = _is_tiktok_configured()
-    if not (yt_ready or tt_ready):
+    ig_ready = _is_instagram_configured()
+    if not (yt_ready or tt_ready or ig_ready):
         return
     candidates: List[Dict] = list(result.get("clips") or []) or [result]
     for item in candidates:
@@ -480,6 +551,11 @@ def _auto_crosspost_channels(result: Dict) -> None:
         if yt_ready and not (pack.get("youtube") or {}).get("video_id"):
             try:
                 publish_pack_to_youtube(out_p)
+            except Exception:
+                pass
+        if ig_ready and not (pack.get("instagram") or {}).get("media_pk"):
+            try:
+                publish_pack_to_instagram_reels(out_p)
             except Exception:
                 pass
 
@@ -896,10 +972,19 @@ def make_handler(out_dir: Path):
                 )
                 return
 
+            if parsed.path == "/api/tools/validate":
+                self._send_json(200, validate_system_tools(out_dir))
+                return
+
             if parsed.path == "/api/autopublish/plan":
                 self._send_json(
                     200,
-                    get_autopublish_plan(out_dir, youtube_ready=_is_youtube_configured(), tiktok_ready=_is_tiktok_configured()),
+                    get_autopublish_plan(
+                        out_dir,
+                        youtube_ready=_is_youtube_configured(),
+                        tiktok_ready=_is_tiktok_configured(),
+                        instagram_ready=_is_instagram_configured(),
+                    ),
                 )
                 return
 
@@ -920,6 +1005,7 @@ def make_handler(out_dir: Path):
                     vis_ok = bool((v.get("visual_audit") or {}).get("approved") if v.get("visual_audit") else (v.get("validation") or {}).get("valid"))
                     is_pub = bool((v.get("youtube") or {}).get("video_id") or (v.get("youtube") or {}).get("url"))
                     tt_sent = bool((v.get("tiktok") or {}).get("publish_id"))
+                    ig_sent = bool((v.get("instagram") or {}).get("media_pk"))
                     if status_flt == "approved" and not vis_ok:
                         continue
                     if status_flt == "queued" and not v.get("queued_for_auto_publish"):
@@ -929,6 +1015,10 @@ def make_handler(out_dir: Path):
                     if status_flt == "tiktok_ready" and (not vis_ok or tt_sent):
                         continue
                     if status_flt == "tiktok_sent" and not tt_sent:
+                        continue
+                    if status_flt == "instagram_ready" and (not vis_ok or ig_sent):
+                        continue
+                    if status_flt == "instagram_sent" and not ig_sent:
                         continue
                     if status_flt == "rejected" and vis_ok:
                         continue
@@ -1578,9 +1668,11 @@ def make_handler(out_dir: Path):
                     out_dir,
                     youtube_ready=_is_youtube_configured(),
                     tiktok_ready=_is_tiktok_configured(),
+                    instagram_ready=_is_instagram_configured(),
                     force=bool(body.get("force", False)),
                     yt_publisher=publish_pack_to_youtube,
                     tt_publisher=publish_pack_to_tiktok,
+                    ig_publisher=publish_pack_to_instagram_reels,
                 )
                 self._send_json(200, cycle)
                 return

@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .publisher import optimize_existing_publish_pack, publish_pack_to_tiktok, publish_pack_to_youtube
+from .publisher import optimize_existing_publish_pack, publish_pack_to_instagram_reels, publish_pack_to_tiktok, publish_pack_to_youtube
 from .re_engine import score_short_opus_runbook
 from .retention import prune_storage
 from .tiktok_algorithm import score_short_for_tiktok_algorithm
@@ -15,13 +15,16 @@ from .validator import audit_short_end_to_end
 from .yt_algorithm import score_short_for_youtube_algorithm
 
 
+CHANNELS = ("tiktok", "youtube", "instagram")
 DEFAULT_DAILY_CAPS = {
     "tiktok": int(os.getenv("TIKTOK_DAILY_CAP", "6") or "6"),
     "youtube": int(os.getenv("YT_DAILY_CAP", "5") or "5"),
+    "instagram": int(os.getenv("IG_DAILY_CAP", "4") or "4"),
 }
 DEFAULT_MIN_SPACING_SEC = {
     "tiktok": max(60, int(os.getenv("TIKTOK_MIN_SPACING_MIN", "90") or "90") * 60),
     "youtube": max(60, int(os.getenv("YT_MIN_SPACING_MIN", "120") or "120") * 60),
+    "instagram": max(60, int(os.getenv("IG_MIN_SPACING_MIN", "90") or "90") * 60),
 }
 YOUTUBE_QUOTA_COOLDOWN_SEC = 4 * 3600
 TIKTOK_INBOX_COOLDOWN_SEC = 2 * 3600
@@ -38,6 +41,7 @@ def load_publish_ledger(out_dir: Path) -> Dict:
         "date": today,
         "tiktok": {"count": 0, "last_ts": 0.0, "last_niche": "", "cooldown_until": 0.0},
         "youtube": {"count": 0, "last_ts": 0.0, "last_niche": "", "cooldown_until": 0.0},
+        "instagram": {"count": 0, "last_ts": 0.0, "last_niche": "", "cooldown_until": 0.0},
         "history": [],
     }
     p = _ledger_path(out_dir)
@@ -52,14 +56,14 @@ def load_publish_ledger(out_dir: Path) -> Dict:
 
     if data.get("date") != today:
         # New calendar day resets daily counters while preserving recent niche memory & spacing timestamps
-        for ch in ("tiktok", "youtube"):
+        for ch in CHANNELS:
             prev = data.get(ch) or {}
             base[ch]["last_ts"] = float(prev.get("last_ts") or 0.0)
             base[ch]["last_niche"] = str(prev.get("last_niche") or "")
         base["history"] = list(data.get("history") or [])[-30:]
         return base
 
-    for ch in ("tiktok", "youtube"):
+    for ch in CHANNELS:
         prev = data.get(ch) or {}
         base[ch].update({
             "count": int(prev.get("count") or 0),
@@ -154,6 +158,8 @@ def rank_publish_candidates(out_dir: Path, channel: str, ledger: Optional[Dict] 
             continue
         if channel == "tiktok" and isinstance(pack.get("tiktok"), dict) and pack["tiktok"].get("publish_id"):
             continue
+        if channel == "instagram" and isinstance(pack.get("instagram"), dict) and pack["instagram"].get("media_pk"):
+            continue
 
         val = pack.get("validation") or {}
         if not val.get("valid"):
@@ -187,11 +193,17 @@ def _needs_seo_healing(pack: Dict) -> bool:
     )
 
 
-def get_autopublish_plan(out_dir: Path, youtube_ready: bool, tiktok_ready: bool, now: Optional[float] = None) -> Dict:
+def get_autopublish_plan(
+    out_dir: Path,
+    youtube_ready: bool,
+    tiktok_ready: bool,
+    instagram_ready: bool = False,
+    now: Optional[float] = None,
+) -> Dict:
     """Summarize live smart queue, top-ranked next post per platform, and cooldown status."""
     ledger = load_publish_ledger(out_dir)
     plan: Dict[str, Dict] = {}
-    for ch, enabled in (("tiktok", tiktok_ready), ("youtube", youtube_ready)):
+    for ch, enabled in (("tiktok", tiktok_ready), ("youtube", youtube_ready), ("instagram", instagram_ready)):
         ok, reason, wait_sec = can_publish_channel(ledger, ch, now=now) if enabled else (False, "unconfigured", 0.0)
         cands = rank_publish_candidates(out_dir, ch, ledger=ledger)
         top = cands[0] if cands else None
@@ -224,21 +236,24 @@ def run_smart_publish_cycle(
     out_dir: Path,
     youtube_ready: bool,
     tiktok_ready: bool,
+    instagram_ready: bool = False,
     force: bool = False,
     now: Optional[float] = None,
     yt_publisher: Optional[Callable[[Path], Dict]] = None,
     tt_publisher: Optional[Callable[[Path], Dict]] = None,
+    ig_publisher: Optional[Callable[[Path], Dict]] = None,
 ) -> Dict:
     """Select the highest-scoring, niche-diverse Short per ready channel, heal SEO, and publish."""
     ts = time.time() if now is None else float(now)
     ledger = load_publish_ledger(out_dir)
     yt_fn = yt_publisher or publish_pack_to_youtube
     tt_fn = tt_publisher or publish_pack_to_tiktok
+    ig_fn = ig_publisher or publish_pack_to_instagram_reels
 
     results: Dict[str, Dict] = {}
     dispatched_any = False
 
-    for ch, enabled, fn in (("tiktok", tiktok_ready, tt_fn), ("youtube", youtube_ready, yt_fn)):
+    for ch, enabled, fn in (("tiktok", tiktok_ready, tt_fn), ("youtube", youtube_ready, yt_fn), ("instagram", instagram_ready, ig_fn)):
         if not enabled:
             results[ch] = {"status": "skipped_unconfigured"}
             continue
@@ -266,7 +281,7 @@ def run_smart_publish_cycle(
 
         try:
             pub_res = fn(mp4)
-            is_sent = bool(pub_res.get("publish_id") or pub_res.get("video_id") or str(pub_res.get("status", "")).startswith("published"))
+            is_sent = bool(pub_res.get("publish_id") or pub_res.get("video_id") or pub_res.get("media_pk") or str(pub_res.get("status", "")).startswith("published"))
             if is_sent:
                 ledger[ch]["count"] = int(ledger[ch].get("count") or 0) + 1
                 ledger[ch]["last_ts"] = ts
@@ -279,7 +294,7 @@ def run_smart_publish_cycle(
                     "title": picked["title"],
                     "niche": picked["niche"],
                     "composite_score": picked["composite_score"],
-                    "id": pub_res.get("publish_id") or pub_res.get("video_id") or "",
+                    "id": pub_res.get("publish_id") or pub_res.get("video_id") or pub_res.get("media_pk") or "",
                 })
                 dispatched_any = True
             results[ch] = {"status": "published", "filename": picked["filename"], "score": picked["composite_score"], **pub_res}
