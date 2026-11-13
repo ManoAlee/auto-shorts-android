@@ -491,7 +491,12 @@ def publish_pack_to_youtube(
 
     if os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower() == "cdp":
         from .youtube_cdp import publish_pack_to_youtube_cdp
-        return publish_pack_to_youtube_cdp(mp4, privacy_status=(privacy_status or "PUBLIC"), force=force)
+        cdp_res = publish_pack_to_youtube_cdp(mp4, privacy_status=(privacy_status or "PUBLIC"), force=force)
+        if cdp_res.get("status") in ("published_youtube_cdp", "already_published_youtube", "deferred"):
+            return cdp_res
+        has_api = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
+        if not has_api:
+            return cdp_res
 
     ass_cand = mp4.parent / f"_narrate_{mp4.stem}" / f"{mp4.stem}.ass"
     from .validator import audit_short_end_to_end
