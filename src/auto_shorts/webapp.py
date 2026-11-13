@@ -22,9 +22,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .anime_trends import get_releasing_anime_radar
+from .comfyui_client import get_comfyui_url, is_comfyui_reachable
 from .config import LOUDNORM_FILTER, METADATA_SCRUB, NICHES, PLATFORMS, load_dotenv_file
 from .evolution import EvolutionStore
 from .highlights import detect_highlights, heal_proper_nouns_and_asr
+from .higgsfield import is_higgsfield_configured
 from .gameplay import discover_dynamic_visual_queries, ensure_gameplay_library, fetch_gameplay_clip, list_gameplay_clips
 from .horizon_radar import _ptbr_headline, build_horizon_spoken_script, fetch_horizon_trends
 from .mahoraga import MahoragaEngine
@@ -880,6 +882,18 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/mahoraga":
                 self._send_json(200, MahoragaEngine(out_dir / "shorts_evolution.db").get_status_summary())
+                return
+
+            if parsed.path == "/api/ai/video-backends":
+                self._send_json(
+                    200,
+                    {
+                        "comfyui_url": get_comfyui_url(),
+                        "comfyui_reachable": is_comfyui_reachable(timeout_sec=1.5),
+                        "higgsfield_configured": is_higgsfield_configured(),
+                        "recommended_open_source": ["Wan 2.2 (Apache 2.0)", "LTX-2 (Native Audio+Video)"],
+                    },
+                )
                 return
 
             if parsed.path == "/api/autopublish/plan":
