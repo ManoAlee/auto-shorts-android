@@ -469,6 +469,9 @@ def sanitize_repetitive_text(text: str) -> str:
     cleaned = " ".join(str(text or "").split()).strip()
     if not cleaned:
         return ""
+    raw_words = re.findall(r"[a-zA-ZÀ-ÿ0-9]+", cleaned.lower())
+    if len(raw_words) >= 10 and (len(set(raw_words)) / len(raw_words)) < 0.35:
+        return ""
     # Collapse consecutive repeated phrases of 1-10 words repeated 3+ times
     cleaned = re.sub(
         r"(?i)\b((?:\S+\s+){0,9}\S+?)(?:\s+\1){2,}\b",
