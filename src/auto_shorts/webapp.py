@@ -239,6 +239,22 @@ def render_dashboard_html(out_dir: str | Path = "output") -> str:
     )
 
 
+def _read_tunnel_url(out_dir: Path) -> str:
+    """Return configured fixed studio URL or latest active Cloudflare Tunnel URL."""
+    fixed = os.getenv("PUBLIC_STUDIO_URL", "").strip()
+    if fixed.startswith(("http://", "https://")):
+        return fixed
+    tunnel_file = out_dir / "tunnel_url.txt"
+    if tunnel_file.is_file():
+        try:
+            url = tunnel_file.read_text(encoding="utf-8").strip()
+            if url.startswith(("http://", "https://")):
+                return url
+        except OSError:
+            pass
+    return ""
+
+
 def list_generated_videos(out_dir: Path) -> List[Dict]:
     if not out_dir.exists():
         return []
@@ -914,7 +930,18 @@ def make_handler(out_dir: Path):
                 return
 
             if parsed.path == "/api/system":
-                self._send_json(200, build_system_diagnostics(out_dir))
+                diag = build_system_diagnostics(out_dir)
+                diag["tunnel_url"] = _read_tunnel_url(out_dir)
+                self._send_json(200, diag)
+                return
+
+            if parsed.path == "/api/tunnel":
+                url = _read_tunnel_url(out_dir)
+                self._send_json(200, {
+                    "ok": bool(url),
+                    "tunnel_url": url,
+                    "fixed_configured": bool(os.getenv("CLOUDFLARE_TUNNEL_TOKEN", "").strip() or os.getenv("PUBLIC_STUDIO_URL", "").strip()),
+                })
                 return
 
             if parsed.path == "/api/animes/search":
