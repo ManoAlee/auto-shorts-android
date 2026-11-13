@@ -201,6 +201,7 @@ node --check src/auto_shorts/frontend/studio.js
 
 ## Contributing & Security
 
+- Guia técnico de CDP nativo (TikTok & YouTube), Analytics Multiplataforma, Radar Global e Piloto Automático 24/7: [docs/CDP_ANALYTICS_E_PILOTO_AUTOMATICO.md](docs/CDP_ANALYTICS_E_PILOTO_AUTOMATICO.md).
 - Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 - Vulnerability reporting and hardening guidelines live in [SECURITY.md](SECURITY.md).
 - Released under the [MIT License](LICENSE).
