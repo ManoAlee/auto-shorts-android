@@ -767,9 +767,29 @@ def _resolve_highlight_title(niche: str, explicit_title: Optional[str] = None) -
     return NICHE_HIGHLIGHT_TITLES.get(key, "🔥 Destaques")
 
 
-def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Destaques") -> Dict:
-    """Share a published Reel to Story and append it to an Instagram Highlight."""
-    story = cl.media_share_to_story(media_pk)
+def _auto_add_reel_to_highlight(
+    cl,
+    media_pk: str,
+    title: str = "🔥 Destaques",
+    video_path: Optional[Path] = None,
+    thumb_path: Optional[Path] = None,
+    caption: str = "",
+) -> Dict:
+    """Publish a real visual Story (never a black canvas) and append it to an Instagram Highlight."""
+    story = None
+    if video_path is not None and video_path.is_file() and hasattr(cl, "video_upload_to_story"):
+        try:
+            kwargs: Dict = {"caption": caption[:200]} if caption else {}
+            if thumb_path is not None and thumb_path.is_file():
+                kwargs["thumbnail"] = thumb_path
+            story = cl.video_upload_to_story(video_path, **kwargs)
+        except Exception:
+            story = None
+    if story is None:
+        if thumb_path is not None and thumb_path.is_file():
+            story = cl.media_share_to_story(media_pk, background=thumb_path, caption=caption[:200] if caption else "")
+        else:
+            story = cl.media_share_to_story(media_pk)
     story_pk = str(getattr(story, "pk", "") or getattr(story, "id", "") or "")
     if not story_pk:
         return {"status": "story_pk_missing"}
@@ -783,7 +803,10 @@ def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Destaques"
     if existing_pk:
         hl = cl.highlight_add_stories(existing_pk, [story_pk])
         return {"status": "highlight_appended", "highlight_pk": existing_pk, "story_pk": story_pk, "title": title}
-    hl = cl.highlight_create(title, [story_pk])
+    try:
+        hl = cl.highlight_create(title, [story_pk], cover_story_id=story_pk)
+    except TypeError:
+        hl = cl.highlight_create(title, [story_pk])
     return {"status": "highlight_created", "highlight_pk": str(getattr(hl, "pk", "")), "story_pk": story_pk, "title": title}
 
 
@@ -908,7 +931,14 @@ def publish_pack_to_instagram_reels(
     if do_highlight and media_pk:
         hl_title = _resolve_highlight_title(str(pack.get("niche") or "geral"), explicit_title=highlight_title)
         try:
-            ig_info["highlight"] = _auto_add_reel_to_highlight(cl, media_pk, title=hl_title)
+            ig_info["highlight"] = _auto_add_reel_to_highlight(
+                cl,
+                media_pk,
+                title=hl_title,
+                video_path=mp4,
+                thumb_path=thumb_path,
+                caption=str(pack.get("hook_title") or pack.get("title") or ""),
+            )
         except Exception as exc:
             ig_info["highlight"] = {"status": "highlight_error", "error": str(exc)}
 
