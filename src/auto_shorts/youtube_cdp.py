@@ -197,30 +197,34 @@ def _publish_single_yt_in_cdp(
     cur_url = ""
     file_node_id = 0
     for _ in range(36):
-        time.sleep(0.5)
-        cur_url = str(cdp.eval_js("window.location.href") or "")
-        if "accounts.google.com" in cur_url.lower():
-            return {
-                "status": "login_required",
-                "reason": "Sessao do YouTube Studio Web nao autenticada. Salve os cookies via /api/youtube/cdp/cookies.",
-                "current_url": cur_url,
-                "file": mp4.name,
-            }
-        # Open Create -> Upload videos dialog if file input not yet in DOM
-        cdp.eval_js("""
-        (() => {
-            if (document.querySelector('input[type="file"]')) return;
-            const createBtn = document.querySelector('#create-icon') || document.querySelector('ytcp-button#create-icon');
-            if (createBtn) createBtn.click();
-            const uploadItem = document.querySelector('#text-item-0') || document.querySelector('[test-id="upload-betas"]');
-            if (uploadItem) uploadItem.click();
-        })()
-        """)
-        doc = cdp.call("DOM.getDocument", {"depth": -1})
-        inp = cdp.call("DOM.querySelector", {"nodeId": doc["root"]["nodeId"], "selector": "input[type='file']"})
-        file_node_id = int(inp.get("nodeId") or 0)
-        if file_node_id:
-            break
+        time.sleep(0.8)
+        try:
+            cur_url = str(cdp.eval_js("window.location.href") or "")
+            if "accounts.google.com" in cur_url.lower():
+                return {
+                    "status": "login_required",
+                    "reason": "Sessao do YouTube Studio Web nao autenticada. Salve os cookies via /api/youtube/cdp/cookies.",
+                    "current_url": cur_url,
+                    "file": mp4.name,
+                }
+            # Open Create -> Upload videos dialog if file input not yet in DOM
+            cdp.eval_js("""
+            (() => {
+                if (document.querySelector('input[type="file"]')) return;
+                const createBtn = document.querySelector('#create-icon') || document.querySelector('ytcp-button#create-icon');
+                if (createBtn) createBtn.click();
+                const uploadItem = document.querySelector('#text-item-0') || document.querySelector('[test-id="upload-betas"]');
+                if (uploadItem) uploadItem.click();
+            })()
+            """)
+            doc = cdp.call("DOM.getDocument", {"depth": -1})
+            inp = cdp.call("DOM.querySelector", {"nodeId": doc["root"]["nodeId"], "selector": "input[type='file']"})
+            file_node_id = int(inp.get("nodeId") or 0)
+            if file_node_id:
+                break
+        except RuntimeError:
+            # Cross-origin redirect from youtube.com/upload -> studio.youtube.com
+            continue
 
     _sync_live_yt_cookies(cdp, out_dir)
     if not file_node_id:
