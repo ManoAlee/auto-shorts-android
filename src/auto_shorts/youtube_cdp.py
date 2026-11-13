@@ -281,7 +281,7 @@ def _publish_single_yt_in_cdp(
         at_vis = bool(cdp.eval_js(f"Boolean(document.querySelector('tp-yt-paper-radio-button[name={json.dumps(privacy_status.upper())}]'))"))
         if at_vis:
             break
-        cdp.eval_js("const n = document.querySelector('#next-button'); if (n && !n.disabled) n.click();")
+        cdp.eval_js("(() => { const n = document.querySelector('#next-button'); if (n && !n.disabled) n.click(); })()")
 
     # Select visibility and click Publish/Save (#done-button)
     vis_name = privacy_status.upper() if privacy_status.upper() in ("PUBLIC", "UNLISTED", "PRIVATE") else "PUBLIC"
