@@ -2432,6 +2432,111 @@ def test_hook_title_rejects_nonsense_spoken_fragments():
     assert "BLEACH" in hook
 
 
+def test_autoshorts_adaptive_mcp_offline_and_codemode(tmp_path):
+    import json as _json
+    from auto_shorts.autoshorts_mcp import handle_mcp_request
+
+    init_r = handle_mcp_request({"jsonrpc": "2.0", "id": 1, "method": "initialize"}, out_dir=tmp_path)
+    assert init_r["result"]["serverInfo"]["name"] == "autoshorts-adaptive-mcp"
+    assert "resources" in init_r["result"]["capabilities"]
+    assert "prompts" in init_r["result"]["capabilities"]
+
+    tools_r = handle_mcp_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, out_dir=tmp_path)
+    names = {t["name"] for t in tools_r["result"]["tools"]}
+    assert {"mcp_discover_tools", "mcp_execute_codemode", "mcp_run_pipeline_dag", "mcp_reify_tool", "mcp_ecosystem_telemetry"} <= names
+    assert "yt_audit_channel" in names
+
+    disc_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+        "params": {"name": "mcp_discover_tools", "arguments": {"query": "wifi health audit", "limit": 5}},
+    }, out_dir=tmp_path)
+    disc_data = _json.loads(disc_r["result"]["content"][0]["text"])
+    assert disc_data["total_available"] >= 15
+
+    cm_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 4, "method": "tools/call",
+        "params": {
+            "name": "mcp_execute_codemode",
+            "arguments": {
+                "code": (
+                    "h = studio.system.health()\n"
+                    "m = studio.mahoraga.state()\n"
+                    "result = {'ok': h['ok'], 'mode': m['mode'], 'has_wifi_flag': 'wifi_connected' in h}\n"
+                )
+            },
+        },
+    }, out_dir=tmp_path)
+    cm_data = _json.loads(cm_r["result"]["content"][0]["text"])
+    assert cm_data["ok"] is True
+    assert cm_data["result"]["ok"] is True
+    assert cm_data["result"]["mode"] == "MAHORAGA_8_SPOKE_ACTIVE"
+    assert len(cm_data["calls_made"]) == 2
+
+    unsafe_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 5, "method": "tools/call",
+        "params": {"name": "mcp_execute_codemode", "arguments": {"code": "import os\nresult = os.listdir('.')"}},
+    }, out_dir=tmp_path)
+    assert unsafe_r["result"]["isError"] is True
+
+    dag_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 6, "method": "tools/call",
+        "params": {
+            "name": "mcp_run_pipeline_dag",
+            "arguments": {
+                "steps": [
+                    {"id": "sys", "tool": "system.health", "args": {}},
+                    {"id": "audit", "tool": "vault.audit", "depends_on": ["sys"], "args": {}},
+                ]
+            },
+        },
+    }, out_dir=tmp_path)
+    dag_data = _json.loads(dag_r["result"]["content"][0]["text"])
+    assert dag_data["ok"] is True
+    assert len(dag_data["trace"]) == 2
+
+    reify_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 7, "method": "tools/call",
+        "params": {
+            "name": "mcp_reify_tool",
+            "arguments": {
+                "name": "quick_health_snapshot",
+                "description": "Returns system health and vault audit together",
+                "code": "result = {'health': studio.system.health()['ok'], 'audit': studio.vault.audit()['ok']}",
+            },
+        },
+    }, out_dir=tmp_path)
+    reify_data = _json.loads(reify_r["result"]["content"][0]["text"])
+    assert reify_data["ok"] is True
+
+    call_reified = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 8, "method": "tools/call",
+        "params": {"name": "mcp_call_tool", "arguments": {"tool": "quick_health_snapshot", "args": {}}},
+    }, out_dir=tmp_path)
+    call_data = _json.loads(call_reified["result"]["content"][0]["text"])
+    assert call_data["result"] == {"health": True, "audit": True}
+
+    res_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 9, "method": "resources/read",
+        "params": {"uri": "autoshorts://system/health"},
+    }, out_dir=tmp_path)
+    res_data = _json.loads(res_r["result"]["contents"][0]["text"])
+    assert res_data["ok"] is True
+
+    pr_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 10, "method": "prompts/get",
+        "params": {"name": "diagnose-and-heal"},
+    }, out_dir=tmp_path)
+    assert "mcp_execute_codemode" in pr_r["result"]["messages"][0]["content"]["text"]
+
+    tel_r = handle_mcp_request({
+        "jsonrpc": "2.0", "id": 11, "method": "tools/call",
+        "params": {"name": "mcp_ecosystem_telemetry", "arguments": {}},
+    }, out_dir=tmp_path)
+    tel_data = _json.loads(tel_r["result"]["content"][0]["text"])
+    assert "quick_health_snapshot" in tel_data["reified_tools"]
+    assert tel_data["tools_telemetry"]["system.health"]["calls"] >= 2
+
+
 
 
 

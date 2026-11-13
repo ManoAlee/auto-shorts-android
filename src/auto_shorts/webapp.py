@@ -952,6 +952,12 @@ def make_handler(out_dir: Path):
                 self._send_json(200, audit_published_vault(out_dir))
                 return
 
+            if parsed.path == "/mcp":
+                from .autoshorts_mcp import handle_mcp_request
+                init_resp = handle_mcp_request({"jsonrpc": "2.0", "id": 1, "method": "initialize"}, out_dir=out_dir)
+                self._send_json(200, {"ok": True, "transport": "streamable-http", "initialize": init_resp.get("result", {})})
+                return
+
             if parsed.path == "/api/animes/search":
                 qs = urllib.parse.parse_qs(parsed.query)
                 q = (qs.get("q") or [""])[0].strip()
@@ -1277,6 +1283,15 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/api/tunnel":
                 self._send_json(200, _start_cloudflare_tunnel(8787))
+                return
+
+            if parsed.path == "/mcp":
+                from .autoshorts_mcp import handle_mcp_request
+                resp = handle_mcp_request(body, out_dir=out_dir)
+                if resp is None:
+                    self._send_json(202, {"ok": True})
+                else:
+                    self._send_json(200, resp)
                 return
 
             if parsed.path == "/api/gdrive/episodes":
