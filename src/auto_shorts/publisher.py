@@ -727,6 +727,30 @@ def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
     return base[:2000]
 
 
+NICHE_HIGHLIGHT_TITLES = {
+    "ia_tech": "🤖 IA & Tech",
+    "entretenimento_animes": "🔥 Animes",
+    "noticias_mundiais": "📰 Notícias",
+    "financas": "💰 Finanças",
+    "podcast": "🎙️ Podcasts",
+    "saude_fitness": "💪 Saúde",
+    "desenvolvimento_pessoal": "🧠 Mentalidade",
+    "concursos": "📚 Estudos",
+    "geral": "🔥 Destaques",
+}
+
+
+def _resolve_highlight_title(niche: str, explicit_title: Optional[str] = None) -> str:
+    """Resolve an automatic Instagram Highlight title per content niche."""
+    if explicit_title and explicit_title.strip():
+        return explicit_title.strip()
+    env_title = os.getenv("IG_HIGHLIGHT_TITLE", "").strip()
+    if env_title:
+        return env_title
+    key = str(niche or "geral").strip().lower()
+    return NICHE_HIGHLIGHT_TITLES.get(key, "🔥 Destaques")
+
+
 def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Destaques") -> Dict:
     """Share a published Reel to Story and append it to an Instagram Highlight."""
     story = cl.media_share_to_story(media_pk)
@@ -829,7 +853,7 @@ def publish_pack_to_instagram_reels(
         else os.getenv("IG_AUTO_HIGHLIGHT", "1").strip().lower() not in {"0", "false", "no"}
     )
     if do_highlight and media_pk:
-        hl_title = (highlight_title or os.getenv("IG_HIGHLIGHT_TITLE", "🔥 Destaques")).strip() or "🔥 Destaques"
+        hl_title = _resolve_highlight_title(str(pack.get("niche") or "geral"), explicit_title=highlight_title)
         try:
             ig_info["highlight"] = _auto_add_reel_to_highlight(cl, media_pk, title=hl_title)
         except Exception as exc:

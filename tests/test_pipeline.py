@@ -1632,6 +1632,11 @@ def test_instagram_caption_idempotency_and_auto_highlight(tmp_path, monkeypatch)
     assert res2["status"] == "already_published_instagram"
     assert res2["media_pk"] == "111222"
 
+    from auto_shorts.publisher import _resolve_highlight_title
+    assert _resolve_highlight_title("ia_tech") == "🤖 IA & Tech"
+    assert _resolve_highlight_title("entretenimento_animes") == "🔥 Animes"
+    assert _resolve_highlight_title("noticias_mundiais") == "📰 Notícias"
+
 
 def test_opus_pro_caption_hold_signalstats_and_runbook_scorecard(tmp_path):
     from auto_shorts.re_engine import get_synapse_overview, score_short_opus_runbook
