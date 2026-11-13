@@ -5,7 +5,7 @@
 [![CI](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml/badge.svg)](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Android Termux aarch64](https://img.shields.io/badge/Android-Termux%20aarch64-3DDC84?logo=android&logoColor=white)](scripts/install_termux.sh)
-[![Tests 42 Passing](https://img.shields.io/badge/Tests-42%20Passing-059669)](#verification--testing)
+[![Tests 76 Passing](https://img.shields.io/badge/Tests-76%20Passing-059669)](#verification--testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Autonomous 9:16 Vertical Video Factory engineered for Android (`Termux aarch64`) & Windows Desktop**  
@@ -15,23 +15,33 @@
 
 ---
 
-## Live Studio Preview
+## Live Studio Preview (Real App Screenshots)
 
 <table>
   <tr>
-    <td width="64%" align="center">
-      <img src="docs/images/studio-desktop.png" alt="AutoShorts Studio Desktop UI" width="100%"/><br/>
-      <sub><b>Desktop Studio (`:8787`)</b> — Modular sidebar rail, UCB1 B-Roll KPIs, Framing Tiles &amp; interactive 9:16 simulator</sub>
+    <td width="68%" align="center">
+      <img src="docs/images/studio-desktop-real.png" alt="AutoShorts Studio Desktop UI" width="100%"/><br/>
+      <sub><b>Desktop Studio (`:8787`)</b> — Copiloto IA, 5-stage live render stepper, UCB1 B-Roll KPIs, Sentinela Google Drive &amp; 9:16 creator</sub>
     </td>
-    <td width="36%" align="center">
-      <img src="docs/images/studio-mobile.png" alt="AutoShorts Studio Mobile Responsive UI" width="240"/><br/>
+    <td width="32%" align="center">
+      <img src="docs/images/studio-mobile-real.png" alt="AutoShorts Studio Mobile Responsive UI" width="240"/><br/>
       <sub><b>Mobile Android View (`390x844`)</b> — Zero horizontal overflow &amp; native bottom navigation</sub>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
-      <img src="docs/images/studio-live-render.png" alt="Live 5-Stage Render Stepper" width="92%"/><br/>
-      <sub><b>Live 5-Stage Render Stepper</b> — Real-time progress across Coleta -> Voz/Legenda -> B-Roll/FFmpeg -> Visao/Opus -> Fila/YT</sub>
+      <img src="docs/images/studio-vault-real.png" alt="Acervo &amp; Multi-Platform Publishing Vault" width="96%"/><br/>
+      <sub><b>Acervo &amp; Canais</b> — Multi-platform status filters (<code>Pronto p/ IG</code>, <code>Enviados IG</code>, <code>TikTok</code>, <code>YT</code>), 5D Opus Scorecard &amp; real 9:16 video cards</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/studio-synapse-real.png" alt="Synapse RE &amp; OMEGA-SYNAPSE Telemetry" width="100%"/><br/>
+      <sub><b>Synapse RE</b> — OMEGA-SYNAPSE v3.0, Roda do Dharma (10 Defesas), AArch64 C11 binary &amp; InnerTube Heatmaps</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/studio-system-real.png" alt="Sistema &amp; FFmpeg Hardware Telemetry" width="100%"/><br/>
+      <sub><b>Sistema &amp; FFmpeg</b> — Storage health, Termux:Boot + Watchdog, Whisper/Kokoro TTS &amp; ARM64 SoC telemetry</sub>
     </td>
   </tr>
 </table>
@@ -120,6 +130,16 @@ python main.py --serve --port 8787
 ```powershell
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /target:winexe /out:desktop-cs\AutoShortsDesktop.exe /reference:System.Web.Extensions.dll desktop-cs\AutoShortsDesktop.cs
 ```
+
+### 4. Production Guardrails & `.env` Configuration
+
+| Variable / Mechanism | Default / Behavior | Purpose |
+| :--- | :--- | :--- |
+| `WIFI_ONLY=1` | Enforced on Termux (`wlan0`/`wlan1` `SIOCGIFADDR` ioctl) | Prevents mobile/4G data consumption across `smart_autopublish.py` and `autoshorts-tunnel` |
+| `_AUTOPUBLISH_LOCK` | Threading mutex in `smart_autopublish.py` | Serializes `run_smart_publish_cycle()` to prevent duplicate concurrent posts |
+| **Instagram Stories & Highlights** | `video_upload_to_story` + `_ensure_reel_thumbnail()` | Uploads real 9:16 video + fresh cover frame (no black canvas) and auto-routes to niche Highlights (`🔥 Animes`, `📰 Notícias`) |
+| **Post-Publish Vault Audit** | `GET /api/publish/audit` (`thumbnail_sha256`) | Detects stale/duplicate thumbnails across sibling packs and verifies live media state |
+| **Hook Title Hygiene** | `_polish_hook_phrase()` + `_pick_best_hook()` | Rejects incoherent spoken fragments (`"a gente "`, `"eu "`, `"você "`, etc.) and enforces niche keyword relevance on cover hooks |
 
 ---
 
