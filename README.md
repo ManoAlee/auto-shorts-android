@@ -81,6 +81,7 @@ flowchart LR
 | **9:16 Video & B-Roll** | `blur_bg`, `split_top_bottom`, facial-tracked `center_crop`, dynamic ~4.2s multi-scene B-roll + UCB1 evolution bandit, `-16 LUFS` loudnorm & sidechain ducking | [`renderer.py`](src/auto_shorts/renderer.py), [`gameplay.py`](src/auto_shorts/gameplay.py), [`evolution.py`](src/auto_shorts/evolution.py) |
 | **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, duplicate queue guard | [`validator.py`](src/auto_shorts/validator.py), [`re_engine.py`](src/auto_shorts/re_engine.py), [`publisher.py`](src/auto_shorts/publisher.py) |
 | **Autonomous 24/7 & Episode Slicer** | Zero-auth full anime episode scraper (Archive.org/AnimesDigital), automatic OP/ED 90s skipping, clímax detection with authentic BR dubbing preservation (-14 LUFS), real-time Tech Outage RCA sentinel | [`sentinel.py`](src/auto_shorts/sentinel.py), [`anime_archive_downloader.py`](src/auto_shorts/anime_archive_downloader.py), [`world_news.py`](src/auto_shorts/world_news.py) |
+| **Multi-Platform Publish & Wi-Fi Guard** | Idempotent YouTube Shorts, TikTok & Instagram Reels/Stories/Highlights publishing, real 9:16 video Story/Highlight covers, `thumbnail_sha256` post-publish vault audit, `_AUTOPUBLISH_LOCK` mutex, and `WIFI_ONLY=1` (`wlan0`/`wlan1` `SIOCGIFADDR`) 4G block | [`publisher.py`](src/auto_shorts/publisher.py), [`smart_autopublish.py`](src/auto_shorts/smart_autopublish.py) |
 | **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion (`IDisposable` safe HTTP/FFmpeg + Opus inspector) | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
 
 ---
@@ -131,6 +132,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /target:winexe /
 - `POST /api/run` — Enqueue YouTube clip discovery or URL cutting (`9:16`)
 - `POST /api/narrate` — Enqueue Kokoro PT-BR + Multi-Scene B-Roll narration render
 - `POST /api/auto-validate-all` & `POST /api/optimize` — End-to-end validation, English-to-PT-BR healing, hook sanitization, duplicate detection, and YouTube upload queue dispatch
+- `GET /api/publish/audit`, `GET /api/autopublish/plan`, `GET /api/tools/validate`, `GET /api/tunnel`, `GET /api/system` — Post-publish SHA-256 thumbnail audit, autopublish schedule, toolchain health, and active Cloudflare tunnel URL
 - `GET /v1/models`, `POST /v1/chat/completions`, `POST /api/ai/chat`, `POST /api/ai/benchmark` — Offline ARM64/BM25 RAG assistant & local inference telemetry
 
 ---

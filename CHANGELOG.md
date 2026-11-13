@@ -2,6 +2,20 @@
 
 All notable changes to **auto-shorts-android** are documented in this file.
 
+## [2.8.0] - 2026-11-13
+
+### Added
+- **Instagram Niche Auto-Highlights (`publisher.py`):** Automatically organizes published Reels into niche-specific Highlights (`_resolve_highlight_title`, `_auto_add_reel_to_highlight`).
+- **Post-Publish Audit Engine (`publisher.py`, `webapp.py`):** Added `verify_published_post()`, `audit_published_vault()`, and `GET /api/publish/audit` to compute `thumbnail_sha256` across sibling packs, detect duplicate thumbnails, and verify live media state.
+- **Public Tunnel Discovery (`webapp.py`):** Added `_read_tunnel_url()`, `GET /api/tunnel`, and `tunnel_url` in `GET /api/system`.
+- **Strict Wi-Fi-Only Guard & Autopublish Mutex (`smart_autopublish.py`):** Added `is_wifi_connected()` (`SIOCGIFADDR` ioctl on `wlan0`/`wlan1`, enforced via `WIFI_ONLY=1` or on Termux) so mobile/4G data is never consumed, plus `_AUTOPUBLISH_LOCK` around `run_smart_publish_cycle()` to prevent duplicate concurrent posts.
+
+### Fixed
+- **Black-Screen Instagram Stories & Highlights (`publisher.py`):** Replaced black `media_share_to_story` canvas with real 9:16 video uploads via `cl.video_upload_to_story(..., thumbnail=thumb_path)` and `cover_story_id=story_pk` (with `TypeError` fallback).
+- **Stale Reel Thumbnails (`publisher.py`):** Updated `_ensure_reel_thumbnail()` to invalidate stale `.mp4.jpg` files (`mtime < mp4.mtime`), prefer fresh `_cover_9x16.jpg`, or extract a frame at ~22% duration via `ffprobe`/`ffmpeg`.
+- **Incoherent Thumbnail Hook Titles (`highlights.py`):** Updated `_polish_hook_phrase()` and `_pick_best_hook()` to reject conversational fragments (`"a gente "`, `"eu "`, `"você "`, `"pessoal "`, `"aconteceu "`, `"o que "`, `"não "`) and require niche keyword relevance (`best_score >= 6` and `best_has_kw`) before overriding `src_hook`.
+- **YouTube/TikTok Publishing Hardening (`publisher.py`):** Enforced upload idempotency, `#Shorts` tag guarantee, caption sanitization, and `.env` token refresh.
+
 ## [2.7.0] - 2026-11-12
 
 ### Added
