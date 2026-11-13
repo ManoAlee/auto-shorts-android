@@ -184,9 +184,15 @@ def _tool_vault_validate(filename: str, out_dir: Optional[Path] = None) -> Dict[
     return validate_generated_short(target)
 
 
+def _is_instagram_configured() -> bool:
+    return bool(
+        (os.getenv("IG_USERNAME", "").strip() and os.getenv("IG_PASSWORD", "").strip())
+        or (os.getenv("IG_USER_ID", "").strip() and os.getenv("IG_ACCESS_TOKEN", "").strip() and os.getenv("REELS_PUBLIC_BASE_URL", "").strip())
+    )
+
+
 def _tool_autopublish_plan(out_dir: Optional[Path] = None) -> Dict[str, Any]:
     from .smart_autopublish import get_autopublish_plan
-    from .publisher import _is_instagram_configured
     od = out_dir or _default_out_dir()
     yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
     tt_ready = bool(os.getenv("TIKTOK_ACCESS_TOKEN"))
@@ -202,7 +208,6 @@ def _tool_autopublish_run(
     out_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     from .smart_autopublish import run_smart_publish_cycle
-    from .publisher import _is_instagram_configured
     od = out_dir or _default_out_dir()
     yt_ready = youtube and bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
     tt_ready = tiktok and bool(os.getenv("TIKTOK_ACCESS_TOKEN"))

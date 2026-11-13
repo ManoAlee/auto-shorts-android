@@ -2461,7 +2461,8 @@ def test_autoshorts_adaptive_mcp_offline_and_codemode(tmp_path):
                 "code": (
                     "h = studio.system.health()\n"
                     "m = studio.mahoraga.state()\n"
-                    "result = {'ok': h['ok'], 'mode': m['mode'], 'has_wifi_flag': 'wifi_connected' in h}\n"
+                    "p = studio.autopublish.plan()\n"
+                    "result = {'ok': h['ok'], 'mode': m['mode'], 'has_wifi_flag': 'wifi_connected' in h, 'channels': list(p['channels'].keys())}\n"
                 )
             },
         },
@@ -2470,7 +2471,7 @@ def test_autoshorts_adaptive_mcp_offline_and_codemode(tmp_path):
     assert cm_data["ok"] is True
     assert cm_data["result"]["ok"] is True
     assert cm_data["result"]["mode"] == "MAHORAGA_8_SPOKE_ACTIVE"
-    assert len(cm_data["calls_made"]) == 2
+    assert len(cm_data["calls_made"]) == 3
 
     unsafe_r = handle_mcp_request({
         "jsonrpc": "2.0", "id": 5, "method": "tools/call",
