@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -709,11 +710,11 @@ def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
     if "manda" not in lower and "envie" not in lower and "compartilh" not in lower:
         base = f"{base}\n\n📩 Manda pra um amigo que precisa ver isso!"
     if "#" not in base:
-        base = f"{base}\n\n#reels #animes #curiosidades #noticias #shorts"
+        base = f"{base}\n\n#reels #curiosidades #noticias #entretenimento #shorts"
     return base[:2000]
 
 
-def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Cortes & Animes") -> Dict:
+def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Destaques") -> Dict:
     """Share a published Reel to Story and append it to an Instagram Highlight."""
     story = cl.media_share_to_story(media_pk)
     story_pk = str(getattr(story, "pk", "") or getattr(story, "id", "") or "")
@@ -741,7 +742,7 @@ def _ensure_reel_thumbnail(mp4: Path) -> Optional[Path]:
     for seek in ("00:00:01", "00:00:00"):
         try:
             proc = subprocess.run(
-                ["ffmpeg", "-y", "-ss", seek, "-i", str(mp4), "-vframes", "1", "-q:v", "2", str(thumb)],
+                ["ffmpeg", "-y", "-ss", seek, "-i", str(mp4), "-frames:v", "1", "-update", "1", "-q:v", "2", str(thumb)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -815,7 +816,7 @@ def publish_pack_to_instagram_reels(
         else os.getenv("IG_AUTO_HIGHLIGHT", "1").strip().lower() not in {"0", "false", "no"}
     )
     if do_highlight and media_pk:
-        hl_title = (highlight_title or os.getenv("IG_HIGHLIGHT_TITLE", "🔥 Cortes & Animes")).strip() or "🔥 Cortes & Animes"
+        hl_title = (highlight_title or os.getenv("IG_HIGHLIGHT_TITLE", "🔥 Destaques")).strip() or "🔥 Destaques"
         try:
             ig_info["highlight"] = _auto_add_reel_to_highlight(cl, media_pk, title=hl_title)
         except Exception as exc:
