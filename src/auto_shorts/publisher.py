@@ -733,6 +733,27 @@ def _auto_add_reel_to_highlight(cl, media_pk: str, title: str = "🔥 Cortes & A
     return {"status": "highlight_created", "highlight_pk": str(getattr(hl, "pk", "")), "story_pk": story_pk, "title": title}
 
 
+def _ensure_reel_thumbnail(mp4: Path) -> Optional[Path]:
+    """Generate a JPEG cover thumbnail via ffmpeg so instagrapi does not require moviepy."""
+    thumb = Path(f"{mp4}.jpg")
+    if thumb.is_file() and thumb.stat().st_size > 0:
+        return thumb
+    for seek in ("00:00:01", "00:00:00"):
+        try:
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-ss", seek, "-i", str(mp4), "-vframes", "1", "-q:v", "2", str(thumb)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if proc.returncode == 0 and thumb.is_file() and thumb.stat().st_size > 0:
+                return thumb
+        except Exception:
+            break
+    return None
+
+
 def publish_pack_to_instagram_reels(
     video_path: str | Path,
     username: Optional[str] = None,
@@ -778,7 +799,11 @@ def publish_pack_to_instagram_reels(
         cl.dump_settings(str(sess_file))
     except Exception:
         pass
-    media = cl.clip_upload(mp4, caption)
+    thumb_path = _ensure_reel_thumbnail(mp4)
+    if thumb_path is not None:
+        media = cl.clip_upload(mp4, caption, thumbnail=thumb_path)
+    else:
+        media = cl.clip_upload(mp4, caption)
     media_pk = str(getattr(media, "pk", ""))
     code = getattr(media, "code", "") or ""
     ig_url = f"https://www.instagram.com/reel/{code}/" if code else ""

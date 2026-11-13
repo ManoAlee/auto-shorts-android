@@ -1594,7 +1594,7 @@ def test_instagram_caption_idempotency_and_auto_highlight(tmp_path, monkeypatch)
         def dump_settings(self, path):
             pass
 
-        def clip_upload(self, path, caption):
+        def clip_upload(self, path, caption, thumbnail=None):
             return types.SimpleNamespace(pk="111222", code="ABC123")
 
         def media_share_to_story(self, media_pk):
