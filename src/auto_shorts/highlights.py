@@ -599,6 +599,7 @@ def _polish_hook_phrase(words: List[str] | str, max_chars: int = 28) -> str:
         "porque", "que", "se", "o", "a", "os", "as", "um", "uma", "no", "na",
         "salve", "ola", "olá", "fala", "agora", "bem", "já", "ja", "tá", "ta",
         "eu", "ele", "ela", "isso", "isto", "finalmente", "vemos", "vamos",
+        "gente", "pessoal", "voce", "você", "aconteceu", "nada", "tudo", "aqui", "ali",
     }
     dangling_ends = {
         "a", "o", "as", "os", "um", "uma", "de", "da", "do", "das", "dos",
@@ -644,6 +645,8 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
     }
     best_line = ""
     best_score = -1
+    best_has_kw = False
+    _fragment_starts = ("a gente ", "eu ", "voce ", "você ", "pessoal ", "aconteceu ", "o que ", "nao ", "não ")
 
     clean_src = _clean_source_title(source_title)
     src_hook = ""
@@ -664,6 +667,8 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
         if len(words) < 3:
             continue
         lowered = " ".join(words).lower()
+        if lowered.startswith(_fragment_starts):
+            continue
         kw_hits = sum(3 for kw in niche.hook_keywords if kw in lowered)
         score = kw_hits
         score += 2 if ("?" in healed_raw or "!" in healed_raw) else 0
@@ -675,10 +680,11 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
             if cand and len(cand.split()) >= 2 and len(strong_tokens) >= 2:
                 best_score = score
                 best_line = cand
+                best_has_kw = kw_hits > 0
 
-    if src_hook and best_score < 4:
+    if src_hook and (best_score < 6 or not best_has_kw):
         return src_hook
-    if best_line and best_score > 0:
+    if best_line and best_score > 0 and best_has_kw:
         return best_line
     if src_hook:
         return src_hook

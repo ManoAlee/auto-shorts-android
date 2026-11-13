@@ -2418,6 +2418,21 @@ def test_smart_autopublish_mutex_prevents_duplicate_and_respects_wifi_only(tmp_p
     assert blocked["results"]["instagram"]["reason"] == "wifi_only_no_wifi"
 
 
+def test_hook_title_rejects_nonsense_spoken_fragments():
+    from auto_shorts.config import NICHES
+    from auto_shorts.highlights import _pick_best_hook
+
+    hook = _pick_best_hook(
+        ["A gente faz agora?", "Aconteceu nada pessoal eu nao sei"],
+        "Bleach - BR Dub: A Batalha Final",
+        NICHES["entretenimento_animes"],
+    )
+    assert "GENTE FAZ AGORA" not in hook
+    assert "ACONTECEU NADA" not in hook
+    assert "BLEACH" in hook
+
+
+
 
 
 
