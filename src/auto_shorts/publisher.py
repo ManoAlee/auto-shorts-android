@@ -468,6 +468,7 @@ def publish_pack_to_youtube(
     video_path: str | Path,
     playlist_name: Optional[str] = None,
     privacy_status: Optional[str] = None,
+    force: bool = False,
 ) -> Dict:
     """Validate an MP4 Short, upload to YouTube, attach thumbnail, add to playlist, and update .publish.json."""
     from .validator import validate_generated_short
@@ -483,6 +484,10 @@ def publish_pack_to_youtube(
             pack = json.loads(pack_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             pack = {}
+
+    existing_yt = pack.get("youtube") or {}
+    if not force and existing_yt.get("video_id"):
+        return {**existing_yt, "status": "already_published_youtube", "skipped": True}
 
     ass_cand = mp4.parent / f"_narrate_{mp4.stem}" / f"{mp4.stem}.ass"
     from .validator import audit_short_end_to_end
@@ -502,7 +507,9 @@ def publish_pack_to_youtube(
         raise RuntimeError(f"Video reprovado na validacao e auto-auditoria visual: {'; '.join(audit['reject_reasons'])}")
 
     title = str(pack.get("title") or mp4.stem.replace("_", " ").title()).strip()[:95]
-    caption = str(pack.get("caption") or f"{title}\n\n#Shorts #Brasil").strip()
+    caption = _sanitize_publish_caption(str(pack.get("caption") or f"{title}\n\n#Shorts #Brasil"))
+    if "#shorts" not in caption.lower():
+        caption = f"{caption}\n#Shorts".strip()
     tags = pack.get("hashtags") or ["#Shorts", "#Brasil"]
 
     yt_res = publish_youtube_short(
@@ -702,22 +709,31 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
     return pack
 
 
-def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
-    """Format an Instagram Reels caption with a DM-share CTA and focused hashtags."""
+def _sanitize_publish_caption(raw: str) -> str:
+    """Strip Whisper repetition loops inside 'Sobre este corte:' blocks from any publish caption."""
     import re
     from .highlights import sanitize_repetitive_text
 
-    base = str(pack.get("caption") or pack.get("title") or fallback_stem).strip()
+    base = str(raw or "").strip()
+    if not base:
+        return ""
+    if "Sobre este corte:" in base:
+        base = re.sub(
+            r"Sobre este corte:\n(.*?)(?:\n\n|\Z)",
+            lambda m: (f"Sobre este corte:\n{sanitize_repetitive_text(m.group(1))}\n" if sanitize_repetitive_text(m.group(1)) else ""),
+            base,
+            flags=re.DOTALL,
+        )
+    else:
+        base = sanitize_repetitive_text(base)
+    return re.sub(r"\n{3,}", "\n\n", base).strip()
+
+
+def _build_instagram_caption(pack: Dict, fallback_stem: str) -> str:
+    """Format an Instagram Reels caption with a DM-share CTA and focused hashtags."""
+    base = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or fallback_stem))
     if not base:
         base = fallback_stem
-
-    # Heal legacy .publish.json captions that contain Whisper repetition loops in "Sobre este corte:"
-    def _clean_summary_block(match: re.Match) -> str:
-        body = sanitize_repetitive_text(match.group(1))
-        return f"Sobre este corte:\n{body}\n" if body else ""
-
-    base = re.sub(r"Sobre este corte:\n(.*?)(?:\n\n|\Z)", _clean_summary_block, base, flags=re.DOTALL)
-    base = re.sub(r"\n{3,}", "\n\n", base).strip()
 
     lower = base.lower()
     if "manda" not in lower and "envie" not in lower and "compartilh" not in lower:
@@ -959,12 +975,15 @@ def publish_pack_to_tiktok(
     mode: Optional[str] = None,
     access_token: Optional[str] = None,
     privacy_level: Optional[str] = None,
+    force: bool = False,
 ) -> Dict:
     """Upload a generated MP4 to TikTok via Content Posting API v2 (inbox draft or direct post)."""
     mp4 = Path(video_path)
     if not mp4.is_file():
         raise FileNotFoundError(f"Video not found: {mp4}")
 
+    pack_path = mp4.with_suffix(".publish.json")
+    pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
     token = _resolve_tiktok_access_token(access_token)
     if not token:
         return {
@@ -972,8 +991,10 @@ def publish_pack_to_tiktok(
             "reason": "Defina TIKTOK_ACCESS_TOKEN ou rode scripts/tiktok_auth.py para publicar no TikTok.",
         }
 
-    pack_path = mp4.with_suffix(".publish.json")
-    pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
+    existing_tt = pack.get("tiktok") or {}
+    if not force and existing_tt.get("publish_id"):
+        return {**existing_tt, "status": "already_published_tiktok", "skipped": True}
+
     target_mode = (mode or os.getenv("TIKTOK_PUBLISH_MODE", "inbox") or "inbox").strip().lower()
     if target_mode not in ("inbox", "direct"):
         target_mode = "inbox"
@@ -989,7 +1010,7 @@ def publish_pack_to_tiktok(
 
     if target_mode == "direct":
         endpoint = TIKTOK_DIRECT_INIT_URL
-        caption = (pack.get("caption") or pack.get("title") or mp4.stem).strip()[:2200]
+        caption = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
         priv = (privacy_level or os.getenv("TIKTOK_PRIVACY_LEVEL", "SELF_ONLY") or "SELF_ONLY").strip()
         payload = {
             "post_info": {
@@ -1014,6 +1035,9 @@ def publish_pack_to_tiktok(
         if exc.code == 401 and ckey and csec and rtok:
             refreshed = refresh_tiktok_access_token(ckey, csec, rtok)
             token = str(refreshed["access_token"])
+            os.environ["TIKTOK_ACCESS_TOKEN"] = token
+            if refreshed.get("refresh_token"):
+                os.environ["TIKTOK_REFRESH_TOKEN"] = str(refreshed["refresh_token"])
             init_res = _tiktok_json_post(endpoint, token, payload)
         else:
             detail = exc.read().decode("utf-8", errors="ignore")

@@ -643,7 +643,7 @@ def test_zero_pitch_distortion_humanizer_and_validator_gate(tmp_path, monkeypatc
         },
     )
     try:
-        publish_pack_to_youtube(fake_mp4)
+        publish_pack_to_youtube(fake_mp4, force=True)
         assert False, "Should block invalid video from upload"
     except RuntimeError as exc:
         assert "validacao" in str(exc).lower()
@@ -1908,7 +1908,7 @@ def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
     assert seen_calls[1]["headers"]["content-range"] == f"bytes 0-{mp4.stat().st_size - 1}/{mp4.stat().st_size}"
 
     seen_calls.clear()
-    direct_res = publish_pack_to_tiktok(mp4, mode="direct", privacy_level="PUBLIC_TO_EVERYONE")
+    direct_res = publish_pack_to_tiktok(mp4, mode="direct", privacy_level="PUBLIC_TO_EVERYONE", force=True)
     assert direct_res["status"] == "published_tiktok_direct"
     init_payload = json.loads(seen_calls[0]["data"].decode("utf-8"))
     assert init_payload["post_info"]["privacy_level"] == "PUBLIC_TO_EVERYONE"
@@ -2269,6 +2269,52 @@ def test_tools_validate_smart_autopublish_instagram_and_vault_sanitization(tmp_p
     assert ig_calls == ["vault_clip.mp4"]
     assert cycle["results"]["instagram"]["status"] == "published_instagram"
     assert cycle["results"]["instagram"]["media_pk"] == "998877"
+
+
+def test_youtube_and_tiktok_idempotency_and_caption_sanitization(tmp_path, monkeypatch):
+    from auto_shorts.publisher import (
+        _sanitize_publish_caption,
+        publish_pack_to_tiktok,
+        publish_pack_to_youtube,
+    )
+
+    monkeypatch.setenv("TIKTOK_ACCESS_TOKEN", "dummy-token")
+
+    noisy = "O que é isso? O que é isso? O que é isso? Esse corte mostra tudo sobre o ataque hacker em detalhes."
+    cleaned = _sanitize_publish_caption(noisy)
+    assert cleaned.count("O que é isso?") == 1
+    assert "Esse corte mostra tudo sobre o ataque hacker em detalhes." in cleaned
+
+    video_path = tmp_path / "clip.mp4"
+    video_path.write_bytes(b"fake-video")
+    pack_path = tmp_path / "clip.publish.json"
+    pack_path.write_text(
+        json.dumps(
+            {
+                "title": "Teste",
+                "youtube": {
+                    "video_id": "yt123",
+                    "url": "https://www.youtube.com/shorts/yt123",
+                },
+                "tiktok": {
+                    "status": "published_tiktok",
+                    "publish_id": "tt456",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    yt_res = publish_pack_to_youtube(video_path, force=False)
+    assert yt_res["status"] == "already_published_youtube"
+    assert yt_res["video_id"] == "yt123"
+    assert yt_res["skipped"] is True
+
+    tt_res = publish_pack_to_tiktok(video_path, force=False)
+    assert tt_res["status"] == "already_published_tiktok"
+    assert tt_res["publish_id"] == "tt456"
+    assert tt_res["skipped"] is True
+
 
 
 
