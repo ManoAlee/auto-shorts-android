@@ -283,6 +283,171 @@ def _wait_cdp_page_ws(port: int, timeout: float = 15.0) -> str:
     raise TimeoutError(f"Chromium CDP did not open on port {port}")
 
 
+def _inject_cookies(cdp: CDPClient, out_dir: Path) -> None:
+    """Inject saved TikTok cookies (and optional TIKTOK_SESSIONID) into CDP."""
+    cookies: List[Dict[str, Any]] = []
+    ck_file = _cookies_path(out_dir)
+    if ck_file.is_file():
+        try:
+            loaded = json.loads(ck_file.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                cookies = loaded
+        except (OSError, json.JSONDecodeError):
+            cookies = []
+    env_sid = os.getenv("TIKTOK_SESSIONID", "").strip()
+    if env_sid and not any(isinstance(c, dict) and c.get("name") == "sessionid" for c in cookies):
+        cookies.append({"name": "sessionid", "value": env_sid, "domain": ".tiktok.com", "path": "/"})
+    for ck in cookies:
+        if isinstance(ck, dict) and ck.get("name") and ck.get("value"):
+            cdp.call("Network.setCookie", {
+                "name": str(ck["name"]),
+                "value": str(ck["value"]),
+                "domain": str(ck.get("domain") or ".tiktok.com"),
+                "path": str(ck.get("path") or "/"),
+                "secure": True,
+            })
+
+
+def _publish_single_in_cdp(
+    cdp: CDPClient,
+    mp4: Path,
+    out_dir: Path,
+    force: bool = False,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Upload and publish one MP4 inside an already-open, cookie-injected CDP session."""
+    from .publisher import _sanitize_publish_caption
+
+    pack_path = mp4.with_suffix(".publish.json")
+    pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
+    existing = pack.get("tiktok") or {}
+    if not force and existing.get("publish_id"):
+        return {**existing, "status": "already_published_tiktok", "skipped": True, "file": mp4.name}
+
+    caption = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
+    cdp.call("Page.navigate", {"url": "https://www.tiktok.com/tiktokstudio/upload?from=webapp"})
+
+    cur_url = ""
+    file_node_id = 0
+    for _ in range(36):
+        time.sleep(0.5)
+        cur_url = str(cdp.eval_js("window.location.href") or "")
+        if "/login" in cur_url.lower():
+            return {
+                "status": "login_required",
+                "reason": "Sessao do TikTok Studio Web nao autenticada. Salve o cookie sessionid via /api/tiktok/cdp/cookies.",
+                "current_url": cur_url,
+                "file": mp4.name,
+            }
+        doc = cdp.call("DOM.getDocument", {"depth": -1})
+        root_id = doc["root"]["nodeId"]
+        inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
+        file_node_id = int(inp.get("nodeId") or 0)
+        if file_node_id:
+            break
+
+    _sync_live_cookies(cdp, out_dir)
+    if not file_node_id:
+        return {"status": "error", "reason": "Campo input[type=file] nao encontrado no TikTok Studio Web.", "current_url": cur_url, "file": mp4.name}
+
+    if dry_run:
+        return {"status": "cdp_dry_run_ready", "current_url": cur_url, "caption_preview": caption[:80], "file": mp4.name}
+
+    cdp.call("DOM.setFileInputFiles", {"nodeId": file_node_id, "files": [str(mp4.resolve())]})
+
+    # Fast-poll until caption editor appears (or Retry if TikTok Studio shows transient error)
+    safe_caption = " ".join(caption.split())[:2200]
+    has_ed = False
+    for _ in range(30):
+        time.sleep(0.8)
+        state = cdp.eval_js("""
+        (() => {
+            if (document.querySelector('[contenteditable="true"]')) return 'editor';
+            const retry = Array.from(document.querySelectorAll('button, [role="button"]')).find(b => /^retry$/i.test((b.innerText || '').trim()));
+            if (retry) { retry.click(); return 'retry'; }
+            return 'wait';
+        })()
+        """)
+        if state == "editor":
+            has_ed = True
+            break
+
+    if has_ed and safe_caption:
+        cdp.eval_js("""
+        (() => {
+            const ed = document.querySelector('[contenteditable="true"]');
+            if (!ed) return false;
+            ed.focus();
+            return true;
+        })()
+        """)
+        cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
+        cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
+        cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
+        cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
+        cdp.call("Input.insertText", {"text": safe_caption})
+        time.sleep(1.0)
+
+    # Fast-poll up to 90s (1s interval) for Post/Publicar button to become enabled and click
+    posted = False
+    for _ in range(90):
+        clicked = cdp.eval_js("""
+        (() => {
+            const dismiss = Array.from(document.querySelectorAll('button, [role="button"]')).find(b => {
+                const txt = (b.innerText || '').trim();
+                return /^(got it|entendi)$/i.test(txt) && !b.disabled;
+            });
+            if (dismiss) { dismiss.click(); }
+            const byE2e = document.querySelector('[data-e2e="post_video_button"]');
+            const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const target = byE2e || btns.find(b => {
+                const txt = (b.innerText || '').trim();
+                return /^(post|publicar)$/i.test(txt);
+            });
+            if (!target) return false;
+            const dis = target.disabled || target.getAttribute('aria-disabled') === 'true' || target.getAttribute('data-disabled') === 'true';
+            if (dis) return false;
+            target.scrollIntoView({block: 'center'});
+            target.click();
+            return true;
+        })()
+        """)
+        if clicked:
+            posted = True
+            break
+        time.sleep(1.0)
+
+    if posted:
+        for _ in range(15):
+            time.sleep(1.0)
+            cdp.eval_js("""
+            (() => {
+                const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+                const confirm = btns.find(b => {
+                    const txt = (b.innerText || '').trim();
+                    const dis = b.disabled || b.getAttribute('aria-disabled') === 'true';
+                    return /^(post now|publicar agora|continue)$/i.test(txt) && !dis;
+                });
+                if (confirm) confirm.click();
+            })()
+            """)
+            url_now = cdp.eval_js("location.href") or ""
+            if "/upload" not in url_now:
+                break
+
+    if not posted:
+        return {"status": "error", "reason": "Botao Post/Publicar nao ficou habilitado a tempo.", "file": mp4.name}
+
+    time.sleep(2.5)
+    _sync_live_cookies(cdp, out_dir)
+    pub_id = f"cdp:{int(time.time())}"
+    tt_info = {"publish_id": pub_id, "mode": "cdp", "published_at": int(time.time())}
+    pack["tiktok"] = tt_info
+    pack["tiktok_publish_id"] = pub_id
+    pack_path.write_text(json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "published_tiktok_cdp", "file": mp4.name, **tt_info}
+
+
 def publish_pack_to_tiktok_cdp(
     video_path: Path,
     force: bool = False,
@@ -291,7 +456,6 @@ def publish_pack_to_tiktok_cdp(
 ) -> Dict[str, Any]:
     """Upload and publish an MP4 to TikTok Studio Web via native Chromium CDP."""
     from .smart_autopublish import is_wifi_connected
-    from .publisher import _sanitize_publish_caption
 
     mp4 = Path(video_path)
     if not mp4.is_file():
@@ -311,7 +475,6 @@ def publish_pack_to_tiktok_cdp(
     if not status["ok"]:
         return {"status": "skipped_unconfigured", "reason": "Chromium nao instalado no ambiente."}
 
-    caption = _sanitize_publish_caption(str(pack.get("caption") or pack.get("title") or mp4.stem))[:2200]
     port = _pick_free_port()
     proc = _launch_chromium(out_dir, port, headless=headless)
     try:
@@ -320,141 +483,117 @@ def publish_pack_to_tiktok_cdp(
             cdp.call("Page.enable")
             cdp.call("DOM.enable")
             cdp.call("Network.enable")
+            _inject_cookies(cdp, out_dir)
+            return _publish_single_in_cdp(cdp, mp4, out_dir, force=force, dry_run=dry_run)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
-            # Inject saved cookies or TIKTOK_SESSIONID if provided
-            cookies: List[Dict[str, Any]] = []
-            ck_file = _cookies_path(out_dir)
-            if ck_file.is_file():
-                try:
-                    cookies = json.loads(ck_file.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError):
-                    cookies = []
-            env_sid = os.getenv("TIKTOK_SESSIONID", "").strip()
-            if env_sid and not any(c.get("name") == "sessionid" for c in cookies if isinstance(c, dict)):
-                cookies.append({"name": "sessionid", "value": env_sid, "domain": ".tiktok.com", "path": "/"})
-            for ck in cookies:
-                if isinstance(ck, dict) and ck.get("name") and ck.get("value"):
-                    cdp.call("Network.setCookie", {
-                        "name": str(ck["name"]),
-                        "value": str(ck["value"]),
-                        "domain": str(ck.get("domain") or ".tiktok.com"),
-                        "path": str(ck.get("path") or "/"),
-                        "secure": True,
-                    })
 
+def publish_batch_to_tiktok_cdp(
+    video_paths: List[Path],
+    force: bool = False,
+    headless: bool = True,
+    max_videos: int = 5,
+    dry_run: bool = False,
+    out_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Publish multiple MP4 packs in a single warm Chromium CDP session."""
+    from .smart_autopublish import is_wifi_connected
+
+    if not is_wifi_connected():
+        return {"status": "deferred", "reason": "wifi_only_no_wifi", "results": []}
+
+    results: List[Dict[str, Any]] = []
+    pending: List[Path] = []
+    for vp in video_paths:
+        mp4 = Path(vp)
+        if not mp4.is_file():
+            results.append({"file": mp4.name, "status": "error", "reason": "file_not_found"})
+            continue
+        pack_path = mp4.with_suffix(".publish.json")
+        pack = json.loads(pack_path.read_text(encoding="utf-8")) if pack_path.exists() else {}
+        existing = pack.get("tiktok") or {}
+        if not force and existing.get("publish_id"):
+            results.append({**existing, "file": mp4.name, "status": "already_published_tiktok", "skipped": True})
+            continue
+        pending.append(mp4)
+
+    target_batch = pending[: max(1, int(max_videos))]
+    if not target_batch:
+        return {
+            "status": "batch_complete",
+            "published_count": 0,
+            "skipped_count": sum(1 for r in results if r.get("skipped")),
+            "error_count": sum(1 for r in results if r.get("status") == "error"),
+            "results": results,
+        }
+
+    od = out_dir or target_batch[0].parent
+    status = get_tiktok_cdp_status(od)
+    if not status["ok"]:
+        return {"status": "skipped_unconfigured", "reason": "Chromium nao instalado no ambiente.", "results": results}
+
+    port = _pick_free_port()
+    proc = _launch_chromium(od, port, headless=headless)
+    try:
+        ws_url = _wait_cdp_page_ws(port, timeout=20.0)
+        with CDPClient(ws_url, timeout=30.0) as cdp:
+            cdp.call("Page.enable")
+            cdp.call("DOM.enable")
+            cdp.call("Network.enable")
+            _inject_cookies(cdp, od)
+            for mp4 in target_batch:
+                res = _publish_single_in_cdp(cdp, mp4, od, force=force, dry_run=dry_run)
+                results.append(res)
+                if res.get("status") == "login_required":
+                    break
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+    return {
+        "status": "batch_complete",
+        "published_count": sum(1 for r in results if r.get("status") == "published_tiktok_cdp"),
+        "skipped_count": sum(1 for r in results if r.get("skipped")),
+        "error_count": sum(1 for r in results if r.get("status") == "error"),
+        "results": results,
+    }
+
+
+def keepalive_tiktok_cdp(out_dir: Path, headless: bool = True) -> Dict[str, Any]:
+    """Open TikTok Studio briefly to refresh and persist live .tiktok.com session cookies."""
+    status = get_tiktok_cdp_status(out_dir)
+    if not status["ok"]:
+        return {"ok": False, "reason": "Chromium nao instalado no ambiente."}
+    port = _pick_free_port()
+    proc = _launch_chromium(out_dir, port, headless=headless)
+    try:
+        ws_url = _wait_cdp_page_ws(port, timeout=20.0)
+        with CDPClient(ws_url, timeout=25.0) as cdp:
+            cdp.call("Page.enable")
+            cdp.call("Network.enable")
+            _inject_cookies(cdp, out_dir)
             cdp.call("Page.navigate", {"url": "https://www.tiktok.com/tiktokstudio/upload?from=webapp"})
             cur_url = ""
-            file_node_id = 0
-            for _ in range(18):
-                time.sleep(1.5)
+            for _ in range(16):
+                time.sleep(0.5)
                 cur_url = str(cdp.eval_js("window.location.href") or "")
                 if "/login" in cur_url.lower():
-                    return {
-                        "status": "login_required",
-                        "reason": "Sessao do TikTok Studio Web nao autenticada. Salve o cookie sessionid via /api/tiktok/cdp/cookies.",
-                        "current_url": cur_url,
-                    }
-                doc = cdp.call("DOM.getDocument", {"depth": -1})
-                root_id = doc["root"]["nodeId"]
-                inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
-                file_node_id = int(inp.get("nodeId") or 0)
-                if file_node_id:
-                    break
-
-            _sync_live_cookies(cdp, out_dir)
-            if not file_node_id:
-                return {"status": "error", "reason": "Campo input[type=file] nao encontrado no TikTok Studio Web.", "current_url": cur_url}
-
-            if dry_run:
-                return {"status": "cdp_dry_run_ready", "current_url": cur_url, "caption_preview": caption[:80]}
-
-            cdp.call("DOM.setFileInputFiles", {"nodeId": file_node_id, "files": [str(mp4.resolve())]})
-            time.sleep(10.0)
-
-            # Wait for caption editor and set sanitized single-line caption via CDP Input (avoids crashing Draft.js)
-            safe_caption = " ".join(caption.split())[:2200]
-            has_ed = False
-            for _ in range(12):
-                has_ed = bool(cdp.eval_js("Boolean(document.querySelector('[contenteditable=\"true\"]'))"))
-                if has_ed:
-                    break
-                time.sleep(2.0)
-
-            if has_ed and safe_caption:
-                cdp.eval_js("""
-                (() => {
-                    const ed = document.querySelector('[contenteditable="true"]');
-                    if (!ed) return false;
-                    ed.focus();
-                    return true;
-                })()
-                """)
-                cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
-                cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "modifiers": 2, "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65})
-                cdp.call("Input.dispatchKeyEvent", {"type": "keyDown", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
-                cdp.call("Input.dispatchKeyEvent", {"type": "keyUp", "key": "Backspace", "code": "Backspace", "windowsVirtualKeyCode": 8})
-                cdp.call("Input.insertText", {"text": safe_caption})
-                time.sleep(2.0)
-
-            # Wait up to 90s for Post/Publicar button to become enabled and click
-            posted = False
-            for _ in range(30):
-                clicked = cdp.eval_js("""
-                (() => {
-                    const dismiss = Array.from(document.querySelectorAll('button, [role="button"]')).find(b => {
-                        const txt = (b.innerText || '').trim();
-                        return /^(got it|entendi)$/i.test(txt) && !b.disabled;
-                    });
-                    if (dismiss) { dismiss.click(); }
-                    const byE2e = document.querySelector('[data-e2e="post_video_button"]');
-                    const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-                    const target = byE2e || btns.find(b => {
-                        const txt = (b.innerText || '').trim();
-                        return /^(post|publicar)$/i.test(txt);
-                    });
-                    if (!target) return false;
-                    const dis = target.disabled || target.getAttribute('aria-disabled') === 'true' || target.getAttribute('data-disabled') === 'true';
-                    if (dis) return false;
-                    target.scrollIntoView({block: 'center'});
-                    target.click();
-                    return true;
-                })()
-                """)
-                if clicked:
-                    posted = True
-                    break
-                time.sleep(3.0)
-
-            if posted:
-                # Handle optional confirmation modal (e.g. "Post now" / "Continue") and wait for redirect
-                for _ in range(10):
-                    time.sleep(2.0)
-                    cdp.eval_js("""
-                    (() => {
-                        const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-                        const confirm = btns.find(b => {
-                            const txt = (b.innerText || '').trim();
-                            const dis = b.disabled || b.getAttribute('aria-disabled') === 'true';
-                            return /^(post now|publicar agora|continue)$/i.test(txt) && !dis;
-                        });
-                        if (confirm) confirm.click();
-                    })()
-                    """)
-                    url_now = cdp.eval_js("location.href") or ""
-                    if "/upload" not in url_now:
+                    return {"ok": False, "status": "login_required", "current_url": cur_url}
+                if "tiktokstudio" in cur_url.lower():
+                    ready = cdp.eval_js("document.readyState")
+                    if ready == "complete":
                         break
-
-            if not posted:
-                return {"status": "error", "reason": "Botao Post/Publicar nao ficou habilitado a tempo."}
-
-            time.sleep(6.0)
-            _sync_live_cookies(cdp, out_dir)
-            pub_id = f"cdp:{int(time.time())}"
-            tt_info = {"publish_id": pub_id, "mode": "cdp", "published_at": int(time.time())}
-            pack["tiktok"] = tt_info
-            pack["tiktok_publish_id"] = pub_id
-            pack_path.write_text(json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8")
-            return {"status": "published_tiktok_cdp", **tt_info}
+            saved = _sync_live_cookies(cdp, out_dir)
+            st = get_tiktok_cdp_status(out_dir)
+            return {"ok": st["has_sessionid"], "synced_cookies": saved, "current_url": cur_url, **st}
     finally:
         proc.terminate()
         try:

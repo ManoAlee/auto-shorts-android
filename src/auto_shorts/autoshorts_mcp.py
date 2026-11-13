@@ -33,6 +33,7 @@ load_dotenv_file(PROJECT_ROOT / ".env")
 
 _TELEMETRY_LOCK = threading.Lock()
 _REIFY_LOCK = threading.Lock()
+_REGISTRY_CACHE: Dict[Tuple[str, float], Dict[str, Dict[str, Any]]] = {}
 
 _FORBIDDEN_AST_CALLS = frozenset({
     "eval", "exec", "compile", "__import__", "open", "input", "breakpoint",
@@ -191,11 +192,21 @@ def _is_instagram_configured() -> bool:
     )
 
 
+def _is_tiktok_configured(od: Path) -> bool:
+    if bool(os.getenv("TIKTOK_ACCESS_TOKEN", "").strip()):
+        return True
+    mode = os.getenv("TIKTOK_PUBLISH_MODE", "").strip().lower()
+    if mode == "cdp":
+        from .tiktok_cdp import get_tiktok_cdp_status
+        return bool(get_tiktok_cdp_status(od).get("ready_for_cdp"))
+    return False
+
+
 def _tool_autopublish_plan(out_dir: Optional[Path] = None) -> Dict[str, Any]:
     from .smart_autopublish import get_autopublish_plan
     od = out_dir or _default_out_dir()
     yt_ready = bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
-    tt_ready = bool(os.getenv("TIKTOK_ACCESS_TOKEN"))
+    tt_ready = _is_tiktok_configured(od)
     ig_ready = _is_instagram_configured()
     return get_autopublish_plan(od, youtube_ready=yt_ready, tiktok_ready=tt_ready, instagram_ready=ig_ready)
 
@@ -210,9 +221,25 @@ def _tool_autopublish_run(
     from .smart_autopublish import run_smart_publish_cycle
     od = out_dir or _default_out_dir()
     yt_ready = youtube and bool(os.getenv("YT_CLIENT_ID") and os.getenv("YT_CLIENT_SECRET") and os.getenv("YT_REFRESH_TOKEN"))
-    tt_ready = tiktok and bool(os.getenv("TIKTOK_ACCESS_TOKEN"))
+    tt_ready = tiktok and _is_tiktok_configured(od)
     ig_ready = instagram and _is_instagram_configured()
     return run_smart_publish_cycle(od, youtube_ready=yt_ready, tiktok_ready=tt_ready, instagram_ready=ig_ready, force=force)
+
+
+def _tool_tiktok_publish_batch(
+    filenames: Optional[List[str]] = None,
+    max_videos: int = 3,
+    force: bool = False,
+    dry_run: bool = False,
+    out_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    from .tiktok_cdp import publish_batch_to_tiktok_cdp
+    od = out_dir or _default_out_dir()
+    if filenames:
+        targets = [(od / Path(fn).name) for fn in filenames]
+    else:
+        targets = sorted(od.glob("*.mp4"))
+    return publish_batch_to_tiktok_cdp(targets, force=force, max_videos=max_videos, dry_run=dry_run, out_dir=od)
 
 
 def _bm25_rank_docs(query: str, docs: List[Dict[str, str]], top_k: int = 10) -> List[Dict[str, Any]]:
@@ -271,8 +298,16 @@ def _tool_mahoraga_state(out_dir: Optional[Path] = None) -> Dict[str, Any]:
 
 
 def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
-    from .youtube_studio_mcp import TOOL_REGISTRY as YT_TOOLS
     od = out_dir or _default_out_dir()
+    reified_p = _reified_path(od)
+    reified_mtime = reified_p.stat().st_mtime if reified_p.is_file() else 0.0
+    cache_key = (str(od.resolve()), reified_mtime)
+    with _REIFY_LOCK:
+        cached = _REGISTRY_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    from .youtube_studio_mcp import TOOL_REGISTRY as YT_TOOLS
 
     reg: Dict[str, Dict[str, Any]] = {
         "system.health": {
@@ -391,6 +426,34 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
             "inputSchema": {"type": "object", "properties": {}},
             "handler": lambda a: __import__("auto_shorts.tiktok_cdp", fromlist=["get_tiktok_cdp_status"]).get_tiktok_cdp_status(od),
         },
+        "tiktok.publish_batch": {
+            "category": "publish",
+            "offline": False,
+            "description": "Publish multiple pending MP4 packs to TikTok Studio Web in one warm Chromium CDP session.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filenames": {"type": "array", "items": {"type": "string"}},
+                    "max_videos": {"type": "integer", "default": 3},
+                    "force": {"type": "boolean", "default": False},
+                    "dry_run": {"type": "boolean", "default": False},
+                },
+            },
+            "handler": lambda a: _tool_tiktok_publish_batch(
+                filenames=a.get("filenames"),
+                max_videos=int(a.get("max_videos", 3)),
+                force=bool(a.get("force", False)),
+                dry_run=bool(a.get("dry_run", False)),
+                out_dir=od,
+            ),
+        },
+        "tiktok.keepalive": {
+            "category": "publish",
+            "offline": False,
+            "description": "Refresh and persist live .tiktok.com session cookies via native Chromium CDP.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "handler": lambda a: __import__("auto_shorts.tiktok_cdp", fromlist=["keepalive_tiktok_cdp"]).keepalive_tiktok_cdp(od),
+        },
     }
 
     for yt_name, yt_spec in YT_TOOLS.items():
@@ -416,6 +479,11 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
                     "handler": (lambda args, _c=code_src: execute_codemode(_c, args=args, out_dir=od)),
                 }
 
+    with _REIFY_LOCK:
+        # Keep cache bounded to recent entries
+        if len(_REGISTRY_CACHE) > 8:
+            _REGISTRY_CACHE.clear()
+        _REGISTRY_CACHE[cache_key] = reg
     return reg
 
 

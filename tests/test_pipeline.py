@@ -2566,6 +2566,54 @@ def test_tiktok_cdp_cookies_status_and_idempotency(tmp_path, monkeypatch):
     assert deferred["reason"] == "wifi_only_no_wifi"
 
 
+def test_tiktok_cdp_batch_idempotency_and_keepalive_fallback(tmp_path, monkeypatch):
+    import json as _json
+    from auto_shorts import smart_autopublish as sa
+    from auto_shorts import tiktok_cdp
+
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: True)
+    mp4_done = tmp_path / "done.mp4"
+    mp4_done.write_bytes(b"0" * 500)
+    mp4_done.with_suffix(".publish.json").write_text(
+        _json.dumps({"tiktok": {"publish_id": "cdp:111", "mode": "cdp"}}),
+        encoding="utf-8",
+    )
+    missing = tmp_path / "missing.mp4"
+
+    batch = tiktok_cdp.publish_batch_to_tiktok_cdp([mp4_done, missing], max_videos=3, out_dir=tmp_path)
+    assert batch["status"] == "batch_complete"
+    assert batch["published_count"] == 0
+    assert batch["skipped_count"] == 1
+    assert batch["error_count"] == 1
+
+    monkeypatch.setattr(sa, "is_wifi_connected", lambda: False)
+    deferred = tiktok_cdp.publish_batch_to_tiktok_cdp([mp4_done], out_dir=tmp_path)
+    assert deferred["status"] == "deferred"
+
+    monkeypatch.setattr(tiktok_cdp, "find_chromium_binary", lambda: None)
+    ka = tiktok_cdp.keepalive_tiktok_cdp(tmp_path)
+    assert ka["ok"] is False
+
+
+def test_mcp_registry_cache_and_tiktok_batch_tools(tmp_path, monkeypatch):
+    from auto_shorts import autoshorts_mcp as mcp
+    from auto_shorts import tiktok_cdp
+
+    mcp._REGISTRY_CACHE.clear()
+    reg1 = mcp._build_internal_registry(tmp_path)
+    reg2 = mcp._build_internal_registry(tmp_path)
+    assert reg1 is reg2
+    assert "tiktok.publish_batch" in reg1
+    assert "tiktok.keepalive" in reg1
+    assert "tiktok.cdp_status" in reg1
+
+    monkeypatch.setenv("TIKTOK_PUBLISH_MODE", "cdp")
+    monkeypatch.delenv("TIKTOK_ACCESS_TOKEN", raising=False)
+    monkeypatch.setattr(tiktok_cdp, "get_tiktok_cdp_status", lambda od: {"ready_for_cdp": True})
+    assert mcp._is_tiktok_configured(tmp_path) is True
+
+
+
 
 
 
