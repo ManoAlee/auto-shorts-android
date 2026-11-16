@@ -13,6 +13,7 @@ cookies.txt
 # Runtime media, models & temporary workspaces
 output/
 refs/
+assets/gameplay/
 vendor-research/
 *.mp4
 *.mkv

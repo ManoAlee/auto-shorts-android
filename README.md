@@ -19,13 +19,17 @@
 
 <table>
   <tr>
-    <td width="50%" align="center">
-      <img src="docs/images/short-gta6-semantic.jpg" alt="GTA 6 Semantic Visual Engine Output" width="260"/><br/>
-      <sub><b>Semantic B-Roll: Games</b> — Real GTA 6 Trailer footage sliced on-demand via <code>yt-dlp --download-sections</code> + Vox-style headline card &amp; kinetic captions (<code>90/100</code>)</sub>
+    <td width="33%" align="center">
+      <img src="docs/images/short-gta6-semantic.jpg" alt="GTA 6 Semantic Visual Engine Output" width="240"/><br/>
+      <sub><b>Games &amp; Pop Culture</b> — Real GTA 6 trailer footage sliced on-demand via <code>yt-dlp --download-sections</code> + Vox headline &amp; kinetic captions (<code>90/100</code>)</sub>
     </td>
-    <td width="50%" align="center">
-      <img src="docs/images/short-tech-semantic.jpg" alt="GTA 6 Album Semantic Visual Engine Output" width="260"/><br/>
-      <sub><b>Semantic B-Roll: Multi-Scene</b> — Tri-layer cinema framing, progressive <code>\kf</code> karaoke &amp; <code>-16 LUFS</code> broadcast voice mastering</sub>
+    <td width="33%" align="center">
+      <img src="docs/images/short-tech-semantic.jpg" alt="Tech / AI Semantic Visual Engine Output" width="240"/><br/>
+      <sub><b>Tech &amp; AI (Jensen / Musk)</b> — Tri-layer cinema framing, multi-scene b-roll chaining, progressive <code>\kf</code> karaoke &amp; <code>-16 LUFS</code> voice</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/images/short-brasil-semantic.jpg" alt="Politics &amp; Economy Semantic Visual Engine Output" width="240"/><br/>
+      <sub><b>Politics &amp; World News</b> — Real topic scenes (União Europeia &amp; Brasil), Wikimedia Commons 4K photos, Ken Burns 2.5D &amp; live news card (<code>90/100</code>)</sub>
     </td>
   </tr>
 </table>
@@ -106,6 +110,74 @@ flowchart LR
 | **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, persistent SQLite deduplication guard | [`validator.py`](src/auto_shorts/validator.py), [`deduplication.py`](src/auto_shorts/deduplication.py), [`re_engine.py`](src/auto_shorts/re_engine.py) |
 | **Multi-Platform Auto-Pilot** | Idempotent 24/7 autonomous scheduling & publishing to **YouTube Shorts**, **Instagram Reels**, and **TikTok**, `WIFI_ONLY=1` guard, Google Drive `rclone` backup | [`publisher.py`](src/auto_shorts/publisher.py), [`smart_autopublish.py`](src/auto_shorts/smart_autopublish.py) |
 | **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
+
+---
+
+## Deep Dive: Universal Semantic Visual Engine (Any Topic / Niche)
+
+Rather than looping unrelated subway surfing sludge or generic gameplay, AutoShorts features an **entity-aware visual director** capable of harvesting real footage and photography for **any topic**:
+
+```mermaid
+flowchart TD
+  Topic["Story Topic / News Lead\n(e.g., GTA 6, Política Brasil, IA Jensen Huang, Economia)"]
+  Entities["Entity & Visual Extraction\n(Names, games, institutions, places)"]
+  
+  subgraph Ingestion["Smart Ingestion (Zero-Bloat)"]
+    Sniper["yt-dlp Sniper Slicer\n--download-sections '*00:00:15-00:00:22'\n(Downloads 5-7s 720p/1080p in <4s)"]
+    Wiki["Wikimedia Commons 4K API\n(Public Domain leader portraits,\ncapitol buildings, corporate logos)"]
+  end
+
+  subgraph Compositing["Motion & Cinema Compositing"]
+    KenBurns["2.5D Ken Burns Pan & Zoom\n(60 FPS smooth interpolation over blurred 9:16)"]
+    Breathing["Dynamic Breathing Zoom\n1 + 0.025 * (1 - cos(2*PI*t/6))"]
+    MultiCut["Multi-Scene xfade Transitions\n(New visual beat every 3.5s - 5.5s)"]
+    VoxCard["Vox-Style News Card & Progress Bar\n(High-contrast headline, entity badge)"]
+  end
+
+  subgraph StudioDSP["Studio Audio & Voicebox DSP"]
+    Voice["Kokoro-82M / Edge-TTS\n+ Strict 75-95 Word Script Budget"]
+    DSP["Highpass 75Hz + 145Hz Warmth\n+ 3.4kHz De-ess + -16 LUFS Loudnorm"]
+  end
+
+  Topic --> Entities
+  Entities --> Sniper & Wiki
+  Sniper & Wiki --> KenBurns & Breathing --> MultiCut
+  MultiCut --> VoxCard
+  Voice --> DSP
+  VoxCard & DSP --> FinalShort["Production-Grade 9:16 Short\n(Approved Quality Score >= 90/100)"]
+```
+
+### Supported Topic Archetypes
+
+1. **Games & Pop Culture (e.g., GTA 6, Anime, Cinema)**:
+   - Automatically snipes official 4K trailers, developer showcases, and gameplay slices.
+   - Preserves high-FPS movement with Lanczos scaling and subtle unsharp filtering.
+2. **Politics, Geopolitics & World News (e.g., Brasil, STF, G20, White House)**:
+   - Queries Wikimedia Commons REST API with automated attribution.
+   - Generates high-definition Ken Burns 2.5D vertical camera motion across historic and current imagery.
+3. **Tech, AI & Silicon (e.g., Nvidia, Jensen Huang, OpenAI, Elon Musk)**:
+   - Mixes keynote b-roll slices with dynamic multi-angle visual hooks.
+4. **Finance, Macroeconomics & Commodities (e.g., Selic, Commodities, Câmbio)**:
+   - Renders financial cards with procedural ambient audio textures.
+
+---
+
+## Multi-Language Audio & Whisper Hygiene Guard
+
+When processing international content (such as Japanese anime, French documentaries, or English podcasts), traditional forced transcription models often suffer from **catastrophic acoustic hallucination loops** (e.g. Whisper repeating phrases endlessly). AutoShorts incorporates an end-to-end hygiene firewall:
+
+- **Acoustic Language Probe (`whisper-cli -dl`)**: Runs a 15-second acoustic probe to detect language probability before running full decoding. If Japanese (`ja`) is detected, it automatically routes through `-l ja --translate` to Portuguese instead of forcing a mismatched acoustic alphabet.
+- **Strict Cue Deduplication**: Strips sequential identical subtitle cues from `.ass` karaoke tracks before burn-in.
+- **Title Truthfulness Guard**: Automatically checks audio metadata: if audio is original Japanese and subtitled, titles are labeled `"Cena Épica Legendada!"` and **never** falsely tagged as `"Dublada!"`.
+
+---
+
+## 24/7 Autonomous Daemon & Multi-Platform Delivery
+
+The production stack on Android Termux runs under a 3-tier supervisor:
+- **`runsv` Supervisor**: Continuously monitors `autoshorts`, `autoshorts-web`, and `autoshorts-tunnel`.
+- **`autoshorts watch 30`**: Native C11 binary watchdog verifying HTTP endpoint health, Wi-Fi wake-locks, and automatic restart on memory pressure.
+- **Smart Autopublish Engine**: Enforces organic publishing intervals and daily quota caps across **YouTube Shorts**, **Instagram Reels**, and **TikTok**, automatically dispatching approved shorts as each platform's window opens.
 
 ---
 
