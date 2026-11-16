@@ -39,6 +39,18 @@ NICHE_SEARCH_QUERIES: Dict[str, List[str]] = {
         "como estudar concurso publico podcast brasil",
         "dicas aprovacao concurso brasil",
     ],
+    "games": [
+        "alanzoka gta 6 live completa brasil",
+        "alanzoka melhores momentos live jogos brasil",
+        "gta 6 gameplay react live brasil",
+        "gaules davyjones live gameplay cortes brasil",
+    ],
+    "humor_memes": [
+        "alanzoka momentos engracados live brasil",
+        "casimiro react memes engracado live brasil",
+        "diogo defante melhores momentos live brasil",
+        "compilado memes engracado stream brasil",
+    ],
     "podcast": [
         "corte podcast entrevista viral brasil",
         "flow podpah inteligencia ltda corte",
@@ -54,7 +66,7 @@ def parse_discovery_lines(
     ndjson_text: str,
     seen_ids: Optional[Set[str]] = None,
     min_duration: float = 180.0,
-    max_duration: float = 1200.0,
+    max_duration: float = 28800.0,
     registry: Optional[Any] = None,
 ) -> List[Dict]:
     """Filter raw yt-dlp --flat-playlist --dump-json output for clip-worthy real videos."""
@@ -127,7 +139,9 @@ def discover_videos(
             if radar:
                 q = radar[0]["youtube_query"]
         if not q:
-            q = NICHE_SEARCH_QUERIES.get(niche, NICHE_SEARCH_QUERIES["geral"])[0]
+            import random
+            pool = NICHE_SEARCH_QUERIES.get(niche, NICHE_SEARCH_QUERIES["geral"])
+            q = random.choice(pool)
         target = f"ytsearch{max(1, limit)}:{q}"
 
     cmd = ["yt-dlp", "--flat-playlist", "--dump-json", "--no-warnings"]
