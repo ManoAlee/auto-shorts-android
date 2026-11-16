@@ -19,17 +19,21 @@
 
 <table>
   <tr>
-    <td width="33%" align="center">
-      <img src="docs/images/short-gta6-semantic.jpg" alt="GTA 6 Semantic Visual Engine Output" width="240"/><br/>
-      <sub><b>Games &amp; Pop Culture</b> — Real GTA 6 trailer footage sliced on-demand via <code>yt-dlp --download-sections</code> + Vox headline &amp; kinetic captions (<code>90/100</code>)</sub>
+    <td width="25%" align="center">
+      <img src="docs/images/short-stf-safezone-real.jpg" alt="9:16 Safe-Zone Calibrated Cover" width="210"/><br/>
+      <sub><b>Safe-Zone 9:16 (`Y>=140`, `MarginV=300`)</b> — Top news card clear of notch/headers, centered badge, balanced hook &amp; elevated subtitles (<code>90/100</code>)</sub>
     </td>
-    <td width="33%" align="center">
-      <img src="docs/images/short-tech-semantic.jpg" alt="Tech / AI Semantic Visual Engine Output" width="240"/><br/>
-      <sub><b>Tech &amp; AI (Jensen / Musk)</b> — Tri-layer cinema framing, multi-scene b-roll chaining, progressive <code>\kf</code> karaoke &amp; <code>-16 LUFS</code> voice</sub>
+    <td width="25%" align="center">
+      <img src="docs/images/short-gta6-semantic.jpg" alt="GTA 6 Semantic Visual Engine Output" width="210"/><br/>
+      <sub><b>Games &amp; Live VODs</b> — Real GTA 6 / streamer VODs up to 8h sliced on-demand via <code>yt-dlp</code> + kinetic captions (<code>90/100</code>)</sub>
     </td>
-    <td width="33%" align="center">
-      <img src="docs/images/short-brasil-semantic.jpg" alt="Politics &amp; Economy Semantic Visual Engine Output" width="240"/><br/>
-      <sub><b>Politics &amp; World News</b> — Real topic scenes (União Europeia &amp; Brasil), Wikimedia Commons 4K photos, Ken Burns 2.5D &amp; live news card (<code>90/100</code>)</sub>
+    <td width="25%" align="center">
+      <img src="docs/images/short-tech-semantic.jpg" alt="Tech / AI Semantic Visual Engine Output" width="210"/><br/>
+      <sub><b>Tech &amp; AI</b> — Tri-layer cinema framing, multi-scene b-roll chaining, progressive <code>\kf</code> karaoke &amp; <code>-16 LUFS</code> voice</sub>
+    </td>
+    <td width="25%" align="center">
+      <img src="docs/images/short-brasil-semantic.jpg" alt="Politics &amp; Economy Semantic Visual Engine Output" width="210"/><br/>
+      <sub><b>World News &amp; Economy</b> — 4-Act journalistic structure, Wikimedia Commons 4K photos, Ken Burns 2.5D &amp; live news card (<code>90/100</code>)</sub>
     </td>
   </tr>
 </table>
@@ -38,60 +42,74 @@
   <tr>
     <td width="68%" align="center">
       <img src="docs/images/studio-desktop-real.png" alt="AutoShorts Studio Desktop UI" width="100%"/><br/>
-      <sub><b>Desktop Studio (`:8787`)</b> — Copiloto IA, 5-stage live render stepper, UCB1 B-Roll KPIs, Sentinela Google Drive &amp; 9:16 creator</sub>
+      <sub><b>Desktop Studio (`1440x900` · `:8787`)</b> — Copiloto IA, 5-stage live render stepper, UCB1 B-Roll KPIs, Sentinela Google Drive &amp; 9:16 creator</sub>
     </td>
     <td width="32%" align="center">
-      <img src="docs/images/studio-mobile-real.png" alt="AutoShorts Studio Mobile Responsive UI" width="240"/><br/>
+      <img src="docs/images/studio-mobile-real.png" alt="AutoShorts Studio Mobile Responsive UI" width="230"/><br/>
       <sub><b>Mobile Android View (`390x844`)</b> — Zero horizontal overflow &amp; native bottom navigation</sub>
     </td>
   </tr>
   <tr>
+    <td width="68%" align="center">
+      <img src="docs/images/studio-vault-real.png" alt="Acervo &amp; Multi-Platform Publishing Vault" width="100%"/><br/>
+      <sub><b>Acervo &amp; Canais (Desktop)</b> — Multi-platform status filters (<code>Pronto p/ IG</code>, <code>TikTok</code>, <code>YT</code>), 5D Opus Scorecard &amp; validated 9:16 cards</sub>
+    </td>
+    <td width="32%" align="center">
+      <img src="docs/images/studio-mobile-vault-real.png" alt="Acervo Mobile View" width="230"/><br/>
+      <sub><b>Acervo Mobile (`390x844`)</b> — Clean card inspection, one-tap IG/TT/YT publish &amp; quota badges</sub>
+    </td>
+  </tr>
+  <tr>
     <td colspan="2" align="center">
-      <img src="docs/images/studio-vault-real.png" alt="Acervo &amp; Multi-Platform Publishing Vault" width="96%"/><br/>
-      <sub><b>Acervo &amp; Canais</b> — Multi-platform status filters (<code>Pronto p/ IG</code>, <code>Enviados IG</code>, <code>TikTok</code>, <code>YT</code>), 5D Opus Scorecard &amp; real 9:16 video cards</sub>
+      <img src="docs/images/studio-radar-real.png" alt="Tendências &amp; Radar + BrowserSkill Google Trends BR" width="96%"/><br/>
+      <sub><b>Tendências &amp; Radar (`Humor &amp; Memes`, `Games`, `Google Trends BR`)</b> — Live viral topics harvested via <code>bsk</code> + Chromium 157 on Termux</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/studio-synapse-real.png" alt="Synapse RE &amp; OMEGA-SYNAPSE Telemetry" width="100%"/><br/>
-      <sub><b>Synapse RE</b> — OMEGA-SYNAPSE v3.0, Roda do Dharma (10 Defesas), AArch64 C11 binary &amp; InnerTube Heatmaps</sub>
+      <img src="docs/images/studio-synapse-real.png" alt="Piloto Automático &amp; Mahoraga 8-Spoke Engine" width="100%"/><br/>
+      <sub><b>Piloto Automático &amp; Mahoraga</b> — 8-Spoke speech rotation, 24/7 Sentinel &amp; organic multi-platform spacing</sub>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/studio-system-real.png" alt="Sistema &amp; FFmpeg Hardware Telemetry" width="100%"/><br/>
-      <sub><b>Sistema &amp; FFmpeg</b> — Storage health, Termux:Boot + Watchdog, Whisper/Kokoro TTS &amp; ARM64 SoC telemetry</sub>
+      <img src="docs/images/studio-system-real.png" alt="Configurações &amp; Hardware Telemetry" width="100%"/><br/>
+      <sub><b>Configurações &amp; Sistema</b> — Termux <code>runsv</code> services (<code>autoshorts</code>, <code>autoshorts-web</code>, <code>bsk-browser</code>) &amp; ARM64 telemetry</sub>
     </td>
   </tr>
 </table>
 
 ---
 
-## System Architecture
+## System Architecture (Anatomy & Pipeline Flow)
+
+<p align="center">
+  <img src="docs/images/autoshorts-anatomy.svg" alt="AutoShorts Isometric Assembly Rig" width="100%"/>
+</p>
 
 ```mermaid
 flowchart LR
-  subgraph Discovery["1. Multi-Source Discovery"]
-    HR["Horizon Radar\n(Podcasts, Tech/IA, Finanças)"]
-    AN["AniList / Jikan\n(4 Anime Feeds)"]
-    WN["World News RSS\n(Auto PT-BR)"]
-    YT["YouTube InnerTube\n(Most Replayed Heatmaps)"]
+  subgraph Discovery["1. Multi-Source Discovery + BrowserSkill"]
+    HR["Horizon Radar\n(Podcasts, Humor/Memes, Games)"]
+    BSK["BrowserSkill (bsk) + Chromium 157\n(Google Trends BR & Anti-Cloudflare)"]
+    WN["World News 8-10p Extractor\n(Auto PT-BR, 4-Act Structure)"]
+    VOD["8h Live VOD & Stream Discovery\n(Auto-Scale up to 25 Clips)"]
   end
 
   subgraph Intelligence["2. AI Script, Language Probe & Hygiene"]
-    LLM["OpenRouter / Gemini /\nllama-cli GGUF (--single-turn)"]
+    LLM["OpenRouter / Gemini /\n4-Act Narrative (No Cliffhangers)"]
     LANG["Whisper -dl Audio Lang Probe\n+ Anti-Repetition Breaker"]
-    BUD["Strict 75-95 Word Budget\n(32s-54s Shorts Pacing)"]
+    BUD["Word-Boundary Hook Guard\n+ Dangling Title Prevention"]
   end
 
-  subgraph Production["3. Semantic Visuals & Broadcast DSP"]
+  subgraph Production["3. Semantic Visuals & Safe-Zone DSP"]
     SEM["Semantic Visual Engine\n(yt-dlp Sniper + Wikimedia 4K\n+ Ken Burns 2.5D + xfade)"]
-    TTS["Edge-TTS / Kokoro-82M\n+ Voicebox EQ & -16 LUFS"]
-    SUB["Progressive \\kf Karaoke\n(.ass + Procedural BGM)"]
+    SAFE["Universal 9:16 Safe Zones\n(Card Y>=140, Sub MarginV>=300)"]
+    TTS["Kokoro-82M / Edge-TTS\n+ Voicebox EQ & -16 LUFS"]
   end
 
-  subgraph QA["4. Quality Gate & Auto-Delivery"]
-    AUD["5-Frame Vision & Signalstats\n+ Opus Scorecard (0-100)"]
-    DEDUP["Duplicate Queue Guard\n+ Auto-Optimize Metadata"]
-    PUB["YouTube Shorts + Instagram Reels\n+ TikTok Auto-Publish"]
+  subgraph QA["4. Skill Hard-Gate & Auto-Delivery"]
+    AUD["5-Frame Vision & Signalstats\n+ Safe-Zone & Hook Audit"]
+    DEDUP["SQLite Deduplication Guard\n+ Google Drive rclone Vault"]
+    PUB["YouTube Shorts + Instagram Reels\n+ TikTok Organic Autopublish"]
   end
 
   Discovery --> Intelligence --> Production --> QA
@@ -110,6 +128,7 @@ flowchart LR
 | **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, persistent SQLite deduplication guard | [`validator.py`](src/auto_shorts/validator.py), [`deduplication.py`](src/auto_shorts/deduplication.py), [`re_engine.py`](src/auto_shorts/re_engine.py) |
 | **Multi-Platform Auto-Pilot** | Idempotent 24/7 autonomous scheduling & publishing to **YouTube Shorts**, **Instagram Reels**, and **TikTok**, `WIFI_ONLY=1` guard, Google Drive `rclone` backup | [`publisher.py`](src/auto_shorts/publisher.py), [`smart_autopublish.py`](src/auto_shorts/smart_autopublish.py) |
 | **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
+| **BrowserSkill (`bsk`) & Live VODs** | Headless Chromium 157 (`runsv bsk-browser`) for anti-Cloudflare scraping & live Google Trends BR; 8h VOD discovery auto-scaling up to 25 viral cuts | [`bsk_bridge.py`](src/auto_shorts/bsk_bridge.py), [`discovery.py`](src/auto_shorts/discovery.py), [`pipeline.py`](src/auto_shorts/pipeline.py) |
 
 ---
 

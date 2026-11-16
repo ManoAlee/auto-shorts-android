@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 520" width="1120" height="520">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1120"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="railGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="50%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="100%" stop-color="#CA8A04"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Card Frame -->
+  <rect x="0" y="0" width="1120" height="520" rx="18" fill="url(#bgGrad)" stroke="#1E293B" stroke-width="2"/>
+  <rect x="14" y="14" width="1092" height="492" rx="12" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+
+  <!-- Top Card Header (Anatomy Instrumentation Style) -->
+  <text x="32" y="44" fill="#94A3B8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700">FIG. 01 — AUTOSHORTS ARM64 BENCH</text>
+  <text x="1088" y="44" text-anchor="end" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">9:16 Autonomous Video Assembly Rig</text>
+
+  <!-- Heavy Machined Base Plate (Isometric Bench) -->
+  <g filter="url(#softGlow)">
+    <!-- Base bottom bevel -->
+    <polygon points="80,355 560,465 1040,355 560,245" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+    <!-- Base top deck -->
+    <polygon points="80,340 560,450 1040,340 560,230" fill="#1E293B" stroke="#475569" stroke-width="1.5"/>
+    <!-- Corner leveling feet -->
+    <ellipse cx="110" cy="356" rx="12" ry="6" fill="#020617" stroke="#475569" stroke-width="1"/>
+    <ellipse cx="560" cy="466" rx="14" ry="7" fill="#020617" stroke="#475569" stroke-width="1"/>
+    <ellipse cx="1010" cy="356" rx="12" ry="6" fill="#020617" stroke="#475569" stroke-width="1"/>
+    <!-- Machined precision rail tracks -->
+    <line x1="150" y1="335" x2="970" y2="335" stroke="#475569" stroke-width="6" stroke-linecap="round"/>
+    <line x1="150" y1="335" x2="970" y2="335" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="10 6"/>
+  </g>
+
+  <!-- STAGE 1: Discovery + BrowserSkill bsk Hopper -->
+  <g transform="translate(115, 165)" filter="url(#softGlow)">
+    <polygon points="0,45 70,15 140,45 70,75" fill="#334155" stroke="#64748B" stroke-width="1.2"/>
+    <polygon points="0,45 70,75 70,145 0,115" fill="#1E293B" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="70,75 140,45 140,115 70,145" fill="#0F172A" stroke="#475569" stroke-width="1.2"/>
+    <!-- Hopper top slot + indicator -->
+    <polygon points="28,45 70,28 112,45 70,62" fill="#020617" stroke="url(#cyanGrad)" stroke-width="1.5"/>
+    <circle cx="35" cy="95" r="5" fill="#38BDF8"/>
+    <circle cx="52" cy="102" r="5" fill="#34D399"/>
+    <text x="70" y="168" text-anchor="middle" fill="#E2E8F0" font-family="system-ui, sans-serif" font-size="12" font-weight="700">1. INGESTÃO</text>
+    <text x="70" y="184" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace, monospace" font-size="10">bsk + 8h VOD + RSS</text>
+  </g>
+
+  <!-- Conduit 1->2 -->
+  <path d="M 255,260 C 280,260 285,250 310,250" fill="none" stroke="#38BDF8" stroke-width="3" stroke-dasharray="6 4"/>
+
+  <!-- STAGE 2: Whisper + 4-Act Narrative Core -->
+  <g transform="translate(310, 145)" filter="url(#softGlow)">
+    <polygon points="0,45 75,12 150,45 75,78" fill="#334155" stroke="#64748B" stroke-width="1.2"/>
+    <polygon points="0,45 75,78 75,165 0,132" fill="#1E293B" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="75,78 150,45 150,132 75,165" fill="#0F172A" stroke="#475569" stroke-width="1.2"/>
+    <!-- 4-Act stacked plates inside window -->
+    <rect x="20" y="75" width="38" height="8" rx="2" fill="#38BDF8" transform="skewY(22)"/>
+    <rect x="20" y="88" width="38" height="8" rx="2" fill="#FACC15" transform="skewY(22)"/>
+    <rect x="20" y="101" width="38" height="8" rx="2" fill="#34D399" transform="skewY(22)"/>
+    <rect x="20" y="114" width="38" height="8" rx="2" fill="#A855F7" transform="skewY(22)"/>
+    <text x="75" y="188" text-anchor="middle" fill="#E2E8F0" font-family="system-ui, sans-serif" font-size="12" font-weight="700">2. MOTOR 4-ATOS</text>
+    <text x="75" y="204" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace, monospace" font-size="10">Whisper + Mahoraga</text>
+  </g>
+
+  <!-- Conduit 2->3 -->
+  <path d="M 460,250 C 485,250 490,255 510,255" fill="none" stroke="#FACC15" stroke-width="3" stroke-dasharray="6 4"/>
+
+  <!-- STAGE 3: FFmpeg 9:16 Safe-Zone Gauge & Kokoro DSP (Center Hero) -->
+  <g transform="translate(505, 110)" filter="url(#softGlow)">
+    <!-- Vertical 9:16 Calibrated Rig Frame -->
+    <rect x="15" y="0" width="96" height="170" rx="12" fill="#0F172A" stroke="url(#goldGrad)" stroke-width="2.5"/>
+    <!-- Top unsafe zone indicator (0-140px) -->
+    <rect x="21" y="6" width="84" height="22" rx="6" fill="#EF4444" opacity="0.28"/>
+    <line x1="21" y1="28" x2="105" y2="28" stroke="#EF4444" stroke-width="1" stroke-dasharray="3 2"/>
+    <!-- Safe news card slot (Y=140px) -->
+    <rect x="23" y="32" width="80" height="24" rx="4" fill="#1E293B" stroke="#38BDF8" stroke-width="1"/>
+    <rect x="27" y="36" width="20" height="16" rx="2" fill="#38BDF8" opacity="0.8"/>
+    <!-- Center video viewport + centered badge + hook -->
+    <rect x="23" y="60" width="80" height="58" rx="4" fill="#1E293B"/>
+    <rect x="44" y="82" width="38" height="9" rx="2" fill="#FACC15"/>
+    <rect x="31" y="95" width="64" height="8" rx="2" fill="#F8FAFC"/>
+    <!-- Safe subtitle band (MarginV=300px) -->
+    <rect x="33" y="124" width="60" height="10" rx="3" fill="#34D399" opacity="0.9"/>
+    <!-- Bottom TikTok/Reels unsafe zone (bottom 450px @1080p) -->
+    <rect x="21" y="138" width="84" height="26" rx="6" fill="#EF4444" opacity="0.28"/>
+    <line x1="21" y1="138" x2="105" y2="138" stroke="#EF4444" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="63" y="196" text-anchor="middle" fill="#FACC15" font-family="system-ui, sans-serif" font-size="12" font-weight="800">3. SAFE-ZONE 9:16</text>
+    <text x="63" y="212" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace, monospace" font-size="10">Y&gt;=140 · MarginV=300</text>
+  </g>
+
+  <!-- Conduit 3->4 -->
+  <path d="M 625,255 C 650,255 660,250 685,250" fill="none" stroke="#34D399" stroke-width="3" stroke-dasharray="6 4"/>
+
+  <!-- STAGE 4: 5-Skill Hard Gate & Dial Audit -->
+  <g transform="translate(685, 145)" filter="url(#softGlow)">
+    <polygon points="0,45 70,15 140,45 70,75" fill="#334155" stroke="#64748B" stroke-width="1.2"/>
+    <polygon points="0,45 70,75 70,155 0,125" fill="#1E293B" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="70,75 140,45 140,125 70,155" fill="#0F172A" stroke="#475569" stroke-width="1.2"/>
+    <!-- Dial Gauge on front face -->
+    <circle cx="105" cy="98" r="20" fill="#020617" stroke="url(#emeraldGrad)" stroke-width="2.5"/>
+    <line x1="105" y1="98" x2="117" y2="85" stroke="#34D399" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="105" cy="98" r="3" fill="#F8FAFC"/>
+    <text x="70" y="178" text-anchor="middle" fill="#E2E8F0" font-family="system-ui, sans-serif" font-size="12" font-weight="700">4. AUDITORIA QA</text>
+    <text x="70" y="194" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace, monospace" font-size="10">Opus 90+ · -16 LUFS</text>
+  </g>
+
+  <!-- Conduit 4->5 -->
+  <path d="M 825,250 C 850,250 855,260 880,260" fill="none" stroke="#A855F7" stroke-width="3" stroke-dasharray="6 4"/>
+
+  <!-- STAGE 5: 3-Platform Publisher + Google Drive Vault -->
+  <g transform="translate(880, 165)" filter="url(#softGlow)">
+    <polygon points="0,45 65,18 130,45 65,72" fill="#334155" stroke="#64748B" stroke-width="1.2"/>
+    <polygon points="0,45 65,72 65,142 0,115" fill="#1E293B" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="65,72 130,45 130,115 65,142" fill="#0F172A" stroke="#475569" stroke-width="1.2"/>
+    <!-- 3 Platform Pins -->
+    <rect x="22" y="25" width="16" height="22" rx="3" fill="#EF4444"/>
+    <rect x="57" y="18" width="16" height="22" rx="3" fill="#EC4899"/>
+    <rect x="92" y="25" width="16" height="22" rx="3" fill="#06B6D4"/>
+    <text x="65" y="168" text-anchor="middle" fill="#E2E8F0" font-family="system-ui, sans-serif" font-size="12" font-weight="700">5. ENVIO 24/7</text>
+    <text x="65" y="184" text-anchor="middle" fill="#94A3B8" font-family="ui-monospace, monospace" font-size="10">YT · IG · TikTok · Drive</text>
+  </g>
+
+  <!-- Bottom Card Footer (Telemetry Readout) -->
+  <text x="32" y="488" fill="#64748B" font-family="ui-monospace, monospace" font-size="11">Termux aarch64 · runsv 24/7 · Chromium 157 bsk</text>
+  <text x="1088" y="488" text-anchor="end" fill="#34D399" font-family="ui-monospace, monospace" font-size="11" font-weight="700">STATUS: ZERO CLIPPING · 16/16 TESTS PASSING</text>
+</svg>
