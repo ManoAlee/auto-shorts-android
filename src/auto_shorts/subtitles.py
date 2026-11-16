@@ -15,8 +15,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_name},{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,56,56,{margin_v},1
-Style: Karaoke,{font_name},{font_size},&H0015CCFA,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,56,56,{margin_v},1
+Style: Default,{font_name},{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,48,72,{margin_v},1
+Style: Karaoke,{font_name},{font_size},&H0015CCFA,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,48,72,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -135,10 +135,8 @@ def generate_ass_subtitles(
     # Compact readable Shorts proportions (~30px on 720x1280, ~45px on 1080x1920)
     scale = width / 720.0
     font_size = int(round(30 * scale))
-    # Universal safe zone across TikTok, Instagram Reels, and YouTube Shorts:
-    # Bottom margin must be >= 280px in 720x1280 (or ~415px in 1080x1920) so subtitles
-    # sit cleanly above the TikTok sound marquee, creator handle, and caption fold.
-    resolved_margin_v = int(round((margin_v if margin_v is not None else 285) * scale))
+    # Universal safe zone across TikTok, Instagram Reels, and YouTube Shorts (video-edit: bottom 450 @1080p = 300 @720p):
+    resolved_margin_v = int(round((margin_v if margin_v is not None else 300) * scale))
 
     lines = [
         ASS_HEADER.format(

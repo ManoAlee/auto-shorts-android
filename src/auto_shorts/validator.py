@@ -627,10 +627,22 @@ def audit_short_end_to_end(
                     reject_reasons.append("Video narrado sem nenhuma legenda (0 cues).")
                 elif sub_cov_pct < 40.0:
                     reject_reasons.append(f"Cobertura de legendas insuficiente ({sub_cov_pct:.0f}% < 40%; risco de dessincronia).")
+            # Skill Hard Gate (video-edit / skill-reel): enforce safe-zone MarginV >= 280 on 720x1280
+            if sp and str(sp).endswith(".ass"):
+                m_mv = re.search(r"^Style:[^,]+,[^,]+,[^,]+,(?:[^,]*,){18}(\d+),", sub_text, re.M)
+                if m_mv and int(m_mv.group(1)) < 280:
+                    reject_reasons.append(f"Legenda fora da safe zone inferior (MarginV={m_mv.group(1)} < 280).")
             break
     leaks = _find_leaked_garbage(meta, sub_text=sub_text)
     if leaks:
         reject_reasons.append(f"Conteudo/texto sujo detectado ({', '.join(leaks)}).")
+
+    # Skill Hard Gate: reject dangling hooks or truncated titles ending in prepositions/conjunctions
+    hook_chk = str(meta.get("hook_title") or "").strip().lower()
+    if hook_chk:
+        last_hw = re.sub(r"[,.:;!?—–-]+$", "", hook_chk.split()[-1])
+        if last_hw in {"de", "da", "do", "das", "dos", "e", "ou", "em", "no", "na", "para", "por", "com", "a", "o", "que"}:
+            reject_reasons.append(f"Gancho cortado/pendente em preposicao ('{meta.get('hook_title')}').")
 
     dur = float(media_val.get("duration") or 0.0)
     if p.stem.startswith(("narrated_", "mundo_br_")) and 0.0 < dur < 16.0:

@@ -1333,7 +1333,7 @@ def build_narrated_short(
     q = QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])
     width, height = int(q["width"]), int(q["height"])
     ass_path = work_dir / f"{out_path.stem}.ass"
-    safe_margin_v = 310 if bg_has_subs else 285
+    safe_margin_v = 320 if bg_has_subs else 300
     from .pro_editor_engine import generate_capcut_word_pop_ass
     try:
         generate_capcut_word_pop_ass(

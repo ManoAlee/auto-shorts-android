@@ -136,7 +136,7 @@ def test_thumbnail_and_video_safe_zones():
         generate_ass_subtitles([{"start": 0.0, "end": 2.0, "text": "TESTE DE LEGENDA"}], 0.0, 2.0, ass_out, width=720, height=1280)
         ass_content = ass_out.read_text(encoding="utf-8")
         # Check MarginV in Style lines (Format: ... MarginL, MarginR, MarginV, Encoding)
-        m_margin = re.search(r"Style:\s*Default,.*?56,56,(\d+),1", ass_content)
+        m_margin = re.search(r"Style:\s*Default,.*?,\d+,\d+,(\d+),1\s*$", ass_content, re.M)
         assert m_margin, "MarginV not found in ASS style"
         margin_v = int(m_margin.group(1))
         assert margin_v >= 280, f"Subtitle MarginV ({margin_v}) is too low, will overlap TikTok caption (< 280)"

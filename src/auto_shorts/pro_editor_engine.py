@@ -165,8 +165,8 @@ def generate_capcut_word_pop_ass(
     vh = video_height if video_height is not None else height
     out_ass_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Safe vertical position: 285px (~22.5%) from bottom, clear of TikTok handle & caption fold
-    sub_margin_v = margin_v if margin_v is not None else int(vh * 0.23)
+    # Safe vertical position: 300px (~23.5%) from bottom (video-edit 450px @1080p rule)
+    sub_margin_v = margin_v if margin_v is not None else int(vh * 0.235)
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -176,7 +176,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: CapCutPop,{font_name},{font_size},{primary_color},{highlight_color},{outline_color},&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,40,40,{sub_margin_v},1
+Style: CapCutPop,{font_name},{font_size},{primary_color},{highlight_color},{outline_color},&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,48,72,{sub_margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

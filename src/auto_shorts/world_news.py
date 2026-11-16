@@ -429,6 +429,8 @@ def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Ho
         "ao", "aos", "pelo", "pela", "pelos", "pelas", "num", "numa", "nuns", "numas",
         "com", "para", "por", "que", "se", "a", "o", "as", "os", "um", "uma", "uns", "umas",
         "sem", "sob", "sobre", "modo", "como", "da?", "de?", "do?", "e?",
+        "pede", "diz", "afirma", "revela", "mostra", "faz", "vai", "pode", "quer", "tem",
+        "astro", "após", "entre", "contra", "até", "desde",
     }
     words = clipped.split()
     while words and (words[-1].lower().strip(",.:;!?—–-") in dangling_words or re.search(r"[,.:;!?—–-]$", words[-1])):
@@ -531,17 +533,18 @@ def build_brazil_news_story_pack(
     else:
         pt_summary = ""
 
-    # Auto-detect category from content early
-    content_blob = f"{orig_title} {orig_summary} {category}".lower()
-    if category in ("humor", "memes", "humor_memes") or any(k in content_blob for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
+    # Auto-detect category strictly from headline + category + lead snippet (avoiding article footer false positives)
+    title_low = orig_title.lower()
+    content_blob = f"{orig_title} {orig_summary[:180]} {category}".lower()
+    if category in ("humor", "memes", "humor_memes") or any(re.search(rf"\b{k}\b", content_blob) for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
         effective_category = "humor_memes"
-    elif category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
+    elif category in ("games", "jogo", "jogos") or any(re.search(rf"\b{k}\b", content_blob) for k in ("gta", "gta 6", "rockstar", "playstation", "ps5", "xbox", "nintendo", "gamer", "gameplay", "platina")):
         effective_category = "games"
-    elif category in ("tech", "ia", "tech_ia") or any(k in content_blob for k in ("inteligencia artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple")):
+    elif category in ("tech", "ia", "tech_ia") or any(re.search(rf"\b{k}\b", title_low) for k in ("ia", "inteligencia artificial", "inteligência artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple", "chip", "chips", "robô", "robo")):
         effective_category = "tech_ia"
-    elif category in ("economia", "financas") or any(k in content_blob for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib")):
+    elif category in ("economia", "financas") or any(re.search(rf"\b{k}\b", content_blob) for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib", "escala 5x2", "stf")):
         effective_category = "economia"
-    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(k in content_blob for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "planeta", "lua", "marte")):
+    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(re.search(rf"\b{k}\b", content_blob) for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "telescópio", "planeta", "lua", "marte")):
         effective_category = "ciencia_espaco"
     else:
         effective_category = "mundo"
