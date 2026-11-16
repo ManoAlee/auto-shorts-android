@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from .anime_trends import get_releasing_anime_radar
 from .config import NICHES
 from .highlights import _parse_json_loose, call_gemini_or_openai
+from .mahoraga import clean_word_boundary_hook
 from .narrator import humanize_ptbr_script
 from .tiktok_algorithm import build_mentalist_script_blueprint, get_niche_mentalism_playbook
 
@@ -152,7 +153,7 @@ def build_persona_script_brief(
         f"{bp['beats']['2_a_18s_zeigarnik_open_loop']} {bp['beats']['18_a_52s_mentalist_reframe']}"
     )
     climax_line = humanize_ptbr_script(bp["beats"]["52s_end_loop_bridge_cta"])
-    hook_banner = clean_topic.upper()[:34]
+    hook_banner = clean_word_boundary_hook(clean_topic, max_chars=32)
     title = f"{clean_topic[:74]} — O Detalhe Que Ninguém Notou"[:90]
     engine_used = "heuristic_team"
 
@@ -175,7 +176,7 @@ def build_persona_script_brief(
                 body_line = humanize_ptbr_script(str(data["desenvolvimento"]))
                 climax_line = humanize_ptbr_script(str(data.get("climax_cta") or climax_line))
                 if data.get("hook_banner"):
-                    hook_banner = str(data["hook_banner"]).strip().upper()[:38]
+                    hook_banner = clean_word_boundary_hook(str(data["hook_banner"]), max_chars=32)
                 if data.get("seo_title"):
                     title = str(data["seo_title"]).strip()[:90]
                 engine_used = "llm_team"

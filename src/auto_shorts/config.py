@@ -134,6 +134,24 @@ NICHES: Dict[str, NicheProfile] = {
         ],
         cta_suggestion="Fonte jornalistica internacional creditada acima — siga para atualizacoes globais!",
     ),
+    "humor_memes": NicheProfile(
+        key="humor_memes",
+        label="Humor, Memes, Reacts e Shitpost",
+        hook_keywords=[
+            "meme", "engracado", "rir", "comedia", "humor", "react", "casimiro",
+            "defante", "smigol", "gaules", "piada", "zoeira", "viral", "shitpost", "fail",
+        ],
+        cta_suggestion="Manda pro amigo que precisa rir hoje e segue para mais memes!",
+    ),
+    "games": NicheProfile(
+        key="games",
+        label="Games, GTA 6, PlayStation e Cultura Gamer",
+        hook_keywords=[
+            "gta", "gta 6", "rockstar", "game", "games", "jogo", "jogos", "playstation",
+            "xbox", "pc", "gamer", "trailer", "gameplay", "vazamento", "lancamento",
+        ],
+        cta_suggestion="Comenta sua expectativa sobre o jogo e segue para mais novidades dos games!",
+    ),
     "geral": NicheProfile(
         key="geral",
         label="Curiosidades, Cortes e Storytelling",
@@ -154,6 +172,8 @@ NICHE_BADGES: Dict[str, str] = {
     "entretenimento_animes": "ANIMES",
     "podcast": "PODCAST",
     "noticias_mundiais": "MUNDO HOJE",
+    "humor_memes": "MEMES & HUMOR",
+    "games": "GAMES",
     "geral": "DESTAQUE",
 }
 

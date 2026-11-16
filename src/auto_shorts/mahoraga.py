@@ -110,6 +110,7 @@ ACTIVE_IMMUNITIES: List[Dict[str, str]] = [
 _DANGLING_TOKENS = {
     "a", "o", "as", "os", "um", "uma", "uns", "umas",
     "de", "da", "do", "das", "dos", "em", "na", "no", "nas", "nos",
+    "ao", "aos", "pelo", "pela", "pelos", "pelas", "num", "numa", "nuns", "numas",
     "e", "ou", "para", "por", "com", "sem", "sob", "sobre", "entre", "ate", "até",
     "apos", "após", "antes", "depois", "durante", "contra", "perante", "diante", "segundo",
     "que", "se", "mas", "como", "quando", "onde", "porque",
@@ -430,6 +431,18 @@ class MahoragaEngine:
                 cur_words += s_w
             else:
                 break
+
+        # Ensure high-retention length (65 to 95 words, ~35-48s duration) when summary is concise
+        if cur_words < 65:
+            cat_context = {
+                "games": "O assunto movimenta a comunidade gamer e traz repercussões importantes para os próximos lançamentos da indústria.",
+                "tech_ia": "A disputa por avanços tecnológicos segue em ritmo acelerado com investimentos bilionários no setor.",
+                "economia": "Analistas de mercado monitoram os reflexos diretos nas projeções financeiras e no cenário econômico.",
+                "ciencia_espaco": "Novos dados científicos continuam sendo analisados por centros de pesquisa ao redor do mundo.",
+                "humor_memes": "O momento rapidamente repercutiu nas redes sociais e viralizou entre criadores e internautas.",
+            }.get(category, "O desdobramento desse caso segue em acompanhamento atento pelos principais analistas internacionais.")
+            selected_sentences.append(cat_context)
+            cur_words += len(cat_context.split())
 
         budgeted_summary = " ".join(selected_sentences).strip()
         if budgeted_summary and not budgeted_summary.endswith((".", "!", "?")):

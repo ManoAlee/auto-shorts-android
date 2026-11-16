@@ -120,6 +120,44 @@ HORIZON_CATALOG: Dict[str, Dict] = {
             },
         ],
     },
+    "humor_memes": {
+        "label": "Humor, Memes, Reacts & Comédia",
+        "niche": "humor_memes",
+        "playlist": "Humor & Memes BR - Shorts",
+        "cards": [
+            {
+                "title_pt": "Melhores momentos engraçados e reacts de streamers (Casimiro, Defante, Smigol, Gaules)",
+                "hook_suggestion": "EU NÃO ACREDITO QUE ELE FEZ ISSO",
+                "why_viral": "Humor orgânico e identificação imediata — taxa altíssima de compartilhamento no WhatsApp e Direct.",
+                "youtube_query": "react engracado momentos casimiro defante gaules brasil",
+                "source": "Radar Humor & Reacts",
+                "niche": "humor_memes",
+            },
+            {
+                "title_pt": "Memes virais, esquetes do cotidiano brasileiro e quebras de expectativa",
+                "hook_suggestion": "TODO BRASILEIRO É ASSIM",
+                "why_viral": "Efeito espelho cômico e alívio dopaminérgico — retenção alta até a punchline.",
+                "youtube_query": "memes brasil compilação momentos engracados comedia shorts",
+                "source": "Radar Memes BR",
+                "niche": "humor_memes",
+            },
+        ],
+    },
+    "games_esports": {
+        "label": "Games, GTA 6 & PlayStation",
+        "niche": "games",
+        "playlist": "Games, GTA 6 & Novidades - Shorts",
+        "cards": [
+            {
+                "title_pt": "GTA 6: vazamentos, mecânicas secretas do mapa e novidades de lançamento",
+                "hook_suggestion": "DETALHE DO GTA 6 QUE VOCÊ NÃO VIU",
+                "why_viral": "Hype massivo da comunidade gamer com alto volume de busca e retenção.",
+                "youtube_query": "gta 6 novidades detalhes mapa gameplay trailer brasil",
+                "source": "Radar Games & GTA 6",
+                "niche": "games",
+            },
+        ],
+    },
 }
 
 
@@ -219,6 +257,8 @@ def fetch_horizon_trends(
         "saude_treino": ("saude", "Saude & Neuro", "Salvamentos WhatsApp/IG"),
         "entretenimento_cultura": ("cultura", "Cultura Pop", "Comentarios & Teorias"),
         "ciencia_espaco": ("ciencia", "Ciencia & Mundo", "Curiosidade global"),
+        "humor_memes": ("humor", "Humor & Memes", "Compartilhamento Viral WhatsApp"),
+        "games_esports": ("games", "Games & GTA 6", "Comunidade Gamer & Hype"),
     }
 
     want_news = key in {"todos", "all", "", "ciencia_espaco", "dinheiro_ia", "noticias_mundiais"}

@@ -5,7 +5,7 @@
 [![CI](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml/badge.svg)](https://github.com/ManoAlee/auto-shorts-android/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Android Termux aarch64](https://img.shields.io/badge/Android-Termux%20aarch64-3DDC84?logo=android&logoColor=white)](scripts/install_termux.sh)
-[![Tests 101 Passing](https://img.shields.io/badge/Tests-101%20Passing-059669)](#verification--testing)
+[![Tests 107 Passing](https://img.shields.io/badge/Tests-107%20Passing-059669)](#verification--testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Autonomous 9:16 Vertical Video Factory engineered for Android (`Termux aarch64`) & Windows Desktop**  
@@ -152,13 +152,24 @@ flowchart TD
 1. **Games & Pop Culture (e.g., GTA 6, Anime, Cinema)**:
    - Automatically snipes official 4K trailers, developer showcases, and gameplay slices.
    - Preserves high-FPS movement with Lanczos scaling and subtle unsharp filtering.
-2. **Politics, Geopolitics & World News (e.g., Brasil, STF, G20, White House)**:
+2. **Humor, Memes, Reacts & Shitposts (e.g., Casimiro, Defante, Smigol, Gaules, Pegadinhas)**:
+   - Ultra-dynamic pacing with scene switches every 1.8s–2.2s, punch-in camera zooms, dramatic comedy pauses.
+   - Sonic punctuation with clean meme SFX (vine boom, bruh, laughter, whoosh) + kinetic high-contrast captions.
+3. **Politics, Geopolitics & World News (e.g., Brasil, STF, G20, White House)**:
    - Queries Wikimedia Commons REST API with automated attribution.
    - Generates high-definition Ken Burns 2.5D vertical camera motion across historic and current imagery.
-3. **Tech, AI & Silicon (e.g., Nvidia, Jensen Huang, OpenAI, Elon Musk)**:
+4. **Tech, AI & Silicon (e.g., Nvidia, Jensen Huang, OpenAI, Elon Musk)**:
    - Mixes keynote b-roll slices with dynamic multi-angle visual hooks.
-4. **Finance, Macroeconomics & Commodities (e.g., Selic, Commodities, Câmbio)**:
+5. **Finance, Macroeconomics & Commodities (e.g., Selic, Commodities, Câmbio)**:
    - Renders financial cards with procedural ambient audio textures.
+
+---
+
+## Editorial Safe Zones, Audio Mastering & News Hygiene
+
+- **Universal Safe Zone Calibration**: All visual elements (captions, headlines, cards) strictly observe social platform overlays (top 220px for headers/tabs, bottom 450px for handles/audio tags, side rails 35px/100px).
+- **Studio Audio Mastering**: -14 to -16 LUFS integrated loudness with true peak capped at <= -1.0 dBTP for distortion-free mobile speaker playback.
+- **News Sanitization Firewall**: Automated stripping of promotional blog spam (`Google Discover`, `WhatsApp/Telegram VIP`, partner teasers) and elimination of naive string slicing, guaranteeing titles and hooks never cut off mid-word.
 
 ---
 

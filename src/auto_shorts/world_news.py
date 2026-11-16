@@ -35,14 +35,24 @@ _SPAM_JUNK_PATTERNS = (
     "veja também", "veja mais", "redes sociais", "termos de uso", "política de privacidade",
     "todos os direitos reservados", "principais notícias na pesquisa", "principais noticias na pesquisa",
     "adicionar como fonte preferida", "portal viciados", "viciados em gta",
+    "veja as notícias", "veja as noticias", "primeiro no seu discover", "toque aqui e siga",
+    "toque aqui", "vídeo do nosso parceiro", "video do nosso parceiro", "nosso parceiro",
+    "whatsapp", "telegram", "canal no youtube", "quer ser avisado", "grupo vip", "avisos",
+    "notícias no seu celular", "noticias no seu celular", "siga o canal", "inscreva-se no canal",
 )
 
 
 def sanitize_news_lead_text(raw_text: str) -> str:
-    """Strip promotional blog junk, Google Discover/News CTAs, breadcrumbs and social spam from article text."""
+    """Strip promotional blog junk, Google Discover/News CTAs, emojis, and incomplete fragments."""
     if not raw_text:
         return ""
     txt = _clean_text(raw_text)
+    # Strip raw attention emojis, arrows and variation selectors: ➡️, ▶️, 🔥, ⚡, 🚨, 👉, 👇, 💥, etc.
+    txt = re.sub(r"[\u2700-\u27BF\U0001F300-\U0001F9FF\u2190-\u21FF\u2600-\u26FF\uFE00-\uFE0F]", " ", txt)
+    # Split promo colons into sentence boundaries ("...vídeo do parceiro SanInPlay : A Rockstar confirmou...")
+    txt = re.sub(r":\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])", ". ", txt)
+    # Clean irregular spacing around punctuation (e.g., "Nvidia , empresários" -> "Nvidia, empresários")
+    txt = re.sub(r"\s+([,.:;!?])", r"\1", txt)
     # Split into discrete sentences
     sentences = re.split(r"(?<=[.!?])\s+", txt)
     clean: List[str] = []
@@ -54,15 +64,33 @@ def sanitize_news_lead_text(raw_text: str) -> str:
         # Drop breadcrumbs like "Página Inicial - Viciados - GTA 6"
         if s_str.count(" - ") >= 2:
             continue
-        # Drop sentences matching any blog spam / Google Discover CTA pattern
+        # Drop sentences matching any blog spam / Google Discover / Partner CTA pattern
         if any(pat in s_low for pat in _SPAM_JUNK_PATTERNS):
             continue
-        # Drop sentences that are pure navigation fragments
-        if s_low.startswith(("página inicial", "pagina inicial", "seguir +", "clique aqui")):
+        # Drop sentences that are pure navigation fragments or end with a trailing partner colon
+        if s_low.startswith(("página inicial", "pagina inicial", "seguir +", "clique aqui", "toque aqui")):
+            continue
+        if re.search(r":\s*$", s_str):
             continue
         clean.append(s_str)
     res = " ".join(clean).strip()
     return re.sub(r"\s+", " ", res).strip()
+
+
+def clean_truncate_to_sentence(text: str, max_chars: int = 750) -> str:
+    """Truncate article lead strictly at a full stop/sentence boundary before max_chars, never mid-sentence."""
+    clean = re.sub(r"\s+", " ", text or "").strip()
+    if len(clean) <= max_chars:
+        return clean
+    clipped = clean[:max_chars]
+    # Find last sentence end (. or ! or ?)
+    m = re.search(r"^(.*[.!?])(?:\s+.*)?$", clipped)
+    if m and len(m.group(1).strip()) >= 40:
+        return m.group(1).strip()
+    # Fallback to word boundary
+    if " " in clipped:
+        clipped = clipped.rsplit(" ", 1)[0]
+    return re.sub(r"[,.:;!?—–-]+$", "", clipped).strip() + "."
 
 
 _SHOPPING_PROMO_TERMS = (
@@ -372,7 +400,15 @@ def _build_complete_news_hook(pt_title: str, max_chars: int = 32, category: str 
 def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Hoje") -> str:
     """Format SEO title cleanly, trimming without leaving hanging prepositions, conjunctions, or punctuation."""
     clean = re.sub(r"\s+", " ", title or "").strip()
-    clean = re.sub(r"\s*[-–|].*$", "", clean).strip()
+
+    # Safely strip trailing portal/brand suffix ONLY if at the very end of the string
+    # (e.g., " - G1", " - Tecnoblog", " | Viciados.net", " – BBC News Brasil")
+    # Never strip internal hyphens or separators inside actual headlines!
+    m_brand = re.search(r"\s+[-–|]\s+(?:G1.*|Tecnoblog|Viciados.*|IGN.*|BBC.*|CNN.*|Metrópoles|Canaltech|InfoMoney|Olhar Digital|Euronews.*|[A-Za-z0-9\s]{2,20})$", clean, re.I)
+    if m_brand:
+        cand = clean[:m_brand.start()].strip()
+        if len(cand) >= 20:
+            clean = cand
 
     target_len = max(20, max_chars - len(suffix))
     if len(clean) <= target_len:
@@ -390,6 +426,7 @@ def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Ho
         clipped = clipped.rsplit(" ", 1)[0]
     dangling_words = {
         "e", "ou", "de", "da", "do", "das", "dos", "em", "na", "no", "nas", "nos",
+        "ao", "aos", "pelo", "pela", "pelos", "pelas", "num", "numa", "nuns", "numas",
         "com", "para", "por", "que", "se", "a", "o", "as", "os", "um", "uma", "uns", "umas",
         "sem", "sob", "sobre", "modo", "como", "da?", "de?", "do?", "e?",
     }
@@ -433,7 +470,8 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
             combined_parts.append(desc)
         combined_parts.extend(paragraphs)
         combined = sanitize_news_lead_text(" ".join(combined_parts))
-        return combined[:850], img
+        lead = clean_truncate_to_sentence(combined, max_chars=750)
+        return lead, img
     except Exception:
         return "", ""
 
@@ -476,23 +514,18 @@ def build_brazil_news_story_pack(
     # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", etc.
     clean_t = re.sub(r"\s+[-–|]\s+.*$", "", pt_title).strip().lower()
     clean_s = re.sub(r"\s+[-–|]\s+.*$", "", pt_summary).strip().lower()
-    if clean_s and (clean_s in clean_t or clean_t in clean_s or len(clean_s.split()) < 8):
-        # The summary is merely repeating the headline!
-        if any(k in pt_title.lower() for k in ("gta", "rockstar", "vice city", "leonida", "jogo")):
-            pt_summary = (
-                "A Rockstar Games confirmou o aguardado lançamento de Grand Theft Auto 6 para PlayStation 5 "
-                "e Xbox Series X e S. Ambientado no gigantesco estado de Leonida, o jogo traz a icônica Vice City "
-                "reimaginada com gráficos ultrarrealistas, física dinâmica de água e trânsito, acompanhando "
-                "a dupla de protagonistas Lucia e Jason em uma narrativa cinematográfica sem precedentes."
-            )
-        elif any(k in pt_title.lower() for k in ("ia", "inteligencia artificial", "openai", "google", "meta", "nvidia")):
-            pt_summary = (
-                "Avanços acelerados em modelos de inteligência artificial de última geração continuam transformando "
-                "a indústria tecnológica global. Especialistas destacam saltos significativos em eficiência de processamento, "
-                "redução de consumo energético em data centers e novas aplicações operacionais integradas a sistemas cotidianos."
-            )
+    if not pt_summary or clean_s == clean_t or len(clean_s.split()) < 6:
+        # The summary is empty or identical to the headline; generate clean headline-derived context
+        if effective_category == "games" or any(k in pt_title.lower() for k in ("gta", "rockstar", "jogo")):
+            pt_summary = f"{pt_title}. As principais novidades e repercussões no universo dos games e lançamentos da indústria foram detalhadas pela imprensa especializada."
+        elif effective_category == "tech_ia" or any(k in pt_title.lower() for k in ("ia", "inteligencia artificial", "nvidia", "openai")):
+            pt_summary = f"{pt_title}. Os desdobramentos tecnológicos e os impactos no ecossistema digital foram acompanhados por especialistas e analistas do setor."
+        elif effective_category == "economia":
+            pt_summary = f"{pt_title}. Os reflexos nos mercados financeiros e as projeções econômicas movimentaram investidores e analistas nesta semana."
+        elif effective_category == "ciencia_espaco":
+            pt_summary = f"{pt_title}. A descoberta e os dados científicos divulgados chamaram a atenção de pesquisadores e centros de exploração global."
         else:
-            pt_summary = ""
+            pt_summary = f"{pt_title}. Os fatos e os detalhes apurados repercutiram nos principais veículos internacionais e acompanham o cenário global."
 
     # Deduplicate if pt_summary repeats pt_title at the start
     if pt_summary and pt_title and pt_summary.lower().startswith(pt_title.lower()):
@@ -506,7 +539,9 @@ def build_brazil_news_story_pack(
 
     # Auto-detect category from content if not explicitly specified
     content_blob = f"{orig_title} {orig_summary} {category}".lower()
-    if category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
+    if category in ("humor", "memes", "humor_memes") or any(k in content_blob for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
+        effective_category = "humor_memes"
+    elif category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
         effective_category = "games"
     elif category in ("tech", "ia", "tech_ia") or any(k in content_blob for k in ("inteligencia artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple")):
         effective_category = "tech_ia"
@@ -518,6 +553,12 @@ def build_brazil_news_story_pack(
         effective_category = "mundo"
 
     cat_meta_map = {
+        "humor_memes": {
+            "niche": "humor_memes",
+            "seo_suffix": " | Plantão Humor",
+            "hashtags": ["#MemesBrasil", "#HumorBR", "#Comedia", "#Engracado", "#Risos", "#Shorts"],
+            "cta": "Manda pro amigo que precisa rir hoje e segue para mais memes!",
+        },
         "games": {
             "niche": "games",
             "seo_suffix": " | Plantão Games",
@@ -585,7 +626,7 @@ def build_brazil_news_story_pack(
                 if data.get("seo_title") and str(data["seo_title"]).strip().lower() not in {"string", "max 80 chars"}:
                     seo_title = _clean_seo_title(str(data["seo_title"]).strip(), max_chars=80, suffix=cat_meta["seo_suffix"])
                 if data.get("hook_banner") and _is_valid_hook_banner(str(data["hook_banner"])):
-                    hook_banner = str(data["hook_banner"]).strip().upper()[:30]
+                    hook_banner = clean_word_boundary_hook(str(data["hook_banner"]), max_chars=32)
         except Exception:
             pass
 

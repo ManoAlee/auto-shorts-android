@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from .mahoraga import clean_word_boundary_hook
 from .viral_intelligence import (
     AntiSlopHumanizer,
     build_zeigarnik_loop_cta,
@@ -69,6 +70,11 @@ NICHE_TAG_POOLS: Dict[str, Dict[str, List[str]]] = {
         "instagram": ["#GamerBrasil", "#GTA6", "#GamesBR", "#GameplayBR", "#ClipsGamer"],
         "tiktok": ["#GamerBrasil", "#GTA6", "#Gaming", "#Clipada"],
         "youtube": ["#Shorts", "#Gaming", "#GTA6"],
+    },
+    "humor_memes": {
+        "instagram": ["#MemesBrasil", "#ComediaBR", "#Humor", "#Risos", "#Engracado"],
+        "tiktok": ["#MemesBrasil", "#HumorBR", "#Comedia", "#Engracado"],
+        "youtube": ["#Shorts", "#MemesBrasil", "#Humor"],
     },
     "geral": {
         "instagram": ["#Curiosidades", "#Brasil", "#Fatos", "#Conhecimento", "#ViralBR"],
@@ -157,8 +163,8 @@ def build_tiktok_metadata(
     humanizer = AntiSlopHumanizer()
     clean_title = humanizer.clean(title).strip()
     
-    # Banner
-    banner = hook_banner.strip().upper() if hook_banner else clean_title[:32].upper()
+    # Banner (safe word boundary, never slicing mid-word)
+    banner = clean_word_boundary_hook(hook_banner or clean_title, max_chars=32)
     
     # TikTok caption (short, high readability)
     tags_pool = NICHE_TAG_POOLS.get(niche, NICHE_TAG_POOLS["geral"])["tiktok"][:TIKTOK_MAX_TAGS]
@@ -169,7 +175,7 @@ def build_tiktok_metadata(
     
     return {
         "title": clean_title[:TIKTOK_MAX_TITLE],
-        "hook_banner": banner[:32],
+        "hook_banner": banner,
         "caption": caption[:180],
         "hashtags": tags_pool,
     }

@@ -1568,6 +1568,8 @@
     financas: { bg: 'linear-gradient(135deg, #134E4A 0%, #0D9488 100%)', label: 'Dinheiro & IA', sub: 'Nicho alto RPM' },
     psicologia: { bg: 'linear-gradient(135deg, #78350F 0%, #D97706 100%)', label: 'Psicologia', sub: 'Mente & comportamento' },
     saude: { bg: 'linear-gradient(135deg, #0C4A6E 0%, #0284C7 100%)', label: 'Saude & Neuro', sub: 'Habitos & performance' },
+    humor: { bg: 'linear-gradient(135deg, #B45309 0%, #F59E0B 100%)', label: 'Humor & Memes', sub: 'Comédia e virais' },
+    games: { bg: 'linear-gradient(135deg, #3730A3 0%, #6366F1 100%)', label: 'Games & GTA 6', sub: 'Cultura gamer e hype' },
   };
   function createFallbackCover(art) {
     const inner = document.createElement('div');

@@ -1,0 +1,107 @@
+"""Unit tests for world news sanitization, SEO title formatting, word-boundary hooks, and humor/memes niche."""
+
+import pytest
+from auto_shorts.config import NICHES, NICHE_BADGES
+from auto_shorts.horizon_radar import HORIZON_CATALOG
+from auto_shorts.mahoraga import clean_word_boundary_hook, MahoragaEngine
+from auto_shorts.tiktok_algorithm import NICHE_MENTALISM_PLAYBOOKS
+from auto_shorts.world_news import (
+    _clean_seo_title,
+    clean_truncate_to_sentence,
+    sanitize_news_lead_text,
+    build_brazil_news_story_pack,
+)
+
+
+def test_clean_seo_title_preserves_internal_hyphens_and_strips_brands():
+    # Internal hyphens/dashes in game news must NEVER strip the title
+    raw1 = "GTA 6 - Caixa física revela vantagens no PS5"
+    res1 = _clean_seo_title(raw1, suffix=" | Plantão Games")
+    assert "Caixa física revela vantagens" in res1
+    assert res1.endswith(" | Plantão Games")
+    assert not res1.startswith("GTA 6 | Plantão Games")
+
+    # Trailing publisher brands at the end should be stripped
+    raw2 = "Musk defende volta de Jensen Huang para comando da Nvidia - G1"
+    res2 = _clean_seo_title(raw2, suffix=" | Plantão Tech")
+    assert "- G1" not in res2
+    assert "Musk defende volta de Jensen" in res2
+    assert res2.endswith(" | Plantão Tech")
+
+    raw3 = "GTA 6 precisa de nota 90 no Metacritic, diz analista | Viciados.net"
+    res3 = _clean_seo_title(raw3, suffix=" | Plantão Games")
+    assert "Viciados" not in res3
+    assert "Metacritic" in res3
+
+
+def test_clean_word_boundary_hook_never_slices_words():
+    # Must never produce "AO BR" instead of "AO BRASIL"
+    h1 = clean_word_boundary_hook("UE DECIDE FIM DO EMBARGO AO BRASIL", max_chars=32)
+    assert not h1.endswith(" BR")
+    assert h1 in ("UE DECIDE FIM DO EMBARGO", "UE DECIDE FIM DO EMBARGO AO BRASIL")
+
+    # Must never produce "REVELA VA" instead of "REVELA VANTAGENS"
+    h2 = clean_word_boundary_hook("GTA 6 CAIXA FÍSICA REVELA VANTAGENS", max_chars=32)
+    assert not h2.endswith(" VA")
+    assert "REVELA" in h2
+
+    # Contractions and prepositions must be stripped if dangling at the end
+    h3 = clean_word_boundary_hook("DESTAQUE SOBRE O FUTURO DO", max_chars=28)
+    assert not h3.endswith(" DO")
+
+
+def test_sanitize_news_lead_text_removes_portal_junk_and_emojis():
+    raw_junk = (
+        "Movimento reúne empresários e investidores da fabricante. ➡️ O escândalo parece filme. "
+        "Veja as notícias de GTA 6 primeiro no seu Discover. Toque aqui e siga. "
+        "Você pode conferir mais notícias de GTA 6, no vídeo do nosso parceiro SanInPlay : "
+        "A Rockstar confirmou novidades para a comunidade gamer."
+    )
+    clean = sanitize_news_lead_text(raw_junk)
+    assert "Discover" not in clean
+    assert "Toque aqui" not in clean
+    assert "SanInPlay" not in clean
+    assert "➡️" not in clean
+    assert "Rockstar confirmou novidades" in clean
+
+
+def test_clean_truncate_to_sentence_avoids_mid_sentence_cuts():
+    text = (
+        "O executivo renunciou ao cargo após denúncias de relacionamentos na empresa. "
+        "A mobilização envolve empresários de renome global e funcionários da fábrica enquanto uma investigação prossegue no conselho."
+    )
+    # Truncate to 100 chars
+    res = clean_truncate_to_sentence(text, max_chars=110)
+    # Must end with full stop and not mid-sentence fragment
+    assert res.endswith(".")
+    assert "enquanto uma" not in res
+    assert "O executivo renunciou ao cargo após denúncias de relacionamentos na empresa." == res
+
+
+def test_humor_memes_niche_registered_across_system():
+    assert "humor_memes" in NICHES
+    assert NICHES["humor_memes"].key == "humor_memes"
+    assert "MEMES" in NICHE_BADGES["humor_memes"]
+
+    assert "humor_memes" in HORIZON_CATALOG
+    assert len(HORIZON_CATALOG["humor_memes"]["cards"]) >= 2
+    assert "Casimiro" in HORIZON_CATALOG["humor_memes"]["cards"][0]["title_pt"] or "Defante" in HORIZON_CATALOG["humor_memes"]["cards"][0]["title_pt"]
+
+    assert "humor_memes" in NICHE_MENTALISM_PLAYBOOKS
+    assert NICHE_MENTALISM_PLAYBOOKS["humor_memes"]["ideal_bpm_cuts_sec"] <= 2.2
+
+
+def test_build_brazil_news_story_pack_preserves_specific_summary():
+    story = {
+        "title": "GTA 6 terá tracklist com mais de 30 faixas musicais",
+        "summary": "Vazamento revela seleção sonora diversificada para as estações de rádio de Leonida, incluindo rap, rock clássico e synthwave.",
+        "source": "Viciados.net",
+        "url": "https://viciados.net/gta-6-tracklist",
+        "category": "games",
+        "lang": "pt",
+    }
+    pack = build_brazil_news_story_pack(story, use_llm=False)
+    # Must preserve the specific musical tracklist theme and not replace with Vice City boilerplate
+    assert "tracklist" in pack["caption"].lower() or "faixas" in pack["caption"].lower() or "musical" in pack["caption"].lower()
+    assert "A Rockstar Games confirmou o aguardado lançamento de Grand Theft Auto 6 para PlayStation 5" not in pack["caption"]
+    assert len(pack["script"].split()) >= 60
