@@ -12,6 +12,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from .config import NICHES, PLATFORMS, NicheProfile, PlatformPreset
 from .transcript import format_transcript_for_llm
+from .viral_intelligence import AntiSlopHumanizer, score_hook
 
 CHUNK_SIZE_SECONDS = 1200.0
 LONG_VIDEO_THRESHOLD = 1800.0
@@ -194,27 +195,48 @@ def _sanitize_highlights(
         else:
             title = raw_title[:90]
 
+        # Apply AntiSlopHumanizer: strip invisible watermarks, em-dashes, and robotic AI cliches
+        title = AntiSlopHumanizer.clean(title)
+        spoken_first_line = clip_texts[0] if clip_texts else ""
+        _, banner_hook = AntiSlopHumanizer.generate_dual_hook(hook_title, spoken_first_line)
+        if banner_hook:
+            hook_title = banner_hook
+
         raw_reason = str(item.get("virality_reason") or "").strip()
         virality_reason = (
             "Gancho forte nos primeiros segundos e alta densidade de fala."
             if _is_placeholder_text(raw_reason)
             else raw_reason
         )
+        virality_reason = AntiSlopHumanizer.clean(virality_reason)
+
         raw_cta = str(item.get("cta_line") or "").strip()
         cta_line = (
             (niche.cta_suggestion if niche else "Comenta aqui sua opiniao e siga para a parte 2!")
             if _is_placeholder_text(raw_cta)
             else raw_cta
         )
+        cta_line = AntiSlopHumanizer.clean(cta_line)
+
+        # Hook Scoring via 5 viral heuristics
+        hook_metrics = score_hook(spoken_first_line, hook_title)
+        calibrated_score = score
+        if hook_metrics.has_greeting_penalty:
+            calibrated_score = max(20, calibrated_score - 20)
+        elif hook_metrics.composite_score >= 75.0:
+            calibrated_score = min(100, calibrated_score + 10)
 
         cleaned.append({
             "title": title,
             "hook_title": hook_title,
             "start_time": round(start, 2),
             "end_time": round(end, 2),
-            "score": max(0, min(100, score)),
+            "score": max(0, min(100, calibrated_score)),
             "virality_reason": virality_reason,
             "cta_line": cta_line,
+            "hook_score": hook_metrics.composite_score,
+            "hook_grade": hook_metrics.grade,
+            "hook_formula": hook_metrics.matched_formula or "",
         })
     return cleaned
 

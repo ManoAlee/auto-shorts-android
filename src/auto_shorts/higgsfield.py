@@ -148,3 +148,4 @@ def try_generate_hook_broll(
     except Exception as exc:
         logger.warning("Higgsfield hook B-Roll fallback (usando B-Roll local): %s", exc)
         return None
+

@@ -87,17 +87,31 @@ def fetch_world_news_headlines(
     get = fetcher or _http_get_text
     collected: List[Dict] = []
 
-    # 1. BBC News Brasil, Euronews PT, G1, Tecnoblog & Incidentes Globais
-    for rss_url, src_label, cat_name in (
+    # 1. Multi-Portal Brazilian & Global RSS Desks (Diversified & Load-Balanced)
+    base_sources = [
         ("https://news.google.com/rss/search?q=Microsoft+OR+CrowdStrike+OR+AWS+OR+Cloudflare+OR+apagao+OR+pane+when:2d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Tech Global", "tech_ia"),
         ("https://tecnoblog.net/feed/", "Tecnoblog", "tech_ia"),
         ("https://feeds.bbci.co.uk/portuguese/rss.xml", "BBC News Brasil", "mundo"),
         ("https://pt.euronews.com/rss?level=theme&name=news", "Euronews Mundo", "mundo"),
+        ("https://olhardigital.com.br/feed/", "Olhar Digital", "tech_ia"),
+        ("https://canaltech.com.br/rss/", "Canaltech", "tech_ia"),
+        ("https://www.cnnbrasil.com.br/feed/", "CNN Brasil", "mundo"),
+        ("https://www.metropoles.com/feed", "Metrópoles", "mundo"),
+        ("https://www.infomoney.com.br/feed/", "InfoMoney", "economia"),
         ("https://g1.globo.com/rss/g1/tecnologia/", "G1 Tecnologia", "tech_ia"),
         ("https://g1.globo.com/rss/g1/economia/", "G1 Economia", "economia"),
         ("https://g1.globo.com/rss/g1/mundo/", "G1 Mundo", "mundo"),
         ("https://www.bleepingcomputer.com/feed/", "BleepingComputer", "tech_ia"),
-    ):
+    ]
+    if fetcher is None:
+        import random
+        # In live production, randomize order so BBC or G1 don't monopolize the headlines
+        active_sources = list(base_sources)
+        random.shuffle(active_sources)
+    else:
+        active_sources = base_sources
+
+    for rss_url, src_label, cat_name in active_sources:
         try:
             collected.extend(_parse_rss_items(
                 get(rss_url),
@@ -293,12 +307,20 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
         paragraphs: List[str] = []
         for pm in re.finditer(r"<p[^>]*>(.*?)</p>", html_raw, re.I | re.S):
             p_txt = _clean_text(pm.group(1))
-            if 65 <= len(p_txt) <= 420 and not any(b in p_txt.lower() for b in ("cookie", "subscribe", "newsletter", "all rights reserved", "javascript")):
+            if 50 <= len(p_txt) <= 450 and not any(b in p_txt.lower() for b in (
+                "cookie", "subscribe", "newsletter", "all rights reserved", "javascript",
+                "compartilhe", "inscreva-se", "leia mais", "redes sociais", "anúncio", "publicidade",
+                "termos de uso", "privacidade"
+            )):
                 paragraphs.append(p_txt)
-                if len(paragraphs) >= 2:
+                if len(paragraphs) >= 4:
                     break
-        combined = " ".join([*( [desc] if desc and len(desc) >= 45 else [] ), *paragraphs]).strip()
-        return combined[:460], img
+        combined_parts = []
+        if desc and len(desc) >= 45 and not any(desc[:30].lower() in p.lower() for p in paragraphs):
+            combined_parts.append(desc)
+        combined_parts.extend(paragraphs)
+        combined = " ".join(combined_parts).strip()
+        return combined[:850], img
     except Exception:
         return "", ""
 
@@ -320,13 +342,17 @@ def build_brazil_news_story_pack(
     category = str(story.get("category") or "mundo").strip().lower()
     is_already_pt = str(story.get("lang") or "").lower() == "pt"
 
-    # If the source (e.g. Hacker News) only provided a title with no body summary, extract real article paragraphs
-    if (not orig_summary or orig_summary.lower() == orig_title.lower() or len(orig_summary) < 55) and translator is None and "PYTEST_CURRENT_TEST" not in os.environ:
-        fetched_lead, fetched_img = _extract_article_lead_from_url(orig_url)
-        if fetched_lead and fetched_lead.lower() != orig_title.lower():
-            orig_summary = fetched_lead
-        if fetched_img and not story.get("image_url"):
-            story["image_url"] = fetched_img
+    # Deep article extraction: if orig_url is available, scrape full article paragraphs
+    # to elevate thin 1-sentence RSS feeds (BBC, G1, Tech feeds) with full journalistic context.
+    if orig_url and translator is None and "PYTEST_CURRENT_TEST" not in os.environ:
+        try:
+            fetched_lead, fetched_img = _extract_article_lead_from_url(orig_url)
+            if fetched_lead and (not orig_summary or orig_summary.lower() == orig_title.lower() or len(fetched_lead) > len(orig_summary) + 30):
+                orig_summary = fetched_lead
+            if fetched_img and not story.get("image_url"):
+                story["image_url"] = fetched_img
+        except Exception:
+            pass
 
     pt_title = orig_title if is_already_pt else tx(orig_title)
     if orig_summary and orig_summary.lower() != orig_title.lower():
@@ -391,6 +417,17 @@ def build_brazil_news_story_pack(
         "Comenta sua opiniao e siga o canal para ficar atualizado sobre o mundo no Brasil!\n\n"
         "#NoticiasMundiais #Mundo #Brasil #Atualidades #Shorts"
     )
+    from .cross_platform_adapter import adapt_short_for_all_platforms
+
+    multi_platform = adapt_short_for_all_platforms(
+        title=seo_title,
+        body_text=pt_summary,
+        niche="noticias_mundiais",
+        hook_banner=hook_banner,
+        source_attribution=source_name,
+        source_url=orig_url,
+    )
+
     return {
         "title": seo_title,
         "hook_title": hook_banner,
@@ -401,6 +438,7 @@ def build_brazil_news_story_pack(
         "source_url": orig_url,
         "pt_title": pt_title,
         "pt_summary": pt_summary,
+        "multi_platform": multi_platform,
     }
 
 
@@ -706,7 +744,7 @@ def produce_world_news_short(
 
     res["title"] = pack["title"]
     res["hook_title"] = pack["hook_title"]
-    # Enrich generated publish JSON with exact journalism citation & world-news hashtags
+    # Enrich generated publish JSON with exact journalism citation, world-news hashtags & 3-platform bundle
     publish_json = out_mp4.with_suffix(".publish.json")
     if publish_json.is_file():
         try:
@@ -717,6 +755,8 @@ def produce_world_news_short(
             saved["caption"] = pack["caption"]
             saved["hashtags"] = pack["hashtags"]
             saved["source_news"] = {"source": pack["source_name"], "url": pack["source_url"]}
+            if pack.get("multi_platform"):
+                saved["multi_platform"] = pack["multi_platform"]
             publish_json.write_text(json.dumps(saved, indent=2, ensure_ascii=False), encoding="utf-8")
         except (OSError, json.JSONDecodeError):
             pass

@@ -329,6 +329,34 @@ def _tool_mahoraga_state(out_dir: Optional[Path] = None) -> Dict[str, Any]:
     return MahoragaEngine(db_path=od / "shorts_evolution.db").get_status_summary()
 
 
+def _tool_viral_score_hook(spoken_text: str, on_screen_text: str = "") -> Dict[str, Any]:
+    from .viral_intelligence import score_hook
+    import dataclasses
+    res = score_hook(spoken_text, on_screen_text)
+    return dataclasses.asdict(res)
+
+
+def _tool_viral_anti_slop(text: str) -> Dict[str, Any]:
+    from .viral_intelligence import AntiSlopHumanizer
+    cleaned = AntiSlopHumanizer.clean(text)
+    return {"original": text, "cleaned": cleaned, "changed": text != cleaned}
+
+
+def _tool_viral_beat_sheet(duration_sec: float = 30.0) -> Dict[str, Any]:
+    from .viral_intelligence import generate_beat_sheet
+    beats = generate_beat_sheet(float(duration_sec))
+    return {
+        "duration_sec": duration_sec,
+        "beats": [{"name": b.name, "start": b.start_sec, "end": b.end_sec, "purpose": b.purpose} for b in beats]
+    }
+
+
+def _tool_viral_list_formulas() -> Dict[str, Any]:
+    from .viral_intelligence import VIRAL_HOOK_FORMULAS
+    import dataclasses
+    return {"formulas": [dataclasses.asdict(f) for f in VIRAL_HOOK_FORMULAS]}
+
+
 def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
     od = out_dir or _default_out_dir()
     reified_p = _reified_path(od)
@@ -450,6 +478,48 @@ def _build_internal_registry(out_dir: Optional[Path] = None) -> Dict[str, Dict[s
             "description": "Read Mahoraga 8-spoke Dharma Wheel adaptation state and immunity counters.",
             "inputSchema": {"type": "object", "properties": {}},
             "handler": lambda a: _tool_mahoraga_state(od),
+        },
+        "viral.score_hook": {
+            "category": "viral",
+            "offline": True,
+            "description": "Evaluate opening spoken hook (<2.5s) on 5 viral heuristics: length, concrete markers, stakes, front-loading, and audience aim.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "spoken_text": {"type": "string", "description": "Opening spoken sentence"},
+                    "on_screen_text": {"type": "string", "description": "Optional on-screen banner text (max 6 words)"},
+                },
+                "required": ["spoken_text"],
+            },
+            "handler": lambda a: _tool_viral_score_hook(str(a["spoken_text"]), str(a.get("on_screen_text", ""))),
+        },
+        "viral.anti_slop": {
+            "category": "viral",
+            "offline": True,
+            "description": "Strip invisible machine watermarks, typography tells, and robotic AI buzzwords from titles, hooks, or captions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
+            "handler": lambda a: _tool_viral_anti_slop(str(a["text"])),
+        },
+        "viral.beat_sheet": {
+            "category": "viral",
+            "offline": True,
+            "description": "Calculate the 5 psychological retention beats (Hook, Stake, Body, Payoff, Zeigarnik Loop) for a short.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"duration_sec": {"type": "number", "default": 30.0}},
+            },
+            "handler": lambda a: _tool_viral_beat_sheet(float(a.get("duration_sec", 30.0))),
+        },
+        "viral.list_formulas": {
+            "category": "viral",
+            "offline": True,
+            "description": "List the 26 proven viral hook formulas adapted from instagram-agent-skill with templates and examples.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "handler": lambda a: _tool_viral_list_formulas(),
         },
         "tiktok.cdp_status": {
             "category": "publish",

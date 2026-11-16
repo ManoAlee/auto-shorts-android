@@ -19,6 +19,11 @@ GAMEPLAY_QUERIES: Dict[str, List[str]] = {
         "ytsearch8:gta 5 mega ramp no copyright gameplay vertical",
         "ytsearch8:gta 5 stunt race gameplay no copyright",
     ],
+    "gta_6": [
+        "ytsearch8:gta 6 gameplay 4k vertical no copyright",
+        "ytsearch8:gta 6 vice city gameplay leak no commentary",
+        "ytsearch8:gta 6 car driving night 4k 60fps vertical",
+    ],
     "beamng": [
         "ytsearch8:beamng drive mega ramp gameplay no copyright",
         "ytsearch8:beamng drive stunts no copyright gameplay vertical",
@@ -57,6 +62,7 @@ NICHE_STYLE_AFFINITY: Dict[str, List[str]] = {
     "saude_fitness": ["fitness_motion", "drone_cinema", "satisfying", "subway", "minecraft"],
     "entretenimento_animes": ["minecraft", "subway", "gta_ramp", "beamng", "urban_rain"],
     "podcast": ["subway", "minecraft", "gta_ramp", "satisfying", "urban_rain"],
+    "games_gta6": ["gta_6", "gta_ramp", "beamng", "urban_rain"],
 }
 
 

@@ -624,6 +624,9 @@ def test_zero_pitch_distortion_humanizer_and_validator_gate(tmp_path, monkeypatc
     monkeypatch.setenv("YT_CLIENT_ID", "cid")
     monkeypatch.setenv("YT_CLIENT_SECRET", "csec")
     monkeypatch.setenv("YT_REFRESH_TOKEN", "rtok")
+    # This test exercises the mocked Data API uploader. The Termux .env enables
+    # CDP for real publishing, which would otherwise launch Chromium here.
+    monkeypatch.setenv("YOUTUBE_PUBLISH_MODE", "api")
     monkeypatch.setattr("auto_shorts.publisher.urllib.request.urlopen", fake_urlopen)
 
     pub = publish_pack_to_youtube(fake_mp4, playlist_name="Cortes Teste")
