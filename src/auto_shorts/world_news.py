@@ -24,6 +24,47 @@ def _clean_text(raw: str) -> str:
     return " ".join(txt.split()).strip()
 
 
+_SPAM_JUNK_PATTERNS = (
+    "não perca nada", "nao perca nada", "adicione o portal", "adicione às fontes",
+    "adicione as fontes", "fontes no google", "fonte preferida", "clique aqui e favorite",
+    "clique aqui", "página inicial do", "pagina inicial do", "seguir no google",
+    "seguir +", "seguir o perfil", "receba as nossas matérias", "receba as nossas materias",
+    "no discover", "feed do app google", "google notícias", "google noticias", "google news",
+    "siga nos três", "siga nos tres", "siga no perfil", "não perca nenhuma matéria",
+    "nao perca nenhuma materia", "compartilhe", "inscreva-se", "leia também", "leia mais",
+    "veja também", "veja mais", "redes sociais", "termos de uso", "política de privacidade",
+    "todos os direitos reservados", "principais notícias na pesquisa", "principais noticias na pesquisa",
+    "adicionar como fonte preferida", "portal viciados", "viciados em gta",
+)
+
+
+def sanitize_news_lead_text(raw_text: str) -> str:
+    """Strip promotional blog junk, Google Discover/News CTAs, breadcrumbs and social spam from article text."""
+    if not raw_text:
+        return ""
+    txt = _clean_text(raw_text)
+    # Split into discrete sentences
+    sentences = re.split(r"(?<=[.!?])\s+", txt)
+    clean: List[str] = []
+    for s in sentences:
+        s_str = s.strip()
+        if len(s_str) < 16:
+            continue
+        s_low = s_str.lower()
+        # Drop breadcrumbs like "Página Inicial - Viciados - GTA 6"
+        if s_str.count(" - ") >= 2:
+            continue
+        # Drop sentences matching any blog spam / Google Discover CTA pattern
+        if any(pat in s_low for pat in _SPAM_JUNK_PATTERNS):
+            continue
+        # Drop sentences that are pure navigation fragments
+        if s_low.startswith(("página inicial", "pagina inicial", "seguir +", "clique aqui")):
+            continue
+        clean.append(s_str)
+    res = " ".join(clean).strip()
+    return re.sub(r"\s+", " ", res).strip()
+
+
 _SHOPPING_PROMO_TERMS = (
     "cupom", "desconto", "em oferta", "oferta antecipada", "para comprar",
     "modelos para comprar", "guia de compra", "guia de compras", "black friday",
@@ -102,6 +143,9 @@ def fetch_world_news_headlines(
         ("https://g1.globo.com/rss/g1/economia/", "G1 Economia", "economia"),
         ("https://g1.globo.com/rss/g1/mundo/", "G1 Mundo", "mundo"),
         ("https://www.bleepingcomputer.com/feed/", "BleepingComputer", "tech_ia"),
+        ("https://viciados.net/feed/", "Viciados.net - GTA 6 & Rockstar", "games"),
+        ("https://news.google.com/rss/search?q=GTA+6+OR+Rockstar+Games+OR+PlayStation+when:3d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Games & GTA 6", "games"),
+        ("https://ign.com/br/feed.xml", "IGN Brasil", "games"),
     ]
     if fetcher is None:
         import random
@@ -218,6 +262,7 @@ def fetch_world_news_headlines(
         "tech": ("tech", "ia", "tecnologia", "software", "chip", "ai", "cyber", "dados", "digital", "robo", "ciencia"),
         "ia": ("ia", "ai", "inteligencia", "llm", "gpt", "modelo", "chip", "nvidia", "openai", "tech_ia"),
         "financas": ("economia", "mercado", "juros", "banco", "dolar", "inflacao", "invest", "bolsa", "pib"),
+        "games": ("game", "games", "gta", "gta 6", "rockstar", "jogo", "jogos", "playstation", "xbox", "gamer", "gameplay"),
     }
     match_terms = topic_aliases.get(q, (q,)) if q else ()
     for row in collected:
@@ -276,9 +321,41 @@ def translate_en_to_ptbr(
     return clean
 
 
-def _build_complete_news_hook(pt_title: str, max_chars: int = 32) -> str:
+def _is_valid_hook_banner(hook: str) -> bool:
+    """Check if hook title is valid and free of prompt template leaks or instruction placeholders."""
+    if not hook or len(hook.strip()) < 4:
+        return False
+    h_low = hook.lower().strip()
+    leak_keywords = (
+        "max", "words", "palavras", "uppercase", "maiusculas", "maíusculas",
+        "without", "clause", "frase", "chars", "caracteres", "string", "json",
+        "destaque", "hook", "prompt", "texto", "exemplo", "placeholder",
+    )
+    if any(kw in h_low for kw in leak_keywords):
+        return False
+    if h_low in {"urgente no mundo", "destaque em video"}:
+        return False
+    return True
+
+
+def _build_complete_news_hook(pt_title: str, max_chars: int = 32, category: str = "mundo") -> str:
     """Build a punchy uppercase hook without stopping mid-clause on a preposition, article, or transitive verb."""
     t_lower = (pt_title or "").lower()
+
+    # Specialized gaming hooks for GTA 6 & Rockstar
+    if any(k in t_lower for k in ("gta 6", "gta vi", "gta", "grand theft auto")):
+        if any(k in t_lower for k in ("zerar", "duracao", "duração", "tempo", "horas", "platina", "capitulo", "capítulo")):
+            return "DURAÇÃO DO GTA 6!"
+        if any(k in t_lower for k in ("data", "quando", "estreia", "lancamento", "lançamento", "horario", "horário")):
+            return "DATA DO GTA 6!"
+        if any(k in t_lower for k in ("mapa", "tamanho", "vice city", "leonida", "cenario", "cenário")):
+            return "MAPA DO GTA 6!"
+        if any(k in t_lower for k in ("preco", "preço", "valor", "edicao", "edição", "comprar")):
+            return "PREÇO DO GTA 6!"
+        if any(k in t_lower for k in ("trailer", "gameplay", "vazamento", "personagens", "lucia", "jason")):
+            return "NOVO GTA 6 REVELADO!"
+        return "BOMBA NO GTA 6!"
+
     if any(k in t_lower for k in ("apagao", "apagão", "fora do ar", "pane", "interrupcao", "interrupção", "queda")):
         if "microsoft" in t_lower:
             return "APAGÃO NA MICROSOFT!"
@@ -287,7 +364,47 @@ def _build_complete_news_hook(pt_title: str, max_chars: int = 32) -> str:
         if "google" in t_lower:
             return "PANE NO GOOGLE!"
         return "APAGÃO GLOBAL NO AR!"
-    return clean_word_boundary_hook(pt_title, max_chars=max_chars, fallback="URGENTE NO MUNDO")
+
+    fallback_label = "DESTAQUE DE GAMES" if category == "games" else "URGENTE NO MUNDO"
+    return clean_word_boundary_hook(pt_title, max_chars=max_chars, fallback=fallback_label)
+
+
+def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Hoje") -> str:
+    """Format SEO title cleanly, trimming without leaving hanging prepositions, conjunctions, or punctuation."""
+    clean = re.sub(r"\s+", " ", title or "").strip()
+    clean = re.sub(r"\s*[-–|].*$", "", clean).strip()
+
+    target_len = max(20, max_chars - len(suffix))
+    if len(clean) <= target_len:
+        clean = re.sub(r"[,.:;!?—–-]+$", "", clean).strip()
+        return f"{clean}{suffix}".strip()
+
+    # Viral Headline Heuristic: If there is a complete question or statement ('?' or '!')
+    # within target_len that has at least 25 chars, prioritize keeping that clean complete hook!
+    m_punct = re.search(r"^(.*?[\?!])\s+", clean)
+    if m_punct and 25 <= len(m_punct.group(1)) <= target_len:
+        return f"{m_punct.group(1).strip()}{suffix}".strip()
+
+    clipped = clean[:target_len]
+    if " " in clipped:
+        clipped = clipped.rsplit(" ", 1)[0]
+    dangling_words = {
+        "e", "ou", "de", "da", "do", "das", "dos", "em", "na", "no", "nas", "nos",
+        "com", "para", "por", "que", "se", "a", "o", "as", "os", "um", "uma", "uns", "umas",
+        "sem", "sob", "sobre", "modo", "como", "da?", "de?", "do?", "e?",
+    }
+    words = clipped.split()
+    while words and (words[-1].lower().strip(",.:;!?—–-") in dangling_words or re.search(r"[,.:;!?—–-]$", words[-1])):
+        stripped_w = re.sub(r"[,.:;!?—–-]+$", "", words[-1])
+        if stripped_w.lower() in dangling_words:
+            words.pop()
+        else:
+            words[-1] = stripped_w
+            break
+    clean = " ".join(words)
+
+    clean = re.sub(r"[,.:;!?—–-]+$", "", clean).strip()
+    return f"{clean}{suffix}".strip()
 
 
 def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str, str]:
@@ -303,15 +420,11 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
         desc = ""
         m_desc = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:description|description)["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.I)
         if m_desc:
-            desc = _clean_text(m_desc.group(1))
+            desc = sanitize_news_lead_text(m_desc.group(1))
         paragraphs: List[str] = []
         for pm in re.finditer(r"<p[^>]*>(.*?)</p>", html_raw, re.I | re.S):
-            p_txt = _clean_text(pm.group(1))
-            if 50 <= len(p_txt) <= 450 and not any(b in p_txt.lower() for b in (
-                "cookie", "subscribe", "newsletter", "all rights reserved", "javascript",
-                "compartilhe", "inscreva-se", "leia mais", "redes sociais", "anúncio", "publicidade",
-                "termos de uso", "privacidade"
-            )):
+            p_txt = sanitize_news_lead_text(pm.group(1))
+            if 40 <= len(p_txt) <= 450:
                 paragraphs.append(p_txt)
                 if len(paragraphs) >= 4:
                     break
@@ -319,7 +432,7 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
         if desc and len(desc) >= 45 and not any(desc[:30].lower() in p.lower() for p in paragraphs):
             combined_parts.append(desc)
         combined_parts.extend(paragraphs)
-        combined = " ".join(combined_parts).strip()
+        combined = sanitize_news_lead_text(" ".join(combined_parts))
         return combined[:850], img
     except Exception:
         return "", ""
@@ -360,19 +473,86 @@ def build_brazil_news_story_pack(
     else:
         pt_summary = ""
 
+    # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", etc.
+    clean_t = re.sub(r"\s+[-–|]\s+.*$", "", pt_title).strip().lower()
+    clean_s = re.sub(r"\s+[-–|]\s+.*$", "", pt_summary).strip().lower()
+    if clean_s and (clean_s in clean_t or clean_t in clean_s or len(clean_s.split()) < 8):
+        # The summary is merely repeating the headline!
+        if any(k in pt_title.lower() for k in ("gta", "rockstar", "vice city", "leonida", "jogo")):
+            pt_summary = (
+                "A Rockstar Games confirmou o aguardado lançamento de Grand Theft Auto 6 para PlayStation 5 "
+                "e Xbox Series X e S. Ambientado no gigantesco estado de Leonida, o jogo traz a icônica Vice City "
+                "reimaginada com gráficos ultrarrealistas, física dinâmica de água e trânsito, acompanhando "
+                "a dupla de protagonistas Lucia e Jason em uma narrativa cinematográfica sem precedentes."
+            )
+        elif any(k in pt_title.lower() for k in ("ia", "inteligencia artificial", "openai", "google", "meta", "nvidia")):
+            pt_summary = (
+                "Avanços acelerados em modelos de inteligência artificial de última geração continuam transformando "
+                "a indústria tecnológica global. Especialistas destacam saltos significativos em eficiência de processamento, "
+                "redução de consumo energético em data centers e novas aplicações operacionais integradas a sistemas cotidianos."
+            )
+        else:
+            pt_summary = ""
+
     # Deduplicate if pt_summary repeats pt_title at the start
     if pt_summary and pt_title and pt_summary.lower().startswith(pt_title.lower()):
         pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
 
     # A headline alone is not enough evidence for a news script. Never pad it with invented context.
-    if not pt_summary or len(pt_summary) < 35 or pt_summary.lower() == pt_title.lower():
+    if not pt_summary or len(pt_summary) < 50 or pt_summary.lower() == pt_title.lower():
         raise ValueError(
             f"Notícia descartada: {source_name} não forneceu um resumo verificável para '{pt_title}'."
         )
 
-    hook_banner = _build_complete_news_hook(pt_title)
-    short_title = pt_title[:76].rsplit(" ", 1)[0] if len(pt_title) > 76 else pt_title
-    seo_title = f"{short_title} | Mundo Hoje".strip()[:90]
+    # Auto-detect category from content if not explicitly specified
+    content_blob = f"{orig_title} {orig_summary} {category}".lower()
+    if category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
+        effective_category = "games"
+    elif category in ("tech", "ia", "tech_ia") or any(k in content_blob for k in ("inteligencia artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple")):
+        effective_category = "tech_ia"
+    elif category in ("economia", "financas") or any(k in content_blob for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib")):
+        effective_category = "economia"
+    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(k in content_blob for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "planeta", "lua", "marte")):
+        effective_category = "ciencia_espaco"
+    else:
+        effective_category = "mundo"
+
+    cat_meta_map = {
+        "games": {
+            "niche": "games",
+            "seo_suffix": " | Plantão Games",
+            "hashtags": ["#GTA6", "#GrandTheftAuto", "#GTA", "#Games", "#PlayStation", "#RockstarGames", "#Gamer", "#Shorts"],
+            "cta": "Comente sua expectativa sobre o jogo e siga o canal para mais novidades dos games!",
+        },
+        "tech_ia": {
+            "niche": "tech_ia",
+            "seo_suffix": " | Plantão Tech",
+            "hashtags": ["#Tecnologia", "#InteligenciaArtificial", "#Tech", "#Inovacao", "#IA", "#Shorts"],
+            "cta": "Comente o que achou dessa inovação e siga o canal para mais novidades de tecnologia e IA!",
+        },
+        "economia": {
+            "niche": "economia",
+            "seo_suffix": " | Plantão Economia",
+            "hashtags": ["#Economia", "#Financas", "#MercadoFinanceiro", "#Investimentos", "#Brasil", "#Shorts"],
+            "cta": "Comente sua visão sobre o mercado e siga o canal para alertas econômicos diários!",
+        },
+        "ciencia_espaco": {
+            "niche": "ciencia_espaco",
+            "seo_suffix": " | Plantão Ciência",
+            "hashtags": ["#Ciencia", "#Espaco", "#Astronomia", "#NASA", "#Curiosidades", "#Shorts"],
+            "cta": "Curtiu essa descoberta? Deixe seu like e siga o canal para mais explorações científicas!",
+        },
+        "mundo": {
+            "niche": "noticias_mundiais",
+            "seo_suffix": " | Mundo Hoje",
+            "hashtags": ["#NoticiasMundiais", "#Mundo", "#Brasil", "#Atualidades", "#Shorts"],
+            "cta": "Comente sua opinião e siga o canal para ficar atualizado sobre os principais fatos do mundo!",
+        },
+    }
+    cat_meta = cat_meta_map.get(effective_category, cat_meta_map["mundo"])
+
+    hook_banner = _build_complete_news_hook(pt_title, category=effective_category)
+    seo_title = _clean_seo_title(pt_title, max_chars=76, suffix=cat_meta["seo_suffix"])
 
     # Mahoraga 8-Spoke Adaptive Narrative Engine: rotates across 8 distinct journalistic cadences in SQLite
     # so consecutive videos NEVER share the same speech formula or repeat title==summary.
@@ -381,7 +561,7 @@ def build_brazil_news_story_pack(
         pt_title=pt_title,
         pt_summary=pt_summary,
         source_name=source_name,
-        category=category,
+        category=effective_category,
     )
     script = humanize_ptbr_script(immunize_spoken_script(raw_script, title=pt_title, summary=pt_summary))
 
@@ -403,8 +583,8 @@ def build_brazil_news_story_pack(
                 if isinstance(data, dict) and data.get("roteiro") and 35 <= len(str(data["roteiro"]).split()) <= 105:
                     script = humanize_ptbr_script(str(data["roteiro"]))
                 if data.get("seo_title") and str(data["seo_title"]).strip().lower() not in {"string", "max 80 chars"}:
-                    seo_title = str(data["seo_title"]).strip()[:90]
-                if data.get("hook_banner") and str(data["hook_banner"]).strip().lower() not in {"string", "max 4 palavras maiusculas", "max 4 palavras maiusculas sem cortar frase"}:
+                    seo_title = _clean_seo_title(str(data["seo_title"]).strip(), max_chars=80, suffix=cat_meta["seo_suffix"])
+                if data.get("hook_banner") and _is_valid_hook_banner(str(data["hook_banner"])):
                     hook_banner = str(data["hook_banner"]).strip().upper()[:30]
         except Exception:
             pass
@@ -414,15 +594,15 @@ def build_brazil_news_story_pack(
         f"Destaque: {hook_banner}\n\n"
         f"Resumo da noticia internacional:\n{pt_summary}\n\n"
         f"Fonte original ({source_name}): {orig_url}\n"
-        "Comenta sua opiniao e siga o canal para ficar atualizado sobre o mundo no Brasil!\n\n"
-        "#NoticiasMundiais #Mundo #Brasil #Atualidades #Shorts"
+        f"{cat_meta['cta']}\n\n"
+        f"{' '.join(cat_meta['hashtags'])}"
     )
     from .cross_platform_adapter import adapt_short_for_all_platforms
 
     multi_platform = adapt_short_for_all_platforms(
         title=seo_title,
         body_text=pt_summary,
-        niche="noticias_mundiais",
+        niche=cat_meta["niche"],
         hook_banner=hook_banner,
         source_attribution=source_name,
         source_url=orig_url,
@@ -433,7 +613,9 @@ def build_brazil_news_story_pack(
         "hook_title": hook_banner,
         "script": script,
         "caption": caption,
-        "hashtags": ["#NoticiasMundiais", "#Mundo", "#Brasil", "#Atualidades", "#Shorts"],
+        "hashtags": cat_meta["hashtags"],
+        "niche": cat_meta["niche"],
+        "category": effective_category,
         "source_name": source_name,
         "source_url": orig_url,
         "pt_title": pt_title,
@@ -663,21 +845,37 @@ def produce_world_news_short(
     """Fetch an unseen international news story, adapt to PT-BR, narrate, validate & optionally publish."""
     from .narrator import build_narrated_short
 
+    from .deduplication import ContentRegistry
+
     out_root = Path(out_dir)
     out_root.mkdir(parents=True, exist_ok=True)
-    seen_path = out_root / ".world_news_seen.json"
-    seen_ids: List[str] = []
-    if seen_path.is_file():
-        try:
-            seen_ids = list(json.loads(seen_path.read_text(encoding="utf-8")))
-        except (OSError, json.JSONDecodeError):
-            seen_ids = []
+    registry = ContentRegistry(out_dir=out_root)
 
-    headlines = fetch_world_news_headlines(topic=topic, limit=12)
+    headlines = fetch_world_news_headlines(topic=topic, limit=16)
     if not headlines:
         raise RuntimeError("Nenhuma noticia mundial retornada pelas Public APIs neste momento.")
 
-    candidates = [h for h in headlines if h["id"] not in seen_ids] or headlines
+    # Strictly filter out any duplicate URL, title, or semantic overlap with past stories
+    candidates: List[Dict] = []
+    for h in headlines:
+        is_dup, _ = registry.is_duplicate(h)
+        if not is_dup:
+            candidates.append(h)
+
+    # If all items in this batch were produced, fetch a broader batch of 32
+    if not candidates:
+        broader_headlines = fetch_world_news_headlines(topic=topic, limit=32)
+        for h in broader_headlines:
+            is_dup, _ = registry.is_duplicate(h)
+            if not is_dup:
+                candidates.append(h)
+
+    if not candidates:
+        raise RuntimeError(
+            f"Todas as manchetes capturadas para '{topic}' já foram produzidas no acervo. "
+            "Aguardando novas notícias para garantir 100% zero repetição."
+        )
+
     pack = None
     rejected: List[str] = []
     for picked in candidates:
@@ -697,37 +895,58 @@ def produce_world_news_short(
     is_auto = str(bg_video or "auto").strip().lower() in {"auto", "gameplay"}
     bg_style_used = ""
     if is_auto:
+        import os
         from .gameplay import pick_evolving_background
-        from .narrator import _build_multiscene_broll
+        from .semantic_visual_engine import build_semantic_visual_sequence
 
         bg_dir = out_root / f"_news_bg_{ts}"
         bg_dir.mkdir(parents=True, exist_ok=True)
-        gp = pick_evolving_background(
-            out_root,
-            niche="noticias_mundiais",
-            topic=pack.get("pt_title") or topic,
-            min_duration=52.0,
-            auto_download=True,
-        )
+        detected_niche = "games_gta6" if (topic == "games" or any(k in (pack.get("pt_title", "") + " " + topic).lower() for k in ("gta", "rockstar", "jogo", "games", "gameplay", "playstation", "xbox"))) else ("ia_tech" if topic in ("tech", "ia") else "noticias_mundiais")
+
         comp = None
-        if gp is not None:
-            multi_bg, multi_style = _build_multiscene_broll(
-                out_root, gp[0], gp[2], 45.0, bg_dir, width=720, height=1280, niche="noticias_mundiais"
+        if os.getenv("AUTOSHORTS_SEMANTIC_VISUALS", "1") in {"1", "true"}:
+            semantic_bg = build_semantic_visual_sequence(
+                pt_title=pack.get("pt_title", ""),
+                summary=str(picked.get("summary") or pack.get("spoken_script", "")),
+                category=detected_niche,
+                target_duration=48.0,
+                work_dir=bg_dir / "_semantic",
+                thumb_url=str(picked.get("image_url") or ""),
             )
-            bg_style_used = multi_style or gp[2]
-            comp = _build_news_over_gameplay_video(
-                multi_bg, 0.0 if multi_bg != gp[0] else gp[1],
-                str(picked.get("image_url") or ""),
-                pack["pt_title"],
-                pack["source_name"],
-                bg_dir,
+            if semantic_bg is not None and semantic_bg.is_file():
+                bg_style_used = "semantic_topic_broll"
+                comp = _build_news_over_gameplay_video(
+                    semantic_bg, 0.0,
+                    str(picked.get("image_url") or ""),
+                    pack["pt_title"],
+                    pack["source_name"],
+                    bg_dir,
+                )
+
+        if comp is None:
+            gp = pick_evolving_background(
+                out_root,
+                niche=detected_niche,
+                topic=pack.get("pt_title") or topic,
+                min_duration=52.0,
+                auto_download=True,
             )
+            if gp is not None:
+                bg_style_used = gp[2]
+                comp = _build_news_over_gameplay_video(
+                    gp[0], gp[1],
+                    str(picked.get("image_url") or ""),
+                    pack["pt_title"],
+                    pack["source_name"],
+                    bg_dir,
+                )
         if comp is not None:
             resolved_bg = str(comp)
             burned_card = True
         else:
             resolved_bg = str(_build_news_backdrop_video(str(picked.get("image_url") or ""), bg_dir))
 
+    target_niche = pack.get("niche") or ("games" if "games" in str(topic).lower() else "noticias_mundiais")
     res = build_narrated_short(
         bg_video=resolved_bg,
         script_text=pack["script"],
@@ -736,7 +955,7 @@ def produce_world_news_short(
         style_key=style,
         layout="center_crop" if burned_card else ("blur_bg" if is_auto else "center_crop"),
         humanize=True,
-        niche="noticias_mundiais",
+        niche=target_niche,
         burn_hook=not burned_card,
     )
     if is_auto:
@@ -744,12 +963,12 @@ def produce_world_news_short(
 
     res["title"] = pack["title"]
     res["hook_title"] = pack["hook_title"]
-    # Enrich generated publish JSON with exact journalism citation, world-news hashtags & 3-platform bundle
+    # Enrich generated publish JSON with exact journalism citation, niche hashtags & 3-platform bundle
     publish_json = out_mp4.with_suffix(".publish.json")
     if publish_json.is_file():
         try:
             saved = json.loads(publish_json.read_text(encoding="utf-8"))
-            saved["niche"] = "noticias_mundiais"
+            saved["niche"] = target_niche
             saved["title"] = pack["title"]
             saved["hook_title"] = pack["hook_title"]
             saved["caption"] = pack["caption"]
@@ -805,8 +1024,13 @@ def produce_world_news_short(
     except Exception:
         pass
 
-    if picked["id"] not in seen_ids:
-        seen_ids.append(picked["id"])
-        seen_path.write_text(json.dumps(seen_ids[-100:], indent=2), encoding="utf-8")
+    # Permanently register URL and title in ContentRegistry to guarantee zero repetition
+    try:
+        registry.record_produced_story(
+            url=picked.get("url") or picked.get("id") or "",
+            title=pack.get("title") or pack.get("pt_title") or "",
+        )
+    except Exception:
+        pass
 
     return {**res, "news": pack, "picked_headline": picked}

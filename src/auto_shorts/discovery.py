@@ -3,7 +3,7 @@
 import json
 import os
 import subprocess
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from .anime_trends import get_releasing_anime_radar
 
@@ -55,6 +55,7 @@ def parse_discovery_lines(
     seen_ids: Optional[Set[str]] = None,
     min_duration: float = 180.0,
     max_duration: float = 1200.0,
+    registry: Optional[Any] = None,
 ) -> List[Dict]:
     """Filter raw yt-dlp --flat-playlist --dump-json output for clip-worthy real videos."""
     seen = seen_ids or set()
@@ -71,8 +72,15 @@ def parse_discovery_lines(
 
         vid = str(item.get("id") or "").strip()
         url = str(item.get("webpage_url") or item.get("url") or "").strip()
+        title = str(item.get("title") or "").strip()
         if not vid or not url or vid in seen:
             continue
+        if registry:
+            if registry.is_duplicate_video_id(vid) or registry.is_duplicate_url(url):
+                continue
+            is_dup_title, _ = registry.is_duplicate_headline(title)
+            if is_dup_title:
+                continue
         if item.get("live_status") in {"is_live", "is_upcoming"} or item.get("is_live"):
             continue
 

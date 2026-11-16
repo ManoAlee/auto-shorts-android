@@ -99,3 +99,4 @@ SVDIR=/data/data/com.termux/files/usr/var/service sv restart autoshorts autoshor
 python -m pytest auto-shorts-android/tests --basetemp=auto-shorts-android/.pytest_tmp -q
 ```
 Cobertura adicionada em `tests/test_pipeline.py` para cookies/status/lote CDP (TikTok e YouTube), otimização de legenda para o algoritmo do TikTok, cache de registro MCP, detecção de modo CDP no `webapp.py`, analytics multiplataforma, radar de tendências offline-safe e acessibilidade do painel `/analytics`.
+

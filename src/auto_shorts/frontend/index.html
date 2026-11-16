@@ -37,46 +37,51 @@ __INLINE_CSS__
             <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </button>
           <a href="/analytics" class="btn-quick-create" id="btn-open-analytics" style="text-decoration:none;background:#0f172a;border:1px solid #22d3ee;color:#22d3ee;" aria-label="Abrir Analytics e Radar Global">Analytics</a>
-          <button type="button" class="btn-quick-create" id="btn-quick-create">+ Criar</button>
+          <button type="button" class="btn-quick-create" id="btn-quick-create">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>+ Criar Vídeo</span>
+          </button>
         </div>
       </div>
-      <div id="channel-telemetry" class="telemetry-strip" aria-live="polite">
-        <span class="pill">Conectando aos canais...</span>
-        <span class="pill">Motor de voz: __TTS_ENGINE__</span>
-      </div>
+
+      <!-- Advanced Horizontal Top Navbar (Replaces Sidebar) -->
+      <nav class="top-navbar" aria-label="Menu Principal do Estúdio">
+        <div role="tablist" class="nav-tablist" aria-label="Áreas de Trabalho">
+          <button type="button" role="tab" id="tab-cortes" aria-selected="true" aria-controls="panel-cortes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Criar Vídeo</span>
+          </button>
+          <button type="button" role="tab" id="tab-equipe" aria-selected="false" aria-controls="panel-equipe" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Piloto Automático</span>
+          </button>
+          <button type="button" role="tab" id="tab-voz" aria-selected="false" aria-controls="panel-voz" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            <span>Roteiro &amp; Voz</span>
+          </button>
+          <button type="button" role="tab" id="tab-videos" aria-selected="false" aria-controls="panel-videos" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>Meus Vídeos</span>
+          </button>
+          <button type="button" role="tab" id="tab-synapse" aria-selected="false" aria-controls="panel-synapse" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span>Tendências &amp; Radar</span>
+            <span class="nav-badge-hot">EM ALTA</span>
+          </button>
+          <button type="button" role="tab" id="tab-sistema" aria-selected="false" aria-controls="panel-sistema" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Configurações</span>
+          </button>
+        </div>
+        <div id="channel-telemetry" class="navbar-telemetry" aria-live="polite">
+          <span class="pill pill-ok">🟢 Piloto Ativo</span>
+          <span class="pill">Voz: Kokoro PT-BR</span>
+        </div>
+      </nav>
     </div>
   </header>
 
   <div class="studio-shell">
-    <aside class="side-rail" aria-label="Menu do Estudio">
-      <div role="tablist" aria-label="Areas do estudio">
-        <button type="button" role="tab" id="tab-cortes" aria-selected="true" aria-controls="panel-cortes">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <span>Criar &amp; Radar</span>
-        </button>
-        <button type="button" role="tab" id="tab-equipe" aria-selected="false" aria-controls="panel-equipe" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Equipe &amp; Planner</span>
-        </button>
-        <button type="button" role="tab" id="tab-voz" aria-selected="false" aria-controls="panel-voz" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-          <span>Roteiro &amp; Voz</span>
-        </button>
-        <button type="button" role="tab" id="tab-videos" aria-selected="false" aria-controls="panel-videos" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span>Acervo &amp; Canais</span>
-        </button>
-        <button type="button" role="tab" id="tab-synapse" aria-selected="false" aria-controls="panel-synapse" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>Synapse RE</span>
-        </button>
-        <button type="button" role="tab" id="tab-sistema" aria-selected="false" aria-controls="panel-sistema" tabindex="-1">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Sistema &amp; FFmpeg</span>
-        </button>
-      </div>
-    </aside>
-
     <main id="main-content">
       <!-- Intelligent Copiloto IA Strip -->
       <section class="copilot-bar" aria-label="Copiloto Inteligente" aria-live="polite">
@@ -432,9 +437,101 @@ __INLINE_CSS__
       </section>
 
       <section id="panel-synapse" role="tabpanel" aria-labelledby="tab-synapse" class="panel" hidden>
-        <h2>Engenharia Reversa, InnerTube &amp; OMEGA-SYNAPSE</h2>
-        <p class="panel-lead">Extracao InnerTube Most Replayed, trace REA em C11 ELF/AST e Roda do Dharma (10 defesas).</p>
-        <h3>Aprendizado com desempenho real</h3>
+        <div class="panel-hero-gta6">
+          <div class="gta6-hero-content">
+            <span class="badge-pill-hot">🔥 RADAR EM ALTA</span>
+            <h2>Radar de Tendências &amp; Canais em Destaque</h2>
+            <p class="panel-lead">Monitore os maiores canais de entretenimento e games do Brasil, pautas virais e produza Shorts de 45-60s com visual dinâmico e legendas estilo CapCut.</p>
+          </div>
+          <div class="gta6-hero-action">
+            <button type="button" class="btn btn-primary btn-lg" id="btn-quick-gta6-generate">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Gerar Short Viral</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Pautas em Alta prontas para 1-Clique -->
+        <h3 style="margin-top:20px;">Pautas Quentes para Produzir Agora</h3>
+        <div class="gta6-topics-grid">
+          <div class="gta6-topic-card" data-topic="Data de lançamento e novidades oficiais de GTA 6 pela Rockstar Games">
+            <div class="topic-icon">📅</div>
+            <h4>Data de Lançamento &amp; Trailer 2</h4>
+            <p>Previsão no PS5 e Xbox, anúncios de lucros da Take-Two e expectativas para novas revelações.</p>
+            <button type="button" class="btn btn-sm btn-outline btn-use-gta-topic">Produzir Este Short</button>
+          </div>
+          <div class="gta6-topic-card" data-topic="Mapa de Leonida e Vice City em GTA 6 segredos e tamanho">
+            <div class="topic-icon">🗺️</div>
+            <h4>O Gigantesco Mapa de Leonida</h4>
+            <p>Comparativo com o mapa de GTA 5, pântanos, cidades vizinhas e mais de 70% de interiores exploráveis.</p>
+            <button type="button" class="btn btn-sm btn-outline btn-use-gta-topic">Produzir Este Short</button>
+          </div>
+          <div class="gta6-topic-card" data-topic="Lucia e Jason história do casal protagonista de GTA 6">
+            <div class="topic-icon">👫</div>
+            <h4>Lucia &amp; Jason: O Casal Bonnie &amp; Clyde</h4>
+            <p>A primeira protagonista feminina da história moderna de GTA e a dinâmica de assaltos em dupla.</p>
+            <button type="button" class="btn btn-sm btn-outline btn-use-gta-topic">Produzir Este Short</button>
+          </div>
+          <div class="gta6-topic-card" data-topic="Performance de GTA 6 nos consoles 30 FPS vs 60 FPS no PS5 Pro">
+            <div class="topic-icon">🎮</div>
+            <h4>30 FPS vs 60 FPS nos Consoles</h4>
+            <p>A polêmica técnica: física avançada da água, IA de NPCs e limites do hardware da atual geração.</p>
+            <button type="button" class="btn btn-sm btn-outline btn-use-gta-topic">Produzir Este Short</button>
+          </div>
+        </div>
+
+        <!-- Maiores Canais Gamer do Brasil que Cobrem GTA 6 -->
+        <h3 style="margin-top:28px;">🏆 Maiores Canais de Games do Brasil (Cobertura GTA 6)</h3>
+        <p class="panel-lead">Fontes oficiais e criadores com maior volume de buscas e autoridade sobre GTA 6 no YouTube Brasil.</p>
+        <div class="channels-showcase-grid">
+          <div class="channel-card">
+            <div class="channel-badge-num">1</div>
+            <div class="channel-info">
+              <strong>SanInPlay</strong>
+              <span class="channel-meta">~3.5M inscritos • Especialista #1 em GTA</span>
+              <p>O maior fenômeno de cobertura detalhada de trailers, teorias, segredos e easter eggs de GTA 6 no país.</p>
+            </div>
+            <span class="channel-status-pill">⭐ Fonte de Pautas</span>
+          </div>
+          <div class="channel-card">
+            <div class="channel-badge-num">2</div>
+            <div class="channel-info">
+              <strong>GameplayRJ (Davy Jones)</strong>
+              <span class="channel-meta">~8M inscritos • Notícias Diárias</span>
+              <p>Referência diária em notícias sobre o ecossistema da Rockstar Games e o impacto do GTA 6 no mercado.</p>
+            </div>
+            <span class="channel-status-pill">📰 Plantão Gamer</span>
+          </div>
+          <div class="channel-card">
+            <div class="channel-badge-num">3</div>
+            <div class="channel-info">
+              <strong>Viciados.net</strong>
+              <span class="channel-meta">Portal Líder em Vazamentos</span>
+              <p>Maior portal em língua portuguesa dedicado à cobertura investigativa e artigos aprofundados sobre GTA 6.</p>
+            </div>
+            <span class="channel-status-pill">🔍 Portal Ativo</span>
+          </div>
+          <div class="channel-card">
+            <div class="channel-badge-num">4</div>
+            <div class="channel-info">
+              <strong>LipaoGamer</strong>
+              <span class="channel-meta">~12M inscritos • Mods &amp; Gameplay</span>
+              <p>Comunidade massiva focada em mods, física de veículos, roleplay e séries sandbox da franquia.</p>
+            </div>
+            <span class="channel-status-pill">🎮 Gameplay</span>
+          </div>
+          <div class="channel-card">
+            <div class="channel-badge-num">5</div>
+            <div class="channel-info">
+              <strong>IGN Brasil &amp; Flow Games</strong>
+              <span class="channel-meta">Jornalismo &amp; Podcasts</span>
+              <p>Grandes veículos da imprensa especializada, entrevistas com desenvolvedores e conferências.</p>
+            </div>
+            <span class="channel-status-pill">🎙️ Podcasts &amp; Mídia</span>
+          </div>
+        </div>
+
+        <h3 style="margin-top:28px;">Desempenho Real &amp; Retenção dos Vídeos</h3>
         <div id="learning-overview" class="diag-grid" aria-live="polite">Carregando cobertura de feedback...</div>
         <form id="learning-feedback-form" novalidate>
           <div class="grid">
@@ -459,9 +556,9 @@ __INLINE_CSS__
           <div class="actions"><button type="submit" class="btn btn-primary" id="btn-learning-feedback">Registrar métricas</button></div>
           <p id="learning-feedback-message" role="status" aria-live="polite"></p>
         </form>
-        <div id="synapse-overview-grid" class="diag-grid" aria-live="polite">Carregando Synapse...</div>
 
-        <h3 style="margin-top:18px;">1. Heatmap YouTube InnerTube (Most Replayed)</h3>
+        <h3 style="margin-top:24px;">Análise de Picos de Retenção (YouTube Most Replayed)</h3>
+        <p class="panel-lead">Cole o link de qualquer vídeo ou gameplay para extrair a curva exata dos segundos mais assistidos pelo público.</p>
         <form id="synapse-innertube-form" novalidate>
           <div class="grid">
             <div>
@@ -471,41 +568,33 @@ __INLINE_CSS__
             </div>
           </div>
           <div class="actions">
-            <button type="submit" class="btn btn-primary" id="btn-innertube-scan">Extrair Curva Most Replayed</button>
+            <button type="submit" class="btn btn-primary" id="btn-innertube-scan">Analisar Curva de Retenção</button>
           </div>
         </form>
         <div id="innertube-result" class="video-card" style="margin-top:12px;" hidden></div>
 
-        <h3 style="margin-top:18px;">2. REA Trace — C11 ELF &amp; Python AST</h3>
-        <form id="synapse-trace-form" novalidate>
-          <div class="grid">
-            <div>
-              <label for="rea-trace-query">Simbolo ou texto literal <span aria-hidden="true">*</span></label>
-              <input id="rea-trace-query" type="text" value="autopilot" required aria-required="true" />
-            </div>
-          </div>
-          <div class="actions">
-            <button type="submit" class="btn btn-secondary" id="btn-rea-trace">Executar REA Trace</button>
-            <button type="button" class="btn btn-secondary" id="btn-refresh-synapse">Atualizar Synapse</button>
-          </div>
+        <!-- Hidden elements to preserve backward compatibility for JS controller -->
+        <div id="synapse-overview-grid" class="diag-grid" style="display:none;" aria-hidden="true"></div>
+        <form id="synapse-trace-form" style="display:none;" aria-hidden="true">
+          <input id="rea-trace-query" type="text" value="autopilot" />
+          <button type="submit" id="btn-rea-trace">Trace</button>
+          <button type="button" id="btn-refresh-synapse">Refresh</button>
         </form>
-        <div id="rea-trace-result" class="meta-pre" hidden></div>
+        <div id="rea-trace-result" style="display:none;" aria-hidden="true"></div>
+        <div id="synapse-immunities-box" style="display:none;" aria-hidden="true"></div>
 
-        <h3 style="margin-top:18px;">3. Roda do Dharma (Defesas Mahoraga)</h3>
-        <div id="synapse-immunities-box" class="item-grid" aria-live="polite"></div>
-
-        <h3 style="margin-top:22px;">4. Engenharia Reversa TikTok FYP &amp; Psicologia Mentalista por Nicho</h3>
-        <p class="panel-lead">Modelo de pesos do algoritmo For You (Rewatch/Loop 35%, Hold 2s 25%, Share/Save 25%, Nicho 15%) + gatilhos cognitivos prontos.</p>
+        <h3 style="margin-top:24px;">Estratégia de Retenção &amp; Algoritmo TikTok FYP</h3>
+        <p class="panel-lead">Pesos do algoritmo For You (Loop 35%, Primeiros 2s 25%, Compartilhamento 25%, Nicho 15%) + gatilhos cognitivos por nicho.</p>
         <div id="tiktok-algo-weights" class="diag-grid" aria-live="polite"></div>
         <form id="tiktok-mentalist-form" style="margin-top:14px;" novalidate>
           <div class="grid">
             <div>
-              <label for="tt-ment-niche">Nicho para decodificar o cerebro do espectador</label>
+              <label for="tt-ment-niche">Nicho do Conteúdo</label>
               <select id="tt-ment-niche">__NICHE_SIMPLE_OPTIONS__</select>
             </div>
             <div>
-              <label for="tt-ment-topic">Tema / Assunto do Short TikTok</label>
-              <input id="tt-ment-topic" type="text" placeholder="Ex: IA offline rodando no Android" required aria-required="true" />
+              <label for="tt-ment-topic">Tema / Assunto do Short</label>
+              <input id="tt-ment-topic" type="text" placeholder="Ex: GTA 6 rodando a 30 FPS no PS5" required aria-required="true" />
             </div>
           </div>
           <div class="actions">
@@ -643,8 +732,8 @@ __INLINE_CSS__
       <span>Criar</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-tab-idx="1">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-      <span>Equipe</span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Piloto</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-tab-idx="2">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
@@ -652,15 +741,15 @@ __INLINE_CSS__
     </button>
     <button type="button" class="mobile-nav-btn" data-tab-idx="3">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      <span>Acervo</span>
+      <span>Vídeos</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-tab-idx="4">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      <span>Synapse</span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Radar</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-tab-idx="5">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.74.67l-.05.07h-3.4l-.05-.07a1.7 1.7 0 0 0-1.74-.67l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 0 0 9.6 15l-.08-.04v-3.4l.08-.04a1.7 1.7 0 0 0-.34-1.88L9.2 9.58l1.7-2.94.08.02a1.7 1.7 0 0 0 1.74-.67l.05-.07h3.4l.05.07a1.7 1.7 0 0 0 1.74.67l.08-.02 1.7 2.94-.06.06A1.7 1.7 0 0 0 19.4 11l.08.04v3.4z"/></svg>
-      <span>Sistema</span>
+      <span>Ajustes</span>
     </button>
   </nav>
 

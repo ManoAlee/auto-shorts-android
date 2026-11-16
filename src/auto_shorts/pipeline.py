@@ -67,7 +67,7 @@ def _build_clip_subtitles_and_summary(
         s for s in healed_fallback
         if float(s.get("end", 0.0)) > fallback_start and float(s.get("start", 0.0)) < fallback_end
     ]
-    has_rich_fallback = len(win_segs) >= 3 and any(isinstance(s.get("words"), list) and s.get("words") for s in win_segs)
+    has_rich_fallback = len(win_segs) >= 1 and any(str(s.get("text", "")).strip() for s in win_segs)
 
     if not has_rich_fallback and os.getenv("USE_CLIP_WHISPER", "1") == "1" and (shutil.which("whisper-cli") or shutil.which("main")):
         try:
@@ -206,6 +206,7 @@ def run_pipeline(
         learning_context=learning_context,
         source_title=str(resolved_meta.get("title") or ""),
         heatmap=resolved_meta.get("heatmap") if isinstance(resolved_meta.get("heatmap"), list) else None,
+        audio_lang=str(resolved_meta.get("audio_language") or "").strip() or None,
     )
 
     q_cfg = QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])

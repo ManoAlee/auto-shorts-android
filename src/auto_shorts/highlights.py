@@ -719,10 +719,35 @@ def _pick_best_hook(texts: List[str], source_title: str, niche: NicheProfile) ->
     return "PRESTA ATENCAO NISSO"
 
 
-def _build_clip_title(source_title: str, hook_title: str, part_num: int, niche: NicheProfile) -> str:
+def _build_clip_title(
+    source_title: str,
+    hook_title: str,
+    part_num: int,
+    niche: NicheProfile,
+    audio_lang: Optional[str] = None,
+) -> str:
     clean_src = _clean_source_title(source_title)
     is_anime = "anime" in niche.label.lower() or "entretenimento_animes" in str(getattr(niche, "key", "")).lower()
     suffix = f" (Parte {part_num})" if part_num > 1 else ""
+
+    src_lower = (source_title or "").lower()
+    alang = str(audio_lang or "").strip().lower()
+    is_dubbed = "dublado" in src_lower or alang in ("pt", "pt-br")
+    is_subbed = (
+        "legendado" in src_lower
+        or "leg" in src_lower
+        or alang in ("ja", "jpn")
+        or "audio original" in src_lower
+        or "áudio original" in src_lower
+    )
+
+    if is_dubbed and alang not in ("ja", "jpn"):
+        edition_tag = "Cena Épica Dublada!"
+    elif is_subbed:
+        edition_tag = "Cena Épica Legendada!"
+    else:
+        edition_tag = "Cena Épica!"
+
     if is_anime and clean_src and not _looks_english_title(clean_src):
         if hook_title and hook_title != "PRESTA ATENCAO NISSO" and len(hook_title) >= 6:
             hook_pretty = hook_title.title()
@@ -733,14 +758,14 @@ def _build_clip_title(source_title: str, hook_title: str, part_num: int, niche: 
                 if len(clean_src) > max_source:
                     source_cut = source_cut.rsplit(" ", 1)[0]
                 return f"{source_cut.rstrip(' -:,.!?;')}{tail}"[:90]
-        fallback = f"{clean_src} — Cena Épica Dublada!{suffix}"
+        fallback = f"{clean_src} — {edition_tag}{suffix}"
         if len(fallback) <= 90:
             return fallback
-        max_source = max(24, 90 - len(f" — Cena Épica Dublada!{suffix}"))
+        max_source = max(24, 90 - len(f" — {edition_tag}{suffix}"))
         source_cut = clean_src[:max_source]
         if len(clean_src) > max_source:
             source_cut = source_cut.rsplit(" ", 1)[0]
-        return f"{source_cut.rstrip(' -:,.!?;')} — Cena Épica Dublada!{suffix}"[:90]
+        return f"{source_cut.rstrip(' -:,.!?;')} — {edition_tag}{suffix}"[:90]
 
     if clean_src and not _looks_english_title(clean_src):
         base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
@@ -1011,6 +1036,7 @@ def detect_highlights(
     learning_context: str = "",
     source_title: str = "",
     heatmap: Optional[List[Dict]] = None,
+    audio_lang: Optional[str] = None,
 ) -> List[Dict]:
     """Select ranked viral clip intervals for the chosen platform and Brazilian niche."""
     platform = PLATFORMS.get(platform_key, PLATFORMS["tiktok_rewards"])
@@ -1019,7 +1045,7 @@ def detect_highlights(
     duration = float(transcript.get("duration", 0.0))
 
     if not segments:
-        return generate_action_climax_highlights(
+        res = generate_action_climax_highlights(
             duration=duration,
             platform=platform,
             niche=niche,
@@ -1027,6 +1053,9 @@ def detect_highlights(
             source_title=source_title,
             heatmap=heatmap,
         )
+        for idx, clip in enumerate(res, start=1):
+            clip["title"] = _build_clip_title(source_title, clip["hook_title"], idx, niche, audio_lang=audio_lang)
+        return res
 
     has_api = bool(
         llm_fn
@@ -1036,9 +1065,12 @@ def detect_highlights(
         or os.getenv("OPENAI_API_KEY")
     )
     if not use_llm or not has_api:
-        return score_segments_offline(
+        res = score_segments_offline(
             transcript, platform, niche, num_clips, source_title=source_title, heatmap=heatmap
         )
+        for idx, clip in enumerate(res, start=1):
+            clip["title"] = _build_clip_title(source_title, clip["hook_title"], idx, niche, audio_lang=audio_lang)
+        return res
 
     caller = llm_fn or call_gemini_or_openai
     all_candidates: List[Dict] = []

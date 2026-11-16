@@ -1110,28 +1110,42 @@ def _has_audio_stream(media_path: Path) -> bool:
         return False
 
 
-def _ensure_ambient_bgm(out_root: Path) -> Optional[Path]:
-    """Create a copyright-free soft ambient pad bed once for sidechain-ducked mixing."""
-    bgm_file = out_root / "_bgm" / "ambient_focus.mp3"
+def _ensure_ambient_bgm(out_root: Path, niche: str = "podcast") -> Optional[Path]:
+    """Create a copyright-free procedural soundtrack bed for sidechain-ducked mixing."""
+    genre = "synthwave"
+    if niche in ("games", "games_gta6", "gameplay"):
+        genre = "synthwave"
+    elif niche in ("tech", "ia_tech", "tech_ia"):
+        genre = "lofi"
+    elif niche in ("noticias_mundiais", "mundo"):
+        genre = "cinematic_tension"
+
+    bgm_file = out_root / "_bgm" / f"{genre}_bed.wav"
     if bgm_file.is_file() and bgm_file.stat().st_size > 10_000:
         return bgm_file
+    try:
+        from .procedural_music import generate_procedural_track
+        bgm_file.parent.mkdir(parents=True, exist_ok=True)
+        return generate_procedural_track(genre=genre, duration_sec=65.0, out_path=bgm_file)
+    except Exception:
+        pass
+
     if not shutil.which("ffmpeg"):
         return None
     try:
-        bgm_file.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.run(
             [
                 "ffmpeg", "-y", "-loglevel", "error",
                 "-f", "lavfi", "-i", "anoisesrc=d=25:c=pink:a=0.045",
                 "-af", "lowpass=f=360,highpass=f=75,volume=0.22",
                 "-c:a", "libmp3lame", "-b:a", "96k",
-                str(bgm_file),
+                str(bgm_file.with_suffix(".mp3")),
             ],
             check=False,
             timeout=15,
         )
-        if proc.returncode == 0 and bgm_file.is_file() and bgm_file.stat().st_size > 5_000:
-            return bgm_file
+        if proc.returncode == 0 and bgm_file.with_suffix(".mp3").is_file():
+            return bgm_file.with_suffix(".mp3")
     except Exception:
         pass
     return None
@@ -1297,16 +1311,17 @@ def build_narrated_short(
             bg_has_subs = False
             if bg_start <= 0.0:
                 bg_start = rand_start
-            multi_bg, multi_style = _build_multiscene_broll(
-                out_path.parent, resolved_bg, bg_style_used, duration, work_dir,
-                width=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["width"]),
-                height=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["height"]),
-                niche=niche,
-            )
-            if multi_bg != resolved_bg:
-                resolved_bg = multi_bg
-                bg_style_used = multi_style
-                bg_start = 0.0
+            if os.getenv("AUTOSHORTS_MULTISCENE_BROLL", "0") in {"1", "true"} and niche not in {"games", "games_gta6", "gameplay"}:
+                multi_bg, multi_style = _build_multiscene_broll(
+                    out_path.parent, resolved_bg, bg_style_used, duration, work_dir,
+                    width=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["width"]),
+                    height=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["height"]),
+                    niche=niche,
+                )
+                if multi_bg != resolved_bg:
+                    resolved_bg = multi_bg
+                    bg_style_used = multi_style
+                    bg_start = 0.0
     elif bg_start <= 0.0 and "assets" in resolved_bg.parts:
         from .gameplay import _extract_style_tag, probe_video_duration
         import random
@@ -1319,16 +1334,30 @@ def build_narrated_short(
     width, height = int(q["width"]), int(q["height"])
     ass_path = work_dir / f"{out_path.stem}.ass"
     safe_margin_v = 245 if bg_has_subs else 185
-    generate_ass_subtitles(
-        parsed["segments"],
-        0.0,
-        duration,
-        ass_path,
-        width=width,
-        height=height,
-        max_words=3,
-        margin_v=safe_margin_v,
-    )
+    from .pro_editor_engine import generate_capcut_word_pop_ass
+    try:
+        generate_capcut_word_pop_ass(
+            parsed["segments"],
+            ass_path,
+            width=width,
+            height=height,
+            primary_color="&H00FFFFFF&",
+            highlight_color="&H0000FFFF&",
+            outline_color="&H00000000&",
+            font_size=42,
+            margin_v=safe_margin_v,
+        )
+    except Exception:
+        generate_ass_subtitles(
+            parsed["segments"],
+            0.0,
+            duration,
+            ass_path,
+            width=width,
+            height=height,
+            max_words=3,
+            margin_v=safe_margin_v,
+        )
 
     from .renderer import build_video_filter
 
@@ -1346,12 +1375,22 @@ def build_narrated_short(
     if bg_start > 0:
         bg_input_flags.extend(["-ss", f"{bg_start:.2f}"])
 
-    # Warm broadcast speech chain: keeps crisp breath harmonics above 8.8kHz, softens 3.4kHz
-    # metallic nasality, warms body at 145Hz, and levels output cleanly near -16 dB LUFS.
+    # Studio broadcast speech chain (Amphion + Voicebox DSP discipline):
+    # Highpass 75Hz (rumbles), Equalizer 145Hz (warm presence), Notch 3400Hz (anti-metallic),
+    # Equalizer 9500Hz (crisp vocal air), Optical compression (threshold -18dB, makeup 1.35x),
+    # perceptual loudness target -16 dB LUFS.
     voice_chain = (
         "[1:a]aformat=sample_rates=44100:channel_layouts=stereo,"
-        "highpass=f=65,equalizer=f=145:t=q:w=1.0:g=2.5,equalizer=f=3400:t=q:w=1.5:g=-1.8,"
-        "acompressor=threshold=-18dB:ratio=1.8:attack=15:release=110:makeup=1.2[voice_a]"
+        "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,"
+        "equalizer=f=9500:t=q:w=1.2:g=1.8,"
+        "acompressor=threshold=-18dB:ratio=2.8:attack=12:release=120:makeup=1.35[voice_a]"
+    )
+    solo_voice_af = (
+        "aformat=sample_rates=44100:channel_layouts=stereo,"
+        "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,"
+        "equalizer=f=9500:t=q:w=1.2:g=1.8,"
+        "acompressor=threshold=-18dB:ratio=2.8:attack=12:release=120:makeup=1.35,"
+        "loudnorm=I=-16:TP=-1.5:LRA=8"
     )
     mix_chain = (
         f"[0:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={bg_volume:.2f}[bg_a];"
@@ -1371,12 +1410,6 @@ def build_narrated_short(
         *METADATA_SCRUB,
         str(out_path),
     ]
-    solo_voice_af = (
-        "aformat=sample_rates=44100:channel_layouts=stereo,"
-        "highpass=f=65,equalizer=f=145:t=q:w=1.0:g=2.5,equalizer=f=3400:t=q:w=1.5:g=-1.8,"
-        "acompressor=threshold=-18dB:ratio=1.8:attack=15:release=110:makeup=1.2,"
-        "loudnorm=I=-16:TP=-1.5:LRA=8"
-    )
     no_bg_audio_cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         *bg_input_flags, "-i", str(resolved_bg),
@@ -1391,7 +1424,7 @@ def build_narrated_short(
         *METADATA_SCRUB,
         str(out_path),
     ]
-    ambient_bgm = _ensure_ambient_bgm(out_path.parent) if (shutil.which("ffmpeg") and resolved_bg.is_file() and b"ftyp" in resolved_bg.read_bytes()[:64]) else None
+    ambient_bgm = _ensure_ambient_bgm(out_path.parent, niche=niche) if (shutil.which("ffmpeg") and resolved_bg.is_file() and b"ftyp" in resolved_bg.read_bytes()[:64]) else None
     has_bg_a = bg_volume > 0.0 and _has_audio_stream(resolved_bg)
     if has_bg_a:
         try:

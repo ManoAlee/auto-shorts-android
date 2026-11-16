@@ -1,6 +1,7 @@
 """ASS animated/highlighted subtitle generator safe for FFmpeg filtergraphs."""
 
 from pathlib import Path
+import re
 from typing import Dict, List, Optional, Tuple
 
 
@@ -197,6 +198,23 @@ def generate_ass_subtitles(
 
     # Guarantee zero timestamp overlap + OpusClip CUE_JOIN_SEC (0.50s) anti-flicker hold across brief breaths.
     cues.sort(key=lambda item: (item[0], item[1]))
+
+    # Strip Whisper decoding repetition loops (e.g. identical phrase repeating 3+ times in a row)
+    deduped_cues: List[Tuple[float, float, str, str]] = []
+    last_plain = ""
+    repeat_streak = 0
+    for c_item in cues:
+        plain = re.sub(r"\{[^}]*\}", "", c_item[3]).strip().upper()
+        if plain and plain == last_plain:
+            repeat_streak += 1
+            if repeat_streak >= 2:
+                continue
+        else:
+            last_plain = plain
+            repeat_streak = 1
+        deduped_cues.append(c_item)
+    cues = deduped_cues
+
     normalized: List[Tuple[float, float, str, str]] = []
     prev_end = 0.0
     for c_start, c_end, style_name, safe_text in cues:

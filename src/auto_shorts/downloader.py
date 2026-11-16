@@ -24,11 +24,19 @@ def load_source_metadata(work_dir: Path) -> Dict:
                             "end_time": float(pt.get("end_time", 0.0)),
                             "value": float(pt.get("value", 0.0)),
                         })
+            audio_lang = str(data.get("audio_language") or data.get("language") or "").strip().lower()
+            if not audio_lang and isinstance(data.get("requested_formats"), list):
+                for fmt_item in data["requested_formats"]:
+                    if fmt_item.get("vcodec") == "none" or "audio" in str(fmt_item.get("format_note", "")).lower():
+                        if fmt_item.get("language"):
+                            audio_lang = str(fmt_item.get("language")).strip().lower()
+                            break
             return {
                 "title": str(data.get("title") or "").strip(),
                 "channel": str(data.get("channel") or data.get("uploader") or "").strip(),
                 "description": str(data.get("description") or "").strip(),
                 "webpage_url": str(data.get("webpage_url") or "").strip(),
+                "audio_language": audio_lang,
                 "heatmap": heatmap,
             }
         except (OSError, json.JSONDecodeError):
@@ -213,7 +221,7 @@ def download_video_and_subs(
     url: str,
     work_dir: Path,
     max_height: int = 720,
-    sub_langs: str = "pt",
+    sub_langs: str = "pt,pt-BR,pt-br,pt.*,pt-*,en",
     cookies_path: Optional[str] = None,
 ) -> Tuple[Path, Optional[Path]]:
     """Download video + available subtitles via yt-dlp without requiring heavy Python libs."""
@@ -294,7 +302,32 @@ def download_video_and_subs(
     sub_candidates = sorted(
         list(work_dir.glob("source*.vtt")) + list(work_dir.glob("source*.srt"))
     )
-    return video_path, (sub_candidates[0] if sub_candidates else None)
+    pt_subs = [s for s in sub_candidates if ".pt" in s.name.lower()]
+    chosen_sub = pt_subs[0] if pt_subs else (sub_candidates[0] if sub_candidates else None)
+    return video_path, chosen_sub
+
+
+def detect_audio_language(wav_path: Path, model_path: Path, whisper_bin: str) -> str:
+    """Run fast language detection probe with whisper-cli -dl. Returns 2-letter language code (e.g. 'ja', 'pt', 'en')."""
+    try:
+        proc = subprocess.run(
+            [
+                whisper_bin,
+                "-m", str(model_path),
+                "-f", str(wav_path),
+                "-dl",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        m = re.search(r"auto-detected language:\s*([a-z]{2})", proc.stderr)
+        if m:
+            return m.group(1).lower()
+    except Exception:
+        pass
+    return "pt"
 
 
 def transcribe_with_whisper_cpp(
@@ -337,25 +370,35 @@ def transcribe_with_whisper_cpp(
     ])
     subprocess.run(ffmpeg_cmd, check=True)
 
+    detected_lang = language
+    if language in ("pt", "auto"):
+        probe_lang = detect_audio_language(wav_path, resolved_model, whisper_bin)
+        if probe_lang and probe_lang != "pt":
+            detected_lang = probe_lang
+
     out_prefix = work_dir / "whisper_out"
     domain_prompt = (
         "Português do Brasil. One Piece, Luffy, Zoro, Brook, Imu-sama, Haki, Akuma no Mi, "
         "Jujutsu Kaisen, Sukuna, Gojo, Solo Leveling, Naruto, Bleach, análise, capítulo, fatídico."
     )
-    subprocess.run(
-        [
-            whisper_bin,
-            "-m", str(resolved_model),
-            "-f", str(wav_path),
-            "-l", language,
-            "-mc", "0",
-            "-sns",
-            "--prompt", domain_prompt,
-            "-osrt", "-ojf",
-            "-of", str(out_prefix),
-        ],
-        check=True,
-    )
+    whisper_args = [
+        whisper_bin,
+        "-m", str(resolved_model),
+        "-f", str(wav_path),
+        "-mc", "0",
+        "-sns",
+        "-osrt", "-ojf",
+        "-of", str(out_prefix),
+    ]
+    if detected_lang == "ja":
+        # Japanese audio: translate to English using Japanese acoustic model (avoids PT phonetic hallucination loops)
+        whisper_args.extend(["-l", "ja", "--translate"])
+    else:
+        whisper_args.extend(["-l", detected_lang])
+        if detected_lang in ("pt", "pt-br"):
+            whisper_args.extend(["--prompt", domain_prompt])
+
+    subprocess.run(whisper_args, check=True)
 
     json_out = Path(f"{out_prefix}.json")
     if json_out.exists():

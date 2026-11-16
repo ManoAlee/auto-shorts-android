@@ -392,7 +392,6 @@ class MahoragaEngine:
         sum_clean = pt_summary.strip()
         if sum_clean and not sum_clean.endswith((".", "!", "?")):
             sum_clean += "."
-        sum_lower_start = sum_clean[0].lower() + sum_clean[1:] if len(sum_clean) > 1 else sum_clean
 
         # Act 1: 8-Spoke High-Retention Narrative Openers
         openings = (
@@ -407,10 +406,6 @@ class MahoragaEngine:
         )
         act1_hook = openings[spoke_idx % len(openings)]
 
-        # Act 2 & 3: Journalistic Attribution + Full Fact Body
-        # Keeps exact summary text to guarantee zero hallucination & preserve all facts
-        act2_body = f"Segundo apuração divulgada por {source_name}, {sum_lower_start}"
-
         # Act 4: Zeigarnik Loop / Audience Debate CTA
         closings = (
             "Qual é a sua visão sobre esse caso? Deixe sua opinião sincera nos comentários.",
@@ -420,8 +415,32 @@ class MahoragaEngine:
         )
         act4_cta = closings[spoke_idx % len(closings)]
 
+        # Viral Shorts Pacing: budget factual sentences so total script stays strictly between 75 and 98 words (40-54s)
+        sentences = re.split(r"(?<=[.!?])\s+", sum_clean)
+        selected_sentences: List[str] = []
+        fixed_words = len(act1_hook.split()) + len(act4_cta.split()) + 6  # 6 words for attribution
+        cur_words = fixed_words
+        for s in sentences:
+            s_clean = s.strip()
+            if not s_clean:
+                continue
+            s_w = len(s_clean.split())
+            if cur_words + s_w <= 95 or not selected_sentences:
+                selected_sentences.append(s_clean)
+                cur_words += s_w
+            else:
+                break
+
+        budgeted_summary = " ".join(selected_sentences).strip()
+        if budgeted_summary and not budgeted_summary.endswith((".", "!", "?")):
+            budgeted_summary += "."
+        sum_lower_start = budgeted_summary[0].lower() + budgeted_summary[1:] if len(budgeted_summary) > 1 else budgeted_summary
+
+        # Act 2 & 3: Journalistic Attribution + Budgeted Core Facts
+        act2_body = f"Segundo apuração divulgada por {source_name}, {sum_lower_start}"
+
         chosen_raw = f"{act1_hook} {act2_body} {act4_cta}"
-        final_script = immunize_spoken_script(chosen_raw, title=title_clean, summary=sum_clean)
+        final_script = immunize_spoken_script(chosen_raw, title=title_clean, summary=budgeted_summary)
         self.record_speech_turn(f"news_{category}", spoke["id"], title_clean, final_script)
         return final_script, spoke
 

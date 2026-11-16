@@ -9,13 +9,26 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Autonomous 9:16 Vertical Video Factory engineered for Android (`Termux aarch64`) & Windows Desktop**  
-*Zero PyTorch/Docker bloat · Offline Edge-LLM + BM25 RAG · Kokoro-82M PT-BR & Open-Swara Voices · Multi-Scene B-Roll · Opus Scorecard QA*
+*Zero PyTorch/Docker bloat · Semantic Topic B-Roll Sniper (`yt-dlp` + Wikimedia 4K) · Ken Burns 2.5D · Voicebox DSP (`-16 LUFS`) · Whisper Auto-Lang · Opus Scorecard QA*
 
 </div>
 
 ---
 
-## Live Studio Preview (Real App Screenshots)
+## Live Studio & Generated 9:16 Shorts (Real Output)
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/short-gta6-semantic.jpg" alt="GTA 6 Semantic Visual Engine Output" width="260"/><br/>
+      <sub><b>Semantic B-Roll: Games</b> — Real GTA 6 Trailer footage sliced on-demand via <code>yt-dlp --download-sections</code> + Vox-style headline card &amp; kinetic captions (<code>90/100</code>)</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/short-tech-semantic.jpg" alt="GTA 6 Album Semantic Visual Engine Output" width="260"/><br/>
+      <sub><b>Semantic B-Roll: Multi-Scene</b> — Tri-layer cinema framing, progressive <code>\kf</code> karaoke &amp; <code>-16 LUFS</code> broadcast voice mastering</sub>
+    </td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -59,21 +72,22 @@ flowchart LR
     YT["YouTube InnerTube\n(Most Replayed Heatmaps)"]
   end
 
-  subgraph Intelligence["2. AI Script, Hygiene & Offline RAG"]
+  subgraph Intelligence["2. AI Script, Language Probe & Hygiene"]
     LLM["OpenRouter / Gemini /\nllama-cli GGUF (--single-turn)"]
-    BM25["BM25 Local Search\n+ CoT & Hook Sanitizer"]
+    LANG["Whisper -dl Audio Lang Probe\n+ Anti-Repetition Breaker"]
+    BUD["Strict 75-95 Word Budget\n(32s-54s Shorts Pacing)"]
   end
 
-  subgraph Production["3. Audio & 9:16 Video Pipeline"]
-    TTS["Kokoro-82M PT-BR / Edge-TTS /\nCosyVoice + Open-Swara WAVs\n(Warm Broadcast EQ + Trim)"]
-    BR["UCB1 Multi-Scene B-Roll\n(~4.2s switches + Sidechain -16 LUFS)"]
-    SUB["Progressive \\kf Karaoke\n(.ass + Whisper / WordBoundary)"]
+  subgraph Production["3. Semantic Visuals & Broadcast DSP"]
+    SEM["Semantic Visual Engine\n(yt-dlp Sniper + Wikimedia 4K\n+ Ken Burns 2.5D + xfade)"]
+    TTS["Edge-TTS / Kokoro-82M\n+ Voicebox EQ & -16 LUFS"]
+    SUB["Progressive \\kf Karaoke\n(.ass + Procedural BGM)"]
   end
 
-  subgraph QA["4. Quality Gate & Delivery"]
+  subgraph QA["4. Quality Gate & Auto-Delivery"]
     AUD["5-Frame Vision & Signalstats\n+ Opus Scorecard (0-100)"]
     DEDUP["Duplicate Queue Guard\n+ Auto-Optimize Metadata"]
-    PUB["YouTube Data API v3\nInstagram Reels / Webhook"]
+    PUB["YouTube Shorts + Instagram Reels\n+ TikTok Auto-Publish"]
   end
 
   Discovery --> Intelligence --> Production --> QA
@@ -85,14 +99,13 @@ flowchart LR
 
 | Layer | Highlights | Modules |
 | :--- | :--- | :--- |
-| **Web Studio UI (`:8787`)** | Modular responsive shell, persistent 5-stage live render stepper + floating scroll dock, interactive 9:16 framing preview with YouTube thumbnail auto-load, segmented Top-6 radar, accessible `<dialog>` inspector, zero-cache headers | [`src/auto_shorts/frontend/`](src/auto_shorts/frontend/), [`webapp.py`](src/auto_shorts/webapp.py) |
-| **Offline Edge-LLM & BM25** | ARM64 SoC ISA probing (`dotprod`/`asimddp`, `fp16`, `i8mm`, `sve`), RAM-tiered GGUF catalog, `<think>`/`<thought>` CoT stripping, pure-Python BM25 local RAG, `/v1/chat/completions`, `/api/ai/benchmark` | [`offline_llm.py`](src/auto_shorts/offline_llm.py), [`highlights.py`](src/auto_shorts/highlights.py) |
-| **Humanized PT-BR Voice** | PT-BR spoken normalization (`R$`, `%`, `IA`, `EUA`, `STF`, `km/h`), broadcast warmth EQ + de-esser, Kokoro-82M offline + CosyVoice/F5-TTS/GPT-SoVITS failover with CC-BY-SA Open-Swara Portuguese reference WAVs | [`narrator.py`](src/auto_shorts/narrator.py), [`assets/voices/`](assets/voices/) |
-| **9:16 Video & B-Roll** | `blur_bg`, `split_top_bottom`, facial-tracked `center_crop`, dynamic ~4.2s multi-scene B-roll + UCB1 evolution bandit, `-16 LUFS` loudnorm & sidechain ducking | [`renderer.py`](src/auto_shorts/renderer.py), [`gameplay.py`](src/auto_shorts/gameplay.py), [`evolution.py`](src/auto_shorts/evolution.py) |
-| **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, duplicate queue guard | [`validator.py`](src/auto_shorts/validator.py), [`re_engine.py`](src/auto_shorts/re_engine.py), [`publisher.py`](src/auto_shorts/publisher.py) |
-| **Autonomous 24/7 & Episode Slicer** | Zero-auth full anime episode scraper (Archive.org/AnimesDigital), automatic OP/ED 90s skipping, clímax detection with authentic BR dubbing preservation (-14 LUFS), real-time Tech Outage RCA sentinel | [`sentinel.py`](src/auto_shorts/sentinel.py), [`anime_archive_downloader.py`](src/auto_shorts/anime_archive_downloader.py), [`world_news.py`](src/auto_shorts/world_news.py) |
-| **Multi-Platform Publish & Wi-Fi Guard** | Idempotent YouTube Shorts, TikTok & Instagram Reels/Stories/Highlights publishing, real 9:16 video Story/Highlight covers, `thumbnail_sha256` post-publish vault audit, `_AUTOPUBLISH_LOCK` mutex, and `WIFI_ONLY=1` (`wlan0`/`wlan1` `SIOCGIFADDR`) 4G block | [`publisher.py`](src/auto_shorts/publisher.py), [`smart_autopublish.py`](src/auto_shorts/smart_autopublish.py) |
-| **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion (`IDisposable` safe HTTP/FFmpeg + Opus inspector) | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
+| **Universal Semantic Visual Engine** | Extracts entities from any topic (Games, Politics, Tech, Economy, World News), snipes 5–8s real video clips via `yt-dlp --download-sections`, fetches public-domain 4K photos via Wikimedia Commons API, renders jitter-free 2.5D Ken Burns `zoompan` + `xfade` transitions | [`semantic_visual_engine.py`](src/auto_shorts/semantic_visual_engine.py), [`world_news.py`](src/auto_shorts/world_news.py) |
+| **Multi-Lang Whisper & Title Hygiene** | Auto-probes audio language via `whisper-cli -dl` (prevents Japanese-to-Portuguese phonetic hallucination loops), enforces `Legendada` vs `Dublada` title accuracy, and strips repetition loops in `.ass` cues | [`downloader.py`](src/auto_shorts/downloader.py), [`subtitles.py`](src/auto_shorts/subtitles.py), [`highlights.py`](src/auto_shorts/highlights.py) |
+| **Web Studio UI (`:8787`)** | Modular responsive shell, persistent 5-stage live render stepper + floating scroll dock, interactive 9:16 framing preview, segmented Top-6 radar, accessible `<dialog>` inspector, zero-cache headers | [`src/auto_shorts/frontend/`](src/auto_shorts/frontend/), [`webapp.py`](src/auto_shorts/webapp.py) |
+| **Humanized PT-BR Voice & DSP** | Strict 75–95 word script budgeting (`32s–54s` pacing), PT-BR spoken normalization (`R$`, `%`, `IA`, `EUA`, `STF`), Voicebox-inspired broadcast EQ (`highpass 75Hz`, `145Hz` warmth, `3.4kHz` de-ess, `acompressor`, `-16 LUFS` loudnorm) + procedural ambient BGM | [`narrator.py`](src/auto_shorts/narrator.py), [`mahoraga.py`](src/auto_shorts/mahoraga.py), [`procedural_music.py`](src/auto_shorts/procedural_music.py) |
+| **QA & Opus Scorecard** | `ffprobe` & `ffmpeg signalstats` luminance/motion/freeze checks, 5D Opus Scorecard (0–100), subtitle coverage checks, persistent SQLite deduplication guard | [`validator.py`](src/auto_shorts/validator.py), [`deduplication.py`](src/auto_shorts/deduplication.py), [`re_engine.py`](src/auto_shorts/re_engine.py) |
+| **Multi-Platform Auto-Pilot** | Idempotent 24/7 autonomous scheduling & publishing to **YouTube Shorts**, **Instagram Reels**, and **TikTok**, `WIFI_ONLY=1` guard, Google Drive `rclone` backup | [`publisher.py`](src/auto_shorts/publisher.py), [`smart_autopublish.py`](src/auto_shorts/smart_autopublish.py) |
+| **Native C11 & C# Desktop** | C11 watchdog (`autoshorts`) & zero-exec MP4 auditor (`media_audit`); Windows `.NET WinForms` companion | [`native-c/`](native-c/), [`desktop-cs/AutoShortsDesktop.cs`](desktop-cs/AutoShortsDesktop.cs) |
 
 ---
 

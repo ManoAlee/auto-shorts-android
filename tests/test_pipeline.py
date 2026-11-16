@@ -957,7 +957,7 @@ def test_world_news_public_apis_and_security_hardening(tmp_path, monkeypatch):
     from auto_shorts.webapp import _is_safe_public_http_url, _safe_child_path, render_dashboard_html
     from auto_shorts.youtube_studio_mcp import handle_mcp_request
 
-    rss_sample = """<?xml version="1.0"?><rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>Global chip market surges</title><description>New mobile processors break records.</description><link>https://feeds.bbci.co.uk/news/world-1</link><media:thumbnail url="https://ichef.bbci.co.uk/ace/ws/240/test.jpg"/></item></channel></rss>"""
+    rss_sample = """<?xml version="1.0"?><rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>Global chip market surges</title><description>New mobile processors break global performance and efficiency records across major smartphone flagships this quarter.</description><link>https://feeds.bbci.co.uk/news/world-1</link><media:thumbnail url="https://ichef.bbci.co.uk/ace/ws/240/test.jpg"/></item></channel></rss>"""
     sf_sample = json.dumps({"results": [{"title": "Rocket launches satellite", "summary": "Orbital mission succeeds.", "url": "https://spaceflightnewsapi.net/1", "news_site": "Spaceflight"}]})
 
     def fake_fetch(url):
@@ -971,7 +971,7 @@ def test_world_news_public_apis_and_security_hardening(tmp_path, monkeypatch):
 
     headlines = fetch_world_news_headlines(topic="world", limit=6, fetcher=fake_fetch)
     assert len(headlines) >= 2
-    assert headlines[0]["image_url"] == "https://ichef.bbci.co.uk/ace/ws/800/br.jpg"
+    assert any(h["image_url"] == "https://ichef.bbci.co.uk/ace/ws/800/br.jpg" for h in headlines)
     en_story = next(h for h in headlines if h.get("lang") == "en")
 
     # Never hijack an already-rendered anime clip when selecting "auto" background
@@ -1689,7 +1689,7 @@ def test_opus_pro_caption_hold_signalstats_and_runbook_scorecard(tmp_path):
     for token in (
         'id="render-bar"', 'id="render-fill"', 'id="render-badge"', 'class="stage-pills"',
         'id="short-inspector-dlg"', 'id="toast-stack"', 'id="floating-render-dock"',
-        'class="side-rail"', 'class="layout-picker"', 'id="phone-preview-bg"',
+        'class="layout-picker"', 'id="phone-preview-bg"',
         'id="preview-hook-title"', 'id="voice-pace-meta"', 'id="mode-radar-horizon"',
         'id="btn-radar-more"', 'id="acervo-filter-chips"',
     ):

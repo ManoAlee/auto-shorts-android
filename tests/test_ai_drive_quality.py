@@ -255,3 +255,86 @@ def test_autopublish_blocks_narration_with_bad_integrity_or_off_niche_broll():
     assert _passes_narrated_preflight(pack)
     assert not _passes_narrated_preflight({**pack, "script_integrity": {"coverage": 0.47}})
     assert not _passes_narrated_preflight({**pack, "background_style": "space_cosmos+subway"})
+
+
+def test_sanitize_news_lead_text_removes_wordpress_and_google_discover_spam():
+    from auto_shorts.world_news import sanitize_news_lead_text
+
+    raw_spam = (
+        "Saiba quanto tempo leva para zerar GTA 6 e conquistar a platina. "
+        "Campanha de 50 horas em 5 capítulos e cerca de 200 horas para fazer 100%. "
+        "NÃO PERCA NADA DE GTA 6! Adicione o Portal Viciados às fontes no Google. Clique aqui e Favorite! "
+        "Página Inicial do Portal Viciados - Viciados Em GTA - GTA 6 - Quanto tempo leva para zerar GTA 6? "
+        "Seguir no Google Adicionar como fonte preferida Veja as nossas matérias em Principais notícias na Pesquisa do Google. "
+        "Seguir + Seguir o perfil no Google Receba as nossas matérias no Discover, o feed do app Google. "
+        "Seguir + Seguir no Google Notícias Receba as nossas matérias no app Google Notícias. "
+        "Seguir + Siga nos três e não perca nenhuma matéria! "
+        "Uma das maiores dúvidas dos fãs de GTA 6 finalmente ganhou respostas concretas da produtora."
+    )
+    cleaned = sanitize_news_lead_text(raw_spam)
+
+    assert "Saiba quanto tempo leva para zerar GTA 6 e conquistar a platina." in cleaned
+    assert "Campanha de 50 horas em 5 capítulos e cerca de 200 horas para fazer 100%." in cleaned
+    assert "Uma das maiores dúvidas dos fãs de GTA 6 finalmente ganhou respostas concretas da produtora." in cleaned
+
+    # Verify ALL spam and CTA phrases were purged
+    assert "não perca nada" not in cleaned.lower()
+    assert "adicione o portal" not in cleaned.lower()
+    assert "clique aqui" not in cleaned.lower()
+    assert "página inicial" not in cleaned.lower()
+    assert "seguir no google" not in cleaned.lower()
+    assert "discover" not in cleaned.lower()
+    assert "siga nos três" not in cleaned.lower()
+
+
+def test_hook_banner_validation_rejects_prompt_leakage():
+    from auto_shorts.world_news import _is_valid_hook_banner
+
+    # Must reject instruction leaks in both English and Portuguese
+    assert not _is_valid_hook_banner("MAX 4 WORDS UPPERCASE WITHOUT")
+    assert not _is_valid_hook_banner("MAX 4 PALAVRAS MAIUSCULAS")
+    assert not _is_valid_hook_banner("max 4 palavras maiusculas sem cortar frase")
+    assert not _is_valid_hook_banner("STRING")
+    assert not _is_valid_hook_banner("JSON")
+    assert not _is_valid_hook_banner("")
+
+    # Must accept valid hooks
+    assert _is_valid_hook_banner("DURAÇÃO DO GTA 6!")
+    assert _is_valid_hook_banner("CAMPANHA DE 50 HORAS")
+    assert _is_valid_hook_banner("APAGÃO NA MICROSOFT!")
+
+
+def test_clean_seo_title_strips_dangling_prepositions_and_conjunctions():
+    from auto_shorts.world_news import _clean_seo_title
+
+    # When truncated, it must not end in "e da", "de", "com", etc.
+    raw_title = "Quanto tempo leva para zerar GTA 6? Veja a duração do modo história e da platina"
+    clean = _clean_seo_title(raw_title, max_chars=76, suffix=" | Plantão Games")
+
+    assert clean.endswith(" | Plantão Games")
+    base_title = clean.replace(" | Plantão Games", "").strip()
+    assert not base_title.endswith((" e da", " e", " da", " do", " de", " com", " para"))
+    assert "GTA 6" in clean
+
+
+def test_games_category_generates_game_hashtags_and_niche():
+    from auto_shorts.world_news import build_brazil_news_story_pack
+
+    story = {
+        "title": "Quanto tempo leva para zerar GTA 6? Veja a duração do modo história",
+        "summary": "A campanha principal terá cerca de 50 horas distribuídas em cinco capítulos intensos de narrativa.",
+        "source": "Portal Games",
+        "url": "https://viciados.net/gta-6-duracao",
+        "category": "games",
+        "lang": "pt",
+    }
+    pack = build_brazil_news_story_pack(story, use_llm=False)
+
+    assert pack["category"] == "games"
+    assert pack["niche"] == "games"
+    assert "#GTA6" in pack["hashtags"]
+    assert "#Games" in pack["hashtags"]
+    assert "#NoticiasMundiais" not in pack["hashtags"]
+    assert pack["hook_title"] == "DURAÇÃO DO GTA 6!"
+    assert "Plantão Games" in pack["title"]
+

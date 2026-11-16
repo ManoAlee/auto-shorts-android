@@ -2435,6 +2435,58 @@
     });
   }
 
+  /* GTA 6 Radar & 1-Click Generation */
+  const btnQuickGta6 = document.getElementById('btn-quick-gta6-generate');
+  if (btnQuickGta6) {
+    btnQuickGta6.addEventListener('click', () => {
+      withBusyBtn(btnQuickGta6, 'Produzindo GTA 6...', async () => {
+        try {
+          showToast('Iniciando geração de Short de GTA 6 com gameplay e CapCut...', 'info');
+          const resp = await fetch('/api/news/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: 'games', bg_video: 'auto', style: 'podcast_male' }),
+          });
+          const data = await resp.json();
+          if (data.ok) {
+            showToast('Short de GTA 6 gerado com sucesso! Veja em Meus Vídeos.', 'ok');
+            loadVideos();
+          } else {
+            showToast(data.message || 'Erro ao gerar Short de GTA 6', 'err');
+          }
+        } catch (e) {
+          showToast('Falha na requisição: ' + e.message, 'err');
+        }
+      });
+    });
+  }
+
+  document.querySelectorAll('.btn-use-gta-topic').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.gta6-topic-card');
+      const topic = card ? card.getAttribute('data-topic') : 'GTA 6';
+      withBusyBtn(btn, 'Gerando...', async () => {
+        try {
+          showToast('Gerando Short sobre: ' + topic + '...', 'info');
+          const resp = await fetch('/api/news/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: topic, bg_video: 'auto', style: 'podcast_male' }),
+          });
+          const data = await resp.json();
+          if (data.ok) {
+            showToast('Short gerado com sucesso!', 'ok');
+            loadVideos();
+          } else {
+            showToast(data.message || 'Erro ao produzir pauta', 'err');
+          }
+        } catch (e) {
+          showToast('Falha de conexão: ' + e.message, 'err');
+        }
+      });
+    });
+  });
+
   syncWorkstationPreview();
   loadChannelTelemetry();
   loadScheduler();
