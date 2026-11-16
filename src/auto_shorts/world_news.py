@@ -796,6 +796,15 @@ def produce_world_news_short(
 
     res["delivery_status"] = delivery_status
 
+    # Auto-backup rendered news short to corresponding Google Drive niche subfolder
+    try:
+        from .downloader import build_drive_niche_folder, upload_to_rclone
+        target_niche = str(picked.get("category") or "noticias_mundiais").lower()
+        drive_folder = build_drive_niche_folder(target_niche)
+        upload_to_rclone(out_mp4, drive_folder)
+    except Exception:
+        pass
+
     if picked["id"] not in seen_ids:
         seen_ids.append(picked["id"])
         seen_path.write_text(json.dumps(seen_ids[-100:], indent=2), encoding="utf-8")

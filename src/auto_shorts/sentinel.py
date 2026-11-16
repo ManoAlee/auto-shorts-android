@@ -38,6 +38,14 @@ AUTO_ANIME_PULL_QUERIES = [
     "death note dublado cena tensa brasil",
 ]
 
+AUTO_PULL_CYCLE_NICHES = [
+    ("anime", "Anime Dublado", "entretenimento_animes", "Animes e Batalhas Épicas - Shorts"),
+    ("tech_ia", "Plantão Tech & IA", "ia_tech", "Tecnologia e Inteligência Artificial - Shorts"),
+    ("financas", "Economia & Finanças", "financas", "Finanças e Economia - Shorts"),
+    ("games", "Gameplay & GTA 6", "gameplay", "Games e GTA 6 - Shorts"),
+    ("noticias_mundo", "Notícias do Mundo", "noticias_mundiais", "Notícias Mundiais - Shorts"),
+]
+
 
 class DriveSentinelEngine:
     def __init__(
@@ -202,23 +210,39 @@ class DriveSentinelEngine:
             elapsed_min = (time.time() - last_pull) / 60.0
 
         if auto_pull_on and elapsed_min >= self.auto_pull_interval_min:
-            cycle_type = self._state.get("auto_pull_cycle_type", "anime")
-            if cycle_type == "anime":
-                with self._lock:
-                    self._state["auto_pull_cycle_type"] = "tech_news"
-                    self._persist_state()
+            idx = int(self._state.get("auto_pull_niche_index", 0)) % len(AUTO_PULL_CYCLE_NICHES)
+            niche_key, niche_label, niche_category, playlist = AUTO_PULL_CYCLE_NICHES[idx]
+            next_idx = (idx + 1) % len(AUTO_PULL_CYCLE_NICHES)
+            next_key, next_label, _, _ = AUTO_PULL_CYCLE_NICHES[next_idx]
+
+            with self._lock:
+                self._state["auto_pull_niche_index"] = next_idx
+                self._state["auto_pull_cycle_type"] = next_key
+                self._persist_state()
+
+            if niche_key == "anime":
                 self._pull_web_anime_episode()
             else:
-                with self._lock:
-                    self._state["auto_pull_cycle_type"] = "anime"
-                    self._persist_state()
-                self._pull_tech_incident_news()
+                topic_map = {
+                    "tech_ia": "tech",
+                    "financas": "financas",
+                    "games": "games",
+                    "noticias_mundo": "world",
+                }
+                self._pull_niche_short(
+                    niche_key=niche_key,
+                    niche_topic=topic_map.get(niche_key, "world"),
+                    niche_label=niche_label,
+                    niche_category=niche_category,
+                    playlist_name=playlist,
+                )
         else:
             with self._lock:
                 self._state["mode"] = "idle_watching"
                 remaining_min = max(0, int(self.auto_pull_interval_min - elapsed_min))
-                next_type = "Plantão Tech" if self._state.get("auto_pull_cycle_type") == "tech_news" else "Anime Dublado"
-                self._state["last_action"] = f"Drive limpo (0 pendentes). Próximo ciclo ({next_type}) em ~{remaining_min}min."
+                idx = int(self._state.get("auto_pull_niche_index", 0)) % len(AUTO_PULL_CYCLE_NICHES)
+                next_label = AUTO_PULL_CYCLE_NICHES[idx][1]
+                self._state["last_action"] = f"Drive limpo (0 pendentes). Próximo ciclo ({next_label}) em ~{remaining_min}min."
                 self._state["active_episode"] = None
                 self._persist_state()
 
@@ -348,56 +372,74 @@ class DriveSentinelEngine:
                 self._state["last_action"] = f"Falha ao puxar da web. Próxima tentativa em {self.poll_interval_sec}s."
                 self._persist_state()
 
-    def _pull_tech_incident_news(self) -> None:
-        """Autonomously discover breaking tech incidents / outages, explain root cause, and publish short."""
+    def _pull_niche_short(
+        self,
+        niche_key: str,
+        niche_topic: str,
+        niche_label: str,
+        niche_category: str,
+        playlist_name: str,
+    ) -> None:
+        """Autonomously discover and generate shorts for diverse niches (Tech, Finance, Games, World)."""
         with self._lock:
-            self._state["mode"] = "pulling_tech_news"
-            self._state["current_task"] = "Monitorando alertas urgentes de TI e tecnologia global..."
-            self._state["last_action"] = "Buscando notícias e incidentes críticos de TI na web"
+            self._state["mode"] = f"pulling_{niche_key}"
+            self._state["current_task"] = f"Produzindo conteúdo do ciclo: {niche_label}..."
+            self._state["last_action"] = f"Buscando conteúdos na web: {niche_label}"
             self._persist_state()
 
         from .world_news import produce_world_news_short
 
         try:
-            logger.info("DriveSentinel auto-pulling breaking tech news / outage short...")
+            logger.info("DriveSentinel auto-pulling niche %s (topic=%s)...", niche_key, niche_topic)
             fb = produce_world_news_short(
                 out_dir=self.out_dir,
-                topic="tech",
+                topic=niche_topic,
                 auto_publish=True,
-                playlist_name="Notícias Rápidas de Tecnologia e TI",
+                playlist_name=playlist_name,
                 use_llm=True,
             )
 
             out_file = fb.get("output")
             if out_file and Path(out_file).is_file():
                 try:
-                    from .downloader import build_drive_niche_folder
-                    upload_to_rclone(Path(out_file), build_drive_niche_folder("noticias_mundiais"))
+                    from .downloader import build_drive_niche_folder, upload_to_rclone
+                    dest_drive_folder = build_drive_niche_folder(niche_category)
+                    upload_to_rclone(Path(out_file), dest_drive_folder)
                 except Exception:
                     pass
 
             with self._lock:
                 self._state["last_auto_pull_ts"] = time.time()
                 self._state["web_animes_pulled_count"] = int(self._state.get("web_animes_pulled_count", 0)) + 1
-                self._state["mode"] = "tech_news_done"
-                self._state["last_action"] = f"Plantão Tech publicado: {fb.get('title', '')[:55]} e salvo no Drive."
+                self._state["mode"] = f"{niche_key}_done"
+                self._state["last_action"] = f"{niche_label} publicado: {fb.get('title', '')[:50]} e salvo no Drive."
                 self._state["last_error"] = ""
                 self._persist_state()
 
             try:
                 MahoragaEngine(self._db_path).record_adaptation_event(
-                    phenomenon="sentinel_tech_news_pulled",
-                    spoke="Raio VI (Tech & Outage Journalist)",
-                    action=f"Short de incidente tech publicado: {fb.get('title', '')[:60]}",
+                    phenomenon=f"sentinel_{niche_key}_pulled",
+                    spoke="Raio VI (Niche Automation)",
+                    action=f"Short de {niche_label} publicado: {fb.get('title', '')[:60]}",
                     success=True,
                 )
             except Exception:
                 pass
 
         except Exception as exc:
-            logger.exception("Failed auto-pulling tech news short: %s", exc)
+            logger.exception("Failed auto-pulling %s short: %s", niche_key, exc)
             with self._lock:
                 self._state["mode"] = "pull_error"
                 self._state["last_error"] = str(exc)[:200]
-                self._state["last_action"] = f"Falha no plantão tech. Próxima tentativa em {self.poll_interval_sec}s."
+                self._state["last_action"] = f"Falha no ciclo {niche_label}. Próxima tentativa em {self.poll_interval_sec}s."
                 self._persist_state()
+
+    def _pull_tech_incident_news(self) -> None:
+        """Backward-compatible alias for tech incident pulls."""
+        self._pull_niche_short(
+            niche_key="tech_ia",
+            niche_topic="tech",
+            niche_label="Plantão Tech & IA",
+            niche_category="ia_tech",
+            playlist_name="Notícias Rápidas de Tecnologia e TI",
+        )

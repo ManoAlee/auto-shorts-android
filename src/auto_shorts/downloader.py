@@ -142,14 +142,23 @@ def build_drive_niche_folder(niche: str) -> str:
     import time as _time
     mapping = {
         "entretenimento_animes": "Animes",
+        "animes": "Animes",
         "ia_tech": "Tech_IA",
+        "tech_ia": "Tech_IA",
+        "tech": "Tech_IA",
         "noticias_mundiais": "Noticias_Tech",
+        "mundo": "Noticias_Tech",
         "financas": "Financas",
+        "economia": "Financas",
         "podcast": "Podcasts",
+        "podcasts": "Podcasts",
         "saude_fitness": "Saude_Fitness",
         "desenvolvimento_pessoal": "Desenvolvimento",
+        "desenvolvimento": "Desenvolvimento",
         "concursos": "Concursos",
         "gameplay": "Gameplay",
+        "games": "Gameplay",
+        "gta_6": "Gameplay",
     }
     niche_dir = mapping.get(str(niche or "").strip().lower(), "Geral")
     day_dir = _time.strftime("%Y-%m-%d")
