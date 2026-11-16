@@ -133,6 +133,6 @@ def rank_feed_for_channel(videos: List[Dict]) -> List[Dict]:
             filename=item.get("filename", ""),
         )
         enriched.append({**item, "algorithm": algo, "tiktok_algo": tt_algo})
-    enriched.sort(key=lambda x: (1 if x.get("youtube") else 0, x["algorithm"]["algo_score"]), reverse=True)
+    enriched.sort(key=lambda x: x.get("mtime", 0.0), reverse=True)
     return enriched
 

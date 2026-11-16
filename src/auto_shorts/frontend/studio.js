@@ -1127,6 +1127,8 @@
       filtered.sort((a, b) => ((b.validation && b.validation.duration) || 0) - ((a.validation && a.validation.duration) || 0));
     } else if (_acervoSort === 'title_asc') {
       filtered.sort((a, b) => (a.title || a.filename).localeCompare(b.title || b.filename));
+    } else {
+      filtered.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
     }
 
     if (!filtered.length) {

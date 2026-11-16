@@ -18,6 +18,7 @@ import time
 import urllib.parse
 import urllib.request
 import importlib.util
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -301,7 +302,9 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
         items.append({
             "filename": mp4.name,
             "clip_id": pack.get("clip_id"),
-            "size_mb": round(mp4.stat().st_size / (1024 * 1024), 2),
+            "size_mb": round(st.st_size / (1024 * 1024), 2),
+            "mtime": st.st_mtime,
+            "created_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
             "title": heal_proper_nouns_and_asr(str(pack.get("title", mp4.name))),
             "hook_title": heal_proper_nouns_and_asr(str(pack.get("hook_title", ""))),
             "clip_summary": raw_sum,
