@@ -87,6 +87,8 @@ def bsk_fetch_google_trends_br(limit: int = 6, timeout: float = 20.0) -> List[Di
                 continue
             if low in seen or len(cand.split()) < 2:
                 continue
+            if re.match(r"^[\d.,+%\sKMB]+$", cand, re.I) or "000%" in cand or "k+" in low:
+                continue
             seen.add(low)
             items.append({
                 "id": f"bsk_trend_{len(items) + 1}",
