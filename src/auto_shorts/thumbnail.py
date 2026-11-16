@@ -17,14 +17,27 @@ def _escape_text(text: str) -> str:
     )
 
 
-def _split_hook_lines(hook_title: str, max_words: int = 5) -> List[str]:
+def _split_hook_lines(hook_title: str, max_words: int = 6, max_line_chars: int = 15) -> List[str]:
     words = [w for w in (hook_title or "").strip().upper().split() if w][:max_words]
     if not words:
-        return ["VOCE PRECISA", "VER ISSO!"]
-    if len(words) <= 2:
+        return ["VOCÊ PRECISA", "VER ISSO!"]
+    if len(words) <= 2 and len(" ".join(words)) <= max_line_chars:
         return [" ".join(words)]
-    mid = (len(words) + 1) // 2
-    return [" ".join(words[:mid]), " ".join(words[mid:])]
+
+    # Balance words across 2 lines minimizing character length difference
+    best_split = max(1, len(words) // 2)
+    min_diff = 999
+    for i in range(1, len(words)):
+        l1 = " ".join(words[:i])
+        l2 = " ".join(words[i:])
+        diff = abs(len(l1) - len(l2))
+        if len(l1) > max_line_chars or len(l2) > max_line_chars:
+            diff += 25
+        if diff < min_diff:
+            min_diff = diff
+            best_split = i
+
+    return [" ".join(words[:best_split]), " ".join(words[best_split:])]
 
 
 def build_thumbnail_filter(

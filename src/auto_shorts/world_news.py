@@ -850,17 +850,18 @@ def _build_news_over_gameplay_video(
 
     card_filters = [
         "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,eq=brightness=-0.05:contrast=1.08",
-        "drawbox=x=24:y=56:w=672:h=136:color=0x0B0F19@0.86:t=fill",
-        "drawbox=x=24:y=56:w=672:h=4:color=0xCC0000:t=fill",
+        # Safe zone: card starts at Y=140 to remain strictly below phone notch, status bar & TikTok/Reels top bar
+        "drawbox=x=24:y=140:w=672:h=140:color=0x0B0F19@0.88:t=fill",
+        "drawbox=x=24:y=140:w=672:h=4:color=0xCC0000:t=fill",
     ]
     if safe_font:
         card_filters.append(
             f"drawtext=fontfile='{safe_font}':text='{src_badge}':"
-            f"fontsize=17:fontcolor=white:box=1:boxcolor=0xCC0000@0.95:boxborderw=6:x={text_x}:y=72"
+            f"fontsize=17:fontcolor=white:box=1:boxcolor=0xCC0000@0.95:boxborderw=6:x={text_x}:y=156"
         )
         card_filters.append(
             f"drawtext=fontfile='{safe_font}':text='{headline}':"
-            f"fontsize=21:fontcolor=white:borderw=2:bordercolor=black:line_spacing=6:x={text_x}:y=108"
+            f"fontsize=20:fontcolor=white:borderw=2:bordercolor=black:line_spacing=6:x={text_x}:y=194"
         )
 
     base_chain = ",".join(card_filters)
@@ -874,8 +875,8 @@ def _build_news_over_gameplay_video(
         cmd.extend(["-loop", "1", "-r", "30", "-t", f"{duration_sec:.1f}", "-i", str(img_path)])
         vf = (
             f"[0:v]{base_chain}[card_bg];"
-            f"[3:v]scale=172:108:force_original_aspect_ratio=increase,crop=172:108[mini];"
-            f"[card_bg][mini]overlay=x=38:y=70[with_thumb];"
+            f"[3:v]scale=172:112:force_original_aspect_ratio=increase,crop=172:112[mini];"
+            f"[card_bg][mini]overlay=x=38:y=154[with_thumb];"
             f"[with_thumb][1:v]overlay=x='-W+W*(t/{duration_sec:.2f})':y=H-5:shortest=1,format=yuv420p[vout];"
             f"[2:a]lowpass=f=340,volume=0.14[amb_a]"
         )
