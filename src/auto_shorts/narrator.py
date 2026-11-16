@@ -1333,7 +1333,7 @@ def build_narrated_short(
     q = QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])
     width, height = int(q["width"]), int(q["height"])
     ass_path = work_dir / f"{out_path.stem}.ass"
-    safe_margin_v = 245 if bg_has_subs else 185
+    safe_margin_v = 310 if bg_has_subs else 285
     from .pro_editor_engine import generate_capcut_word_pop_ass
     try:
         generate_capcut_word_pop_ass(
@@ -1344,7 +1344,7 @@ def build_narrated_short(
             primary_color="&H00FFFFFF&",
             highlight_color="&H0000FFFF&",
             outline_color="&H00000000&",
-            font_size=42,
+            font_size=34,
             margin_v=safe_margin_v,
         )
     except Exception:

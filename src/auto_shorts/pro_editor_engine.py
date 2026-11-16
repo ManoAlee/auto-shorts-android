@@ -148,28 +148,35 @@ def compute_speech_intervals_from_silences(
 def generate_capcut_word_pop_ass(
     segments: List[Dict[str, Any]],
     out_ass_path: Path,
-    video_width: int = 720,
-    video_height: int = 1280,
+    width: int = 720,
+    height: int = 1280,
+    video_width: Optional[int] = None,
+    video_height: Optional[int] = None,
     primary_color: str = "&H00FFFFFF&",    # White
     highlight_color: str = "&H0000FFFF&",  # Vibrant Yellow (&HAABBGGRR in ASS)
-    font_name: str = "Montserrat",
-    font_size: int = 42,
+    outline_color: str = "&H00000000&",    # Black outline
+    font_name: str = "DejaVu Sans",
+    font_size: int = 34,
+    margin_v: Optional[int] = None,
+    **kwargs: Any,
 ) -> Path:
     """Generate professional CapCut-style ASS subtitles with active word highlight & drop shadow."""
+    vw = video_width if video_width is not None else width
+    vh = video_height if video_height is not None else height
     out_ass_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Safe vertical position: 68% from top (well above TikTok/IG bottom UI bar)
-    sub_margin_v = int(video_height * 0.28)
+    # Safe vertical position: 285px (~22.5%) from bottom, clear of TikTok handle & caption fold
+    sub_margin_v = margin_v if margin_v is not None else int(vh * 0.23)
 
     header = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: {video_width}
-PlayResY: {video_height}
+PlayResX: {vw}
+PlayResY: {vh}
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: CapCutPop,{font_name},{font_size},{primary_color},{highlight_color},&H00000000&,&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,40,40,{sub_margin_v},1
+Style: CapCutPop,{font_name},{font_size},{primary_color},{highlight_color},{outline_color},&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,40,40,{sub_margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

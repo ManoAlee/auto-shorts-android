@@ -432,14 +432,16 @@ class MahoragaEngine:
             else:
                 break
 
-        # Ensure high-retention length (65 to 95 words, ~35-48s duration) when summary is concise
-        if cur_words < 65:
+        # Ensure high-retention length (65 to 95 words, ~35-48s duration) and guarantee resolution
+        last_s = selected_sentences[-1].lower() if selected_sentences else ""
+        cliffhanger_markers = ("jogou um balde", "surpreendeu", "gerou polêmica", "deixou dúvidas", "promete agitar", "tem se perguntado", "não parece")
+        if any(m in last_s for m in cliffhanger_markers) or cur_words < 65:
             cat_context = {
-                "games": "O assunto movimenta a comunidade gamer e traz repercussões importantes para os próximos lançamentos da indústria.",
-                "tech_ia": "A disputa por avanços tecnológicos segue em ritmo acelerado com investimentos bilionários no setor.",
+                "games": "Especialistas e desenvolvedores destacam que as travas de segurança e as novas versões do console limitam a pirataria, reforçando que o foco deve ser no jogo original.",
+                "tech_ia": "A disputa por avanços tecnológicos segue em ritmo acelerado com investimentos bilionários e forte disputa entre as gigantes do setor.",
                 "economia": "Analistas de mercado monitoram os reflexos diretos nas projeções financeiras e no cenário econômico.",
-                "ciencia_espaco": "Novos dados científicos continuam sendo analisados por centros de pesquisa ao redor do mundo.",
-                "humor_memes": "O momento rapidamente repercutiu nas redes sociais e viralizou entre criadores e internautas.",
+                "ciencia_espaco": "Novos dados científicos continuam sendo analisados por centros de pesquisa globais para confirmar as descobertas.",
+                "humor_memes": "O momento rapidamente repercutiu nas redes sociais e viralizou entre criadores e internautas com reações hilárias.",
             }.get(category, "O desdobramento desse caso segue em acompanhamento atento pelos principais analistas internacionais.")
             selected_sentences.append(cat_context)
             cur_words += len(cat_context.split())

@@ -135,7 +135,10 @@ def generate_ass_subtitles(
     # Compact readable Shorts proportions (~30px on 720x1280, ~45px on 1080x1920)
     scale = width / 720.0
     font_size = int(round(30 * scale))
-    resolved_margin_v = int(round((margin_v if margin_v is not None else 190) * scale))
+    # Universal safe zone across TikTok, Instagram Reels, and YouTube Shorts:
+    # Bottom margin must be >= 280px in 720x1280 (or ~415px in 1080x1920) so subtitles
+    # sit cleanly above the TikTok sound marquee, creator handle, and caption fold.
+    resolved_margin_v = int(round((margin_v if margin_v is not None else 285) * scale))
 
     lines = [
         ASS_HEADER.format(

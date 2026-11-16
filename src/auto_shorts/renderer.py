@@ -162,11 +162,13 @@ def build_video_filter(
             # Dynamically fit width * 0.84 cleanly without oversized blocks on vertical canvas
             fit_px = int((width * 0.84) / max(10, longest * 0.58))
             font_size = max(19, min(int(width * 0.035), fit_px))
-            y_pos = int(height * 0.068)
+            # Safe zone: must stay below phone notch / status bar and Reels/TikTok top tabs (>= 150px on 1280h)
+            y_pos = int(height * 0.138)
             bar_w = int(width * 0.42)
             bar_x = (width - bar_w) // 2
+            bar_y = int(height * 0.124)
             # Vibrant amber accent rule + crisp high-contrast hook pill (never font=)
-            post_filters.append(f"drawbox=x={bar_x}:y={int(height * 0.056)}:w={bar_w}:h=4:color=0xFACC15:t=fill")
+            post_filters.append(f"drawbox=x={bar_x}:y={bar_y}:w={bar_w}:h=4:color=0xFACC15:t=fill")
             post_filters.append(
                 f"drawtext=fontfile='{safe_font}':text='{safe_text}':"
                 f"fontsize={font_size}:fontcolor=white:borderw=3:bordercolor=black:"

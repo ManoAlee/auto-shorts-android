@@ -444,6 +444,19 @@ def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Ho
     return f"{clean}{suffix}".strip()
 
 
+_IGNORE_PARA_KEYWORDS = (
+    "confira também", "leia também", "veja também", "siga no google", "fonte:",
+    "tudo sobre gta", "faça parte da discussão", "login para publicar",
+    "compartilhe no whatsapp", "inscreva-se no canal", "deixe seu comentário",
+    "política de privacidade", "todos os direitos reservados", "você precisa fazer o login",
+    "follow the viciados portal", "ao acompanhar nosso portal", "é grátis e leva um toque",
+)
+
+
+def _clean_alnum(s: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]", "", s.lower())
+
+
 def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str, str]:
     """Fetch article meta description / first paragraphs and og:image when RSS/HN only provided a bare title."""
     if not url or not url.startswith(("http://", "https://")) or "news.ycombinator.com" in url:
@@ -461,16 +474,23 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
         paragraphs: List[str] = []
         for pm in re.finditer(r"<p[^>]*>(.*?)</p>", html_raw, re.I | re.S):
             p_txt = sanitize_news_lead_text(pm.group(1))
-            if 40 <= len(p_txt) <= 450:
-                paragraphs.append(p_txt)
-                if len(paragraphs) >= 4:
-                    break
+            if len(p_txt) < 38 or len(p_txt) > 600:
+                continue
+            p_lower = p_txt.lower()
+            if any(ign in p_lower for ign in _IGNORE_PARA_KEYWORDS):
+                continue
+            paragraphs.append(p_txt)
+            if len(paragraphs) >= 8:
+                break
+
         combined_parts = []
-        if desc and len(desc) >= 45 and not any(desc[:30].lower() in p.lower() for p in paragraphs):
+        desc_alnum = _clean_alnum(desc[:40])
+        is_dup_desc = any(desc_alnum and desc_alnum in _clean_alnum(p) for p in paragraphs)
+        if desc and len(desc) >= 45 and not is_dup_desc:
             combined_parts.append(desc)
         combined_parts.extend(paragraphs)
         combined = sanitize_news_lead_text(" ".join(combined_parts))
-        lead = clean_truncate_to_sentence(combined, max_chars=750)
+        lead = clean_truncate_to_sentence(combined, max_chars=1350)
         return lead, img
     except Exception:
         return "", ""
@@ -511,6 +531,21 @@ def build_brazil_news_story_pack(
     else:
         pt_summary = ""
 
+    # Auto-detect category from content early
+    content_blob = f"{orig_title} {orig_summary} {category}".lower()
+    if category in ("humor", "memes", "humor_memes") or any(k in content_blob for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
+        effective_category = "humor_memes"
+    elif category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
+        effective_category = "games"
+    elif category in ("tech", "ia", "tech_ia") or any(k in content_blob for k in ("inteligencia artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple")):
+        effective_category = "tech_ia"
+    elif category in ("economia", "financas") or any(k in content_blob for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib")):
+        effective_category = "economia"
+    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(k in content_blob for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "planeta", "lua", "marte")):
+        effective_category = "ciencia_espaco"
+    else:
+        effective_category = "mundo"
+
     # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", etc.
     clean_t = re.sub(r"\s+[-–|]\s+.*$", "", pt_title).strip().lower()
     clean_s = re.sub(r"\s+[-–|]\s+.*$", "", pt_summary).strip().lower()
@@ -528,29 +563,19 @@ def build_brazil_news_story_pack(
             pt_summary = f"{pt_title}. Os fatos e os detalhes apurados repercutiram nos principais veículos internacionais e acompanham o cenário global."
 
     # Deduplicate if pt_summary repeats pt_title at the start
-    if pt_summary and pt_title and pt_summary.lower().startswith(pt_title.lower()):
-        pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
+    clean_pt_title = _clean_alnum(pt_title[:35])
+    if pt_summary and clean_pt_title and clean_pt_title in _clean_alnum(pt_summary[:90]):
+        m_split = re.search(r"^.*?[.!?]\s+", pt_summary)
+        if m_split and len(pt_summary[m_split.end():].strip()) >= 50:
+            pt_summary = pt_summary[m_split.end():].strip()
+        elif pt_summary.lower().startswith(pt_title.lower()):
+            pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
 
     # A headline alone is not enough evidence for a news script. Never pad it with invented context.
     if not pt_summary or len(pt_summary) < 50 or pt_summary.lower() == pt_title.lower():
         raise ValueError(
             f"Notícia descartada: {source_name} não forneceu um resumo verificável para '{pt_title}'."
         )
-
-    # Auto-detect category from content if not explicitly specified
-    content_blob = f"{orig_title} {orig_summary} {category}".lower()
-    if category in ("humor", "memes", "humor_memes") or any(k in content_blob for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
-        effective_category = "humor_memes"
-    elif category in ("games", "jogo", "jogos") or any(k in content_blob for k in ("gta", "rockstar", "playstation", "xbox", "nintendo", "gamer", "gameplay", "modo história", "platina", "zerar")):
-        effective_category = "games"
-    elif category in ("tech", "ia", "tech_ia") or any(k in content_blob for k in ("inteligencia artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple")):
-        effective_category = "tech_ia"
-    elif category in ("economia", "financas") or any(k in content_blob for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib")):
-        effective_category = "economia"
-    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(k in content_blob for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "planeta", "lua", "marte")):
-        effective_category = "ciencia_espaco"
-    else:
-        effective_category = "mundo"
 
     cat_meta_map = {
         "humor_memes": {
@@ -608,13 +633,16 @@ def build_brazil_news_story_pack(
 
     if use_llm and is_llm_configured():
         prompt = (
-            "Você é jornalista de plantão internacional adaptando notícias reais para o público do Brasil em Shorts (35-45s).\n"
-            f"Fonte: {source_name}\nManchete em PT-BR: {pt_title}\nResumo em PT-BR: {pt_summary}\n"
-            "Regras: português brasileiro natural e claro; use apenas fatos explícitos na manchete e no resumo; "
-            "não invente consequências, especialistas, números, prazos ou impacto no Brasil. Se o impacto local "
-            "não estiver na fonte, diga que ainda não foi informado. Preserve incertezas e atribua afirmações à fonte.\n"
+            "Você é um jornalista de plantão internacional adaptando notícias reais para Shorts dinâmicos no Brasil (35-45s).\n"
+            f"Fonte: {source_name}\nManchete: {pt_title}\nResumo completo dos fatos: {pt_summary}\n\n"
+            "ESTRUTURA OBRIGATÓRIA DO ROTEIRO (4 ATOS):\n"
+            "1. GANCHO (0-3s): Chame a atenção imediatamente com o fato principal.\n"
+            "2. O FATO: Explique objetivamente o que aconteceu.\n"
+            "3. O MOTIVO / EXPLICAÇÃO: Explique O PORQUÊ do fato ou o que o especialista/desenvolvedor/autoridade declarou (NUNCA pare em suspense ou deixe sem explicar!).\n"
+            "4. CONCLUSÃO & CTA: Dê o desfecho claro do caso e faça uma pergunta instigando comentários.\n\n"
+            "Regras: Português brasileiro natural e direto; use os fatos fornecidos sem alucinações; NUNCA corte frase no meio; o vídeo deve ter começo, meio, explicação e desfecho completo.\n"
             "Responda SOMENTE JSON válido:\n"
-            '{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS SEM CORTAR FRASE","roteiro":"texto falado 70 a 105 palavras"}'
+            '{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS","roteiro":"texto falado 70 a 100 palavras completo com explicacao e conclusao"}'
         )
         try:
             raw = call_gemini_or_openai(prompt)

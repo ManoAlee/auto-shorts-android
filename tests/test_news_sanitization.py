@@ -105,3 +105,39 @@ def test_build_brazil_news_story_pack_preserves_specific_summary():
     assert "tracklist" in pack["caption"].lower() or "faixas" in pack["caption"].lower() or "musical" in pack["caption"].lower()
     assert "A Rockstar Games confirmou o aguardado lançamento de Grand Theft Auto 6 para PlayStation 5" not in pack["caption"]
     assert len(pack["script"].split()) >= 60
+
+
+def test_thumbnail_and_video_safe_zones():
+    from auto_shorts.thumbnail import build_thumbnail_filter
+    from auto_shorts.renderer import build_video_filter
+    from auto_shorts.subtitles import generate_ass_subtitles
+    import tempfile
+    from pathlib import Path
+
+    # 1. Thumbnail filter on 720x1280 must position badge in top safe zone (>= 140px, never 28px)
+    thumb_vf = build_thumbnail_filter(720, 1280, "DESENVOLVEDOR PS5 DÁ A REAL", badge="GAMES", font_path="C:/Windows/Fonts/arialbd.ttf")
+    # Badge Y must be >= 140
+    import re
+    m_badge = re.search(r"text='GAMES'.*?:y=(\d+)", thumb_vf)
+    assert m_badge, "Badge drawtext filter not found"
+    badge_y = int(m_badge.group(1))
+    assert badge_y >= 140, f"Thumbnail badge Y ({badge_y}) is in unsafe top bar zone (< 140)"
+
+    # 2. Video hook banner on 720x1280 must position hook pill in top safe zone (>= 150px)
+    vid_vf = build_video_filter(layout="blur_bg", width=720, height=1280, hook_title="DESENVOLVEDOR PS5 DÁ A REAL", font_path="C:/Windows/Fonts/arialbd.ttf")
+    m_hook = re.search(r"boxcolor=0x0B0F19@0.80.*?:y=(\d+)", vid_vf)
+    assert m_hook, "Hook banner drawtext not found"
+    hook_y = int(m_hook.group(1))
+    assert hook_y >= 150, f"Hook banner Y ({hook_y}) is in unsafe top bar zone (< 150)"
+
+    # 3. Subtitles default MarginV on 720x1280 must be >= 280px (clear of TikTok caption fold)
+    with tempfile.TemporaryDirectory() as td:
+        ass_out = Path(td) / "test.ass"
+        generate_ass_subtitles([{"start": 0.0, "end": 2.0, "text": "TESTE DE LEGENDA"}], 0.0, 2.0, ass_out, width=720, height=1280)
+        ass_content = ass_out.read_text(encoding="utf-8")
+        # Check MarginV in Style lines (Format: ... MarginL, MarginR, MarginV, Encoding)
+        m_margin = re.search(r"Style:\s*Default,.*?56,56,(\d+),1", ass_content)
+        assert m_margin, "MarginV not found in ASS style"
+        margin_v = int(m_margin.group(1))
+        assert margin_v >= 280, f"Subtitle MarginV ({margin_v}) is too low, will overlap TikTok caption (< 280)"
+
