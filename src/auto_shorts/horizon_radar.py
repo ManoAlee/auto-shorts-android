@@ -267,14 +267,21 @@ def fetch_horizon_trends(
 
     news_rows: List[Dict] = []
     anime_rows: List[Dict] = []
+    bsk_trend_rows: List[Dict] = []
     yt_rows_by_hk: Dict[str, List[Dict]] = {}
 
-    pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
     try:
         fut_news = None
         fut_anime = None
+        fut_bsk_trends = None
         fut_yts: Dict[str, concurrent.futures.Future] = {}
         wait_list: List[concurrent.futures.Future] = []
+        if use_cache and key in {"todos", "all", "", "humor_memes"}:
+            from .bsk_bridge import bsk_fetch_google_trends_br, is_bsk_ready
+            if is_bsk_ready():
+                fut_bsk_trends = pool.submit(bsk_fetch_google_trends_br, 4)
+                wait_list.append(fut_bsk_trends)
         if want_news:
             topic_map = {"dinheiro_ia": "tech", "ciencia_espaco": "world"}.get(key, "world")
             news_cap = 10 if key in {"ciencia_espaco", "noticias_mundiais"} else 8
@@ -315,6 +322,11 @@ def fetch_horizon_trends(
                 anime_rows = fut_anime.result() or []
             except Exception:
                 anime_rows = []
+        if fut_bsk_trends is not None and fut_bsk_trends.done():
+            try:
+                bsk_trend_rows = fut_bsk_trends.result() or []
+            except Exception:
+                bsk_trend_rows = []
         for hk, f in fut_yts.items():
             if f.done():
                 try:
@@ -323,6 +335,29 @@ def fetch_horizon_trends(
                     yt_rows_by_hk[hk] = []
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
+
+    # 0. Live Google Trends BR via BrowserSkill (`bsk`) when paired
+    for bt in bsk_trend_rows:
+        t_txt = str(bt.get("title") or "").strip()
+        if not t_txt:
+            continue
+        _add_card({
+            "horizon": "humor_memes",
+            "category_kind": "humor",
+            "kind_label": "Em Alta no Brasil (bsk)",
+            "badge": "Trends BR ao vivo",
+            "title_pt": f"{t_txt} — O que está bombando no Brasil agora",
+            "hook_suggestion": " ".join(t_txt.split()[:4]).upper()[:28],
+            "why_viral": "Capturado em tempo real do Google Trends Brasil via Chromium + BrowserSkill.",
+            "metric_badge": "Google Trends BR",
+            "rpm_hint": "Alta busca imediata",
+            "youtube_query": f"{t_txt} brasil",
+            "url": bt.get("url", ""),
+            "image_url": "",
+            "source": bt.get("source", "Google Trends BR"),
+            "niche": "humor_memes",
+            "mode": "discover",
+        })
 
     # 1. Live global journalism / Economy / Tech / Space headlines (translated to clean PT-BR)
     for h in news_rows:

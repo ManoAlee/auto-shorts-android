@@ -777,8 +777,14 @@ def _build_clip_title(
         base = pt_translated[: 90 - len(suffix)].rstrip(" -|:")
         return f"{base}{suffix}"
     if hook_title and hook_title != "PRESTA ATENCAO NISSO":
-        return f"{hook_title.title()} — {niche.label.split(',')[0]}"[:90]
-    return f"Corte Imperdivel de {niche.label.split(',')[0]}"[:90]
+        clean_hk = re.sub(r"^(?:E\s+O|MAS\s+O|ENTAO|POIS)\s+", "", hook_title.strip(), flags=re.I).strip()
+        if clean_hk:
+            prefix = f"{clean_src[:32].rstrip(' -|:')} — " if clean_src else ""
+            return f"{prefix}{clean_hk.title()}{suffix}"[:90]
+    if clean_src:
+        base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
+        return f"{base}{suffix}"
+    return f"Momento Viral de {niche.label.split(',')[0]}{suffix}"[:90]
 
 
 def _heatmap_peak_for_window(heatmap: Optional[List[Dict]], start: float, end: float) -> float:

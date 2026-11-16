@@ -53,6 +53,10 @@ def sanitize_news_lead_text(raw_text: str) -> str:
     txt = re.sub(r":\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])", ". ", txt)
     # Clean irregular spacing around punctuation (e.g., "Nvidia , empresários" -> "Nvidia, empresários")
     txt = re.sub(r"\s+([,.:;!?])", r"\1", txt)
+    # Strip author bylines and portal timestamps (e.g. "Jornalista e comentarista da GloboNews. 16/11/2026 15h36 Atualizado 16/11/2026")
+    txt = re.sub(r"\bJornalista e comentarista d[aoe]\s+[A-Za-zÀ-ÿ0-9\s]+\.?", " ", txt, flags=re.I)
+    txt = re.sub(r"\b\d{2}/\d{2}/\d{4}\s+\d{1,2}h\d{2}(?:\s+Atualizado\s+\d{2}/\d{2}/\d{4}(?:\s+\d{1,2}h\d{2})?)?", " ", txt, flags=re.I)
+    txt = re.sub(r"\s+", " ", txt).strip()
     # Split into discrete sentences
     sentences = re.split(r"(?<=[.!?])\s+", txt)
     clean: List[str] = []
@@ -464,7 +468,23 @@ def _extract_article_lead_from_url(url: str, timeout: float = 4.5) -> Tuple[str,
     if not url or not url.startswith(("http://", "https://")) or "news.ycombinator.com" in url:
         return "", ""
     try:
-        html_raw = _http_get_text(url, timeout=timeout)
+        html_raw = ""
+        try:
+            html_raw = _http_get_text(url, timeout=timeout)
+        except Exception:
+            html_raw = ""
+
+        # If direct HTTP failed (e.g. 403 / Cloudflare) or returned thin JS shell, fallback to BrowserSkill (`bsk`)
+        if not html_raw or len(re.findall(r"<p[^>]*>", html_raw, re.I)) < 2:
+            try:
+                from .bsk_bridge import bsk_fetch_rendered_html
+                bsk_html = bsk_fetch_rendered_html(url)
+                if bsk_html and len(bsk_html) > len(html_raw):
+                    html_raw = bsk_html
+            except Exception:
+                pass
+        if not html_raw:
+            return "", ""
         img = ""
         m_img = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.I)
         if m_img and m_img.group(1).startswith("http"):
