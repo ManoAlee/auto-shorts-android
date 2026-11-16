@@ -197,11 +197,16 @@ def run_pipeline(
     if transcript["duration"] <= 0:
         transcript["duration"] = _probe_duration(video_path)
 
+    # Maximize content extraction for long streams/podcasts/episodes instead of wasting 90% of the video
+    dur_min = max(0.0, float(transcript.get("duration") or 0.0) / 60.0)
+    auto_target = max(3, min(25, int(dur_min / 3.0) + 2)) if dur_min >= 5.0 else max(1, min(3, int(dur_min)))
+    effective_num_clips = auto_target if num_clips <= 0 else (max(num_clips, auto_target) if dur_min >= 18.0 else num_clips)
+
     highlights = detect_highlights(
         transcript=transcript,
         platform_key=platform,
         niche_key=niche,
-        num_clips=num_clips,
+        num_clips=effective_num_clips,
         use_llm=use_llm,
         learning_context=learning_context,
         source_title=str(resolved_meta.get("title") or ""),
