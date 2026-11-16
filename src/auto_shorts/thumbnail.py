@@ -61,16 +61,7 @@ def build_thumbnail_filter(
     if font_path:
         safe_font = escape_ffmpeg_filter_path(font_path)
         badge_txt = _escape_text((badge or "CORTES").upper()[:18])
-        badge_size = max(22, int(min(width, height) * 0.042))
-        # Safe zone calibration: vertical 9:16 (height > width) must clear phone notch,
-        # status bar, and platform UI tabs (>= 150px on 1280h).
-        badge_y = int(height * (0.125 if height > width else 0.08))
-        badge_x = int(width * 0.08 if height > width else width * 0.05)
-        parts.append(
-            f"drawtext=fontfile='{safe_font}':text='{badge_txt}':"
-            f"fontsize={badge_size}:fontcolor=black:box=1:boxcolor=#FFD400@0.95:"
-            f"boxborderw=10:x={badge_x}:y={badge_y}"
-        )
+        badge_size = max(20, int(min(width, height) * (0.034 if height > width else 0.042)))
 
         # Dynamic title sizing to prevent horizontal overflow on narrow mobile screens
         max_line_len = max((len(l) for l in lines), default=10)
@@ -78,6 +69,22 @@ def build_thumbnail_filter(
         title_size = min(base_title_size, int((width * 0.86) / max(8, max_line_len * 0.58)))
         base_y = int(height * (0.60 if len(lines) == 2 else 0.68))
         line_gap = int(title_size * 1.18)
+
+        # In vertical 9:16 covers (height > width), place the category badge centered
+        # directly above the hook title, keeping the top 20% clean for news cards & platform UI.
+        if height > width:
+            badge_y = base_y - int(line_gap * 0.85)
+            badge_x = "(w-text_w)/2"
+        else:
+            badge_y = int(height * 0.08)
+            badge_x = str(int(width * 0.05))
+
+        parts.append(
+            f"drawtext=fontfile='{safe_font}':text='{badge_txt}':"
+            f"fontsize={badge_size}:fontcolor=black:box=1:boxcolor=#FFD400@0.95:"
+            f"boxborderw=8:x={badge_x}:y={badge_y}"
+        )
+
         for idx, line in enumerate(lines):
             color = "#FFD400" if idx == 0 else "white"
             safe_line = _escape_text(line)
