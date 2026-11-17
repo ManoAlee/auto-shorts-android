@@ -389,7 +389,10 @@ def _save_scheduler_cfg(out_dir: Path, cfg: Dict) -> Dict:
     return cfg
 
 
+from .hype_engine import get_hype_status_payload, pick_hype_aware_niche
+
 _AUTO_NICHE_ROTATION = (
+    "games_gta6",
     "noticias_mundiais",
     "entretenimento_animes",
     "ia_tech",
@@ -397,29 +400,28 @@ _AUTO_NICHE_ROTATION = (
     "podcast",
     "desenvolvimento_pessoal",
     "saude_fitness",
-    "concursos",
 )
 
 
 def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
     raw_niche = str(cfg.get("niche") or "all")
-    active_niche = (
-        _AUTO_NICHE_ROTATION[int(cfg.get("runs_completed", 0)) % len(_AUTO_NICHE_ROTATION)]
-        if raw_niche == "all"
-        else raw_niche
+    active_niche, hype_news_topic, hype_summary = pick_hype_aware_niche(
+        int(cfg.get("runs_completed", 0)),
+        raw_niche,
     )
     _JOB_STATE.update({
         "running": True, "last_error": "", "started_at": time.time(),
         "stage_index": 1, "stage_total": 5, "progress_pct": 15,
-        "stage_label": f"1/5 Piloto ({active_niche}) coletando fonte...",
+        "stage_label": f"1/5 Piloto ({active_niche}) • {hype_summary or 'coletando fonte'}...",
         "last_status": f"Piloto automatico ({active_niche}) em execucao...",
     })
     try:
-        if active_niche == "noticias_mundiais":
-            _set_job_progress(2, 5, f"2/5 Traduzindo noticia {active_niche} + Voz Kokoro...", 42)
+        if active_niche == "noticias_mundiais" or hype_news_topic:
+            target_topic = hype_news_topic or "world"
+            _set_job_progress(2, 5, f"2/5 Hype {target_topic.upper()} + Voz PT-BR...", 42)
             res = produce_world_news_short(
                 out_dir=out_dir,
-                topic="world",
+                topic=target_topic,
                 auto_publish=bool(cfg.get("auto_publish", True)),
                 use_llm=is_llm_configured(),
             )
@@ -467,7 +469,7 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 _set_job_progress(2, 5, f"2/5 Mahoraga contra-adaptando ({active_niche} -> noticias_mundiais)...", 45)
                 fb_res = produce_world_news_short(
                     out_dir=out_dir,
-                    topic="world",
+                    topic=hype_news_topic or ("games" if active_niche == "games_gta6" else "world"),
                     auto_publish=bool(cfg.get("auto_publish", True)),
                     use_llm=is_llm_configured(),
                 )
@@ -1063,6 +1065,10 @@ def make_handler(out_dir: Path):
                     st["mahoraga"] = MahoragaEngine(out_dir / "shorts_evolution.db").get_status_summary()
                 except Exception:
                     st["mahoraga"] = {"mode": "MAHORAGA_8_SPOKE_ACTIVE", "wheel_turns": 0}
+                try:
+                    st["hype"] = get_hype_status_payload()
+                except Exception:
+                    st["hype"] = {"active_hype": "Rotação equilibrada", "windows": []}
                 self._send_json(200, st)
                 return
 

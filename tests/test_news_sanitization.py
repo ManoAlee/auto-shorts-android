@@ -227,4 +227,23 @@ def test_voice_clone_hf_chunker_and_style_registered():
     assert all(len(c) <= 140 for c in chunks)
 
 
+def test_hype_engine_boosts_gta6_launch_window_in_nov_2026():
+    import datetime as dt
+    from auto_shorts.hype_engine import build_weighted_rotation, pick_hype_aware_niche
+
+    nov17 = dt.date(2026, 11, 17)
+    rot = build_weighted_rotation(nov17)
+    assert "games_gta6" in rot
+    assert rot.count("games_gta6") >= 3
+
+    niche0, topic0, summary = pick_hype_aware_niche(0, "all", today=nov17)
+    assert niche0 == "games_gta6"
+    assert topic0 is None  # even cycle -> video/gameplay/react clipping
+    assert "faltam 2d" in summary
+
+    niche1, topic1, _ = pick_hype_aware_niche(2, "all", today=nov17)
+    niche_odd, topic_odd, _ = pick_hype_aware_niche(3, "all", today=nov17)
+    assert "games_gta6" in {niche1, niche_odd} or topic_odd == "games" or topic1 == "games"
+
+
 
