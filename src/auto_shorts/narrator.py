@@ -1395,21 +1395,20 @@ def build_narrated_short(
     if bg_start > 0:
         bg_input_flags.extend(["-ss", f"{bg_start:.2f}"])
 
-    # Studio broadcast speech chain (Amphion + Voicebox DSP discipline):
-    # Highpass 75Hz (rumbles), Equalizer 145Hz (warm presence), Notch 3400Hz (anti-metallic),
-    # Equalizer 9500Hz (crisp vocal air), Optical compression (threshold -18dB, makeup 1.35x),
-    # perceptual loudness target -16 dB LUFS.
+    # For cloned human voice ("minha_voz"), preserve natural timbre without Kokoro's +2.8dB 145Hz bass boost.
+    if style.key == "minha_voz":
+        eq_stage = "highpass=f=80,"
+    else:
+        eq_stage = "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,equalizer=f=9500:t=q:w=1.2:g=1.8,"
     voice_chain = (
         "[1:a]aformat=sample_rates=44100:channel_layouts=stereo,"
-        "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,"
-        "equalizer=f=9500:t=q:w=1.2:g=1.8,"
-        "acompressor=threshold=-18dB:ratio=2.8:attack=12:release=120:makeup=1.35[voice_a]"
+        + eq_stage
+        + "acompressor=threshold=-18dB:ratio=2.4:attack=12:release=120:makeup=1.25[voice_a]"
     )
     solo_voice_af = (
         "aformat=sample_rates=44100:channel_layouts=stereo,"
-        "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,"
-        "equalizer=f=9500:t=q:w=1.2:g=1.8,"
-        "acompressor=threshold=-18dB:ratio=2.8:attack=12:release=120:makeup=1.35,"
+        + eq_stage
+        + "acompressor=threshold=-18dB:ratio=2.4:attack=12:release=120:makeup=1.25,"
         "loudnorm=I=-16:TP=-1.5:LRA=8"
     )
     mix_chain = (

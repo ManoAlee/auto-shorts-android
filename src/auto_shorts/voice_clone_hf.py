@@ -90,10 +90,10 @@ def synthesize_chatterbox_hf_space(
             gen_path = client.predict(
                 text_input=chunk,
                 audio_prompt_path_input=ref_handle,
-                exaggeration_input=0.55,
-                temperature_input=0.75,
+                exaggeration_input=0.40,
+                temperature_input=0.70,
                 seed_num_input=0,
-                cfgw_input=0.5,
+                cfgw_input=0.35,
                 api_name="/generate_tts_audio",
             )
             part_src = Path(str(gen_path))
@@ -102,10 +102,17 @@ def synthesize_chatterbox_hf_space(
             wav_parts.append(part_src)
 
         out_mp3.parent.mkdir(parents=True, exist_ok=True)
+        # Tighten pacing (1.18x tempo preserving pitch), trim internal dead air, and keep vocal clarity (no bass mud)
+        clarity_af = (
+            "silenceremove=stop_periods=-1:stop_duration=0.22:stop_threshold=-38dB,"
+            "atempo=1.18,"
+            "highpass=f=85,equalizer=f=140:t=q:w=1.0:g=-1.8,equalizer=f=3200:t=q:w=1.2:g=2.0"
+        )
         if len(wav_parts) == 1:
             cmd = [
                 "ffmpeg", "-y", "-loglevel", "error",
                 "-i", str(wav_parts[0]),
+                "-af", clarity_af,
                 "-ar", "44100", "-ac", "1", "-b:a", "192k",
                 str(out_mp3),
             ]
@@ -118,6 +125,7 @@ def synthesize_chatterbox_hf_space(
             cmd = [
                 "ffmpeg", "-y", "-loglevel", "error",
                 "-f", "concat", "-safe", "0", "-i", str(concat_txt),
+                "-af", clarity_af,
                 "-ar", "44100", "-ac", "1", "-b:a", "192k",
                 str(out_mp3),
             ]
