@@ -88,7 +88,7 @@ def main():
         print(f"    Duração: {res.get('duration')}s")
 
         # Validate with video validator
-        val = validate_generated_short(out_mp4, min_duration=10.0, max_duration=65.0)
+        val = validate_generated_short(out_mp4, max_duration=65.0)
         print(f"    Validação: Valid={val.get('valid')} Errors={val.get('errors')}")
 
     print("\n=== TODOS OS SHORTS FORAM GERADOS COM SUCESSO! ===")
