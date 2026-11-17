@@ -168,6 +168,14 @@ def generate_capcut_word_pop_ass(
     # Safe vertical position: 300px (~23.5%) from bottom (video-edit 450px @1080p rule)
     sub_margin_v = margin_v if margin_v is not None else int(vh * 0.235)
 
+    effective_font = font_name
+    if font_name in ("DejaVu Sans", "Arial"):
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        if (repo_root / "assets" / "fonts" / "AlbertSans-ExtraBold.ttf").is_file() or Path("/data/data/com.termux/files/home/auto-shorts-android/assets/fonts/AlbertSans-ExtraBold.ttf").is_file():
+            effective_font = "Albert Sans"
+        elif (repo_root / "assets" / "fonts" / "TikTokSans-VF.otf").is_file() or Path("/data/data/com.termux/files/home/auto-shorts-android/assets/fonts/TikTokSans-VF.otf").is_file():
+            effective_font = "TikTok Sans"
+
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {vw}
@@ -176,7 +184,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: CapCutPop,{font_name},{font_size},{primary_color},{highlight_color},{outline_color},&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,48,72,{sub_margin_v},1
+Style: CapCutPop,{effective_font},{font_size},{primary_color},{highlight_color},{outline_color},&H80000000&,-1,0,0,0,100,100,1,0,1,3,2,2,48,72,{sub_margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

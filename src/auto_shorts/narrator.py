@@ -38,6 +38,28 @@ class VoiceStyle:
 
 
 VOICE_STYLES: Dict[str, VoiceStyle] = {
+    "capcut_julia": VoiceStyle(
+        key="capcut_julia",
+        label="CapCut Viral PT-BR (Júlia / ByteDance TTS Estúdio)",
+        voice="pt-BR-FranciscaNeural",
+        rate="+3%",
+        pitch="+0Hz",
+        openai_voice="shimmer",
+        elevenlabs_voice="21m00Tcm4TlvDq8ikWAM",
+        kokoro_voice="pf_dora",
+        direction="Voz feminina jovem, dinâmica e viral clássica do CapCut/TikTok com equalização de estúdio.",
+    ),
+    "capcut_cleyton": VoiceStyle(
+        key="capcut_cleyton",
+        label="CapCut Noticiário PT-BR (Cleyton / Narrador Viral)",
+        voice="pt-BR-AntonioNeural",
+        rate="+3%",
+        pitch="+0Hz",
+        openai_voice="onyx",
+        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
+        kokoro_voice="pm_alex",
+        direction="Voz masculina enérgica, firme e clara no estilo de narração dinâmica de games e curiosidades do CapCut.",
+    ),
     "thalita_hd": VoiceStyle(
         key="thalita_hd",
         label="Thalita Multilingual HD (Apresentadora PT-BR Ultra Natural)",
@@ -1401,6 +1423,9 @@ def build_narrated_short(
     # For cloned human voice ("minha_voz"), preserve natural timbre without Kokoro's +2.8dB 145Hz bass boost.
     if str(style_key).strip().lower() == "minha_voz":
         eq_stage = "highpass=f=80,"
+    elif "capcut" in str(style_key).strip().lower():
+        # ByteDance SAMI Vocal Enhancer: clean low boxiness, lift speech presence (3.2kHz), air shimmer (8.5kHz)
+        eq_stage = "highpass=f=85,equalizer=f=350:t=q:w=1.2:g=-1.8,equalizer=f=3200:t=q:w=1.5:g=2.2,equalizer=f=8500:t=q:w=1.0:g=1.5,"
     else:
         eq_stage = "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,equalizer=f=9500:t=q:w=1.2:g=1.8,"
     voice_chain = (

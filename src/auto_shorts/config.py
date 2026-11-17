@@ -248,6 +248,7 @@ NICHE_COLOR_GRADES: Dict[str, str] = {
     "pop_boost": "eq=contrast=1.06:saturation=1.12:brightness=0.01,unsharp=5:5:0.45:5:5:0.0",
     "documentary": "eq=contrast=1.05:saturation=1.04,colorbalance=rs=-0.02:bs=0.03",
     "silverscreen": "eq=contrast=1.07:saturation=1.15,unsharp=5:5:0.50:5:5:0.0",
+    "capcut_vibrant": "eq=contrast=1.08:saturation=1.16:brightness=0.012,unsharp=5:5:0.55:5:5:0.0",
     "crisp": "eq=contrast=1.04:saturation=1.06",
 }
 
@@ -255,6 +256,8 @@ NICHE_COLOR_GRADES: Dict[str, str] = {
 def get_niche_color_grade(niche: str) -> str:
     """Return FFmpeg color-grading filter preset inspired by Shorts/Reels LUT profiles."""
     key = str(niche or "").strip().lower()
+    if key in {"capcut", "capcut_viral", "viral"}:
+        return NICHE_COLOR_GRADES["capcut_vibrant"]
     if key in {"games", "games_gta6", "gameplay", "ia_tech", "tech_ia", "humor_memes"}:
         return NICHE_COLOR_GRADES["pop_boost"]
     if key in {"noticias_mundiais", "world", "economia", "financas", "concursos"}:
