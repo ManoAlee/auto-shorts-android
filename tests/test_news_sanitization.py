@@ -297,6 +297,7 @@ def test_android_share_components_and_chip_mapping():
         res = share_video_to_native_app(src, "tiktok", caption="Teste", shared_dir=shared)
         assert res["ok"] is True
         assert (shared / "clip.mp4").is_file()
+        assert (shared / ".nomedia").is_file()
 
 
 def test_get_video_encode_args_hw_and_sw_fallback(monkeypatch):

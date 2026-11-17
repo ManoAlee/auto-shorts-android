@@ -26,29 +26,36 @@ def resolve_android_component(platform: str) -> str:
     raise ValueError(f"Unsupported native Android target platform: {platform}")
 
 
+def ensure_nomedia(directory: str | Path) -> Path:
+    """Create .nomedia marker so Android MediaStore / Gallery hides generated assets."""
+    d = Path(directory)
+    d.mkdir(parents=True, exist_ok=True)
+    marker = d / ".nomedia"
+    if not marker.exists():
+        marker.touch()
+    return marker
+
+
 def share_video_to_native_app(
     video_path: str | Path,
     platform: str,
     caption: str = "",
-    shared_dir: str | Path = "/sdcard/Movies/AutoShorts",
+    shared_dir: str | Path = "/sdcard/.AutoShortsVault",
 ) -> Dict[str, object]:
-    """Copy MP4 to shared Android Movies folder, copy caption, and launch native upload Activity."""
+    """Copy MP4 to hidden .nomedia folder, copy caption, and launch native upload Activity."""
     src = Path(video_path)
     if not src.is_file():
         raise FileNotFoundError(f"Video not found: {src}")
 
     component = resolve_android_component(platform)
     dest_dir = Path(shared_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    ensure_nomedia(dest_dir)
     dest = dest_dir / src.name
     if src.resolve() != dest.resolve():
         shutil.copy2(src, dest)
 
     if caption and shutil.which("termux-clipboard-set"):
         subprocess.run(["termux-clipboard-set"], input=caption, text=True, check=False)
-
-    if shutil.which("termux-media-scan"):
-        subprocess.run(["termux-media-scan", str(dest)], check=False)
 
     uri = f"file://{dest}"
     launched = False
