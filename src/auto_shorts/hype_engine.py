@@ -265,58 +265,34 @@ def get_hype_status_payload(today: Optional[_dt.date] = None) -> Dict:
 
 
 def get_live_trend_cards(today: Optional[_dt.date] = None) -> Dict:
-    """Build live hype cards combining YouTube BR chips + real RSS headlines (no stale static text)."""
+    """Build live hype cards strictly from real YouTube BR chips + live RSS feeds (zero hardcoded cards)."""
     ref = today or _dt.date.today()
     chips = fetch_youtube_br_home_chips()
     status = get_hype_status_payload(ref)
 
-    # Pull live breaking games/tech headlines (fast timeout, graceful fallback)
     cards: List[Dict[str, str]] = []
+    seen_titles: set[str] = set()
     try:
         from .world_news import fetch_world_news_headlines
-        for h in fetch_world_news_headlines(topic="games", limit=4):
-            title = str(h.get("title") or "").strip()
-            if title:
-                cards.append({
-                    "topic": title,
-                    "title": title[:72],
-                    "desc": f"{h.get('source', 'Radar Games')} • Pauta ao vivo detectada agora.",
-                    "niche": "games",
-                })
-    except Exception:
-        pass
-
-    if len(cards) < 4:
-        defaults = [
-            {
-                "topic": "games",
-                "title": "GTA 6: Lançamento 19/Nov & Truque da Nova Zelândia",
-                "desc": "Contagem regressiva oficial: acesso antecipado, pré-load PS5/Xbox e hype global.",
-                "niche": "games",
-            },
-            {
-                "topic": "games",
-                "title": "Mapa de Leonida & Vice City: Segredos Confirmados",
-                "desc": "Interiores exploráveis, física da água e comparação real com GTA 5.",
-                "niche": "games",
-            },
-            {
-                "topic": "games",
-                "title": "Jason ou Lucia: Qual Protagonista Escolher Primeiro?",
-                "desc": "Pergunta de alta retenção nos comentários para TikTok Rewards 60s+ e Shorts.",
-                "niche": "games",
-            },
-            {
-                "topic": "tech",
-                "title": "IA, Claude 2.0 & Monetização de Shorts em 2026",
-                "desc": "Tendência ativa na Home do YouTube BR com alto RPM.",
-                "niche": "tech",
-            },
-        ]
-        for d in defaults:
+        for topic_key in ("games", "tech", "world"):
             if len(cards) >= 4:
                 break
-            cards.append(d)
+            for h in fetch_world_news_headlines(topic=topic_key, limit=4):
+                title = str(h.get("title") or "").strip()
+                norm = title.lower()
+                if not title or norm in seen_titles:
+                    continue
+                seen_titles.add(norm)
+                cards.append({
+                    "topic": topic_key,
+                    "title": title[:78],
+                    "desc": f"{h.get('source', 'Radar Ao Vivo')} • Capturado em tempo real.",
+                    "niche": topic_key,
+                })
+                if len(cards) >= 4:
+                    break
+    except Exception:
+        pass
 
     return {
         "ok": True,
