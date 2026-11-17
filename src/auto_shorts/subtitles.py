@@ -155,11 +155,18 @@ def generate_ass_subtitles(
     # Universal safe zone across TikTok, Instagram Reels, and YouTube Shorts (video-edit: bottom 450 @1080p = 300 @720p):
     resolved_margin_v = int(round((margin_v if margin_v is not None else 300) * scale))
 
+    # Prefer native extracted TikTok Sans when available
+    effective_font = font_name
+    if font_name in ("DejaVu Sans", "Arial"):
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        if (repo_root / "assets" / "fonts" / "TikTokSans-VF.otf").is_file() or Path("/data/data/com.termux/files/home/auto-shorts-android/assets/fonts/TikTokSans-VF.otf").is_file():
+            effective_font = "TikTok Sans"
+
     lines = [
         ASS_HEADER.format(
             width=width,
             height=height,
-            font_name=font_name,
+            font_name=effective_font,
             font_size=font_size,
             margin_v=resolved_margin_v,
         )

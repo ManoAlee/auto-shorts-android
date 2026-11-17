@@ -264,33 +264,85 @@ def get_hype_status_payload(today: Optional[_dt.date] = None) -> Dict:
     }
 
 
+def fetch_google_trends_br(limit: int = 4, timeout: float = 4.0) -> List[Dict]:
+    """Fetch live breakout search trends in Brazil from Google Trends official RSS."""
+    try:
+        import xml.etree.ElementTree as ET
+        req = urllib.request.Request(
+            "https://trends.google.com.br/trending/rss?geo=BR",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutoShorts/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            xml_data = resp.read()
+        root = ET.fromstring(xml_data)
+        items: List[Dict] = []
+        for item in root.findall(".//item")[:limit]:
+            title = (item.findtext("title") or "").strip()
+            traffic = item.findtext("{https://trends.google.com/trending/rss}approx_traffic") or "Em Alta"
+            link = (item.findtext("link") or "").strip()
+            if title:
+                items.append({
+                    "title": title.title(),
+                    "traffic": traffic,
+                    "desc": f"Google Trends Brasil ({traffic} buscas)",
+                    "url": link,
+                    "source": "Google Trends BR",
+                })
+        return items
+    except Exception:
+        return []
+
+
 def get_live_trend_cards(today: Optional[_dt.date] = None) -> Dict:
-    """Build live hype cards strictly from real YouTube BR chips + live RSS feeds (zero hardcoded cards)."""
+    """Build live hype cards strictly from real YouTube BR chips + diversified RSS + Google Trends (zero hardcoded cards)."""
     ref = today or _dt.date.today()
     chips = fetch_youtube_br_home_chips()
     status = get_hype_status_payload(ref)
 
     cards: List[Dict[str, str]] = []
     seen_titles: set[str] = set()
+    seen_sources: set[str] = set()
+
+    # 1. Breakout Google Trends search spikes in Brazil
+    try:
+        trends = fetch_google_trends_br(limit=2)
+        if trends:
+            t = trends[0]
+            cards.append({
+                "topic": "trends",
+                "title": f"Em Alta: {t['title']} ({t['traffic']} buscas)",
+                "desc": f"{t['desc']} • Capturado em tempo real.",
+                "niche": "noticias_mundiais",
+            })
+            seen_titles.add(t["title"].lower())
+            seen_sources.add("google trends br")
+    except Exception:
+        pass
+
+    # 2. Diversified Portal Coverage across Games, Tech, and World News (Strictly 1 card per portal)
     try:
         from .world_news import fetch_world_news_headlines
         for topic_key in ("games", "tech", "world"):
             if len(cards) >= 4:
                 break
-            for h in fetch_world_news_headlines(topic=topic_key, limit=4):
+            for h in fetch_world_news_headlines(topic=topic_key, limit=8):
                 title = str(h.get("title") or "").strip()
-                norm = title.lower()
-                if not title or norm in seen_titles:
+                source = str(h.get("source") or "Radar Ao Vivo").strip()
+                norm_title = title.lower()
+                norm_src = source.lower()
+                if not title or norm_title in seen_titles:
                     continue
-                seen_titles.add(norm)
+                if norm_src in seen_sources and len(seen_sources) < 6:
+                    continue
+                seen_titles.add(norm_title)
+                seen_sources.add(norm_src)
                 cards.append({
                     "topic": topic_key,
                     "title": title[:78],
-                    "desc": f"{h.get('source', 'Radar Ao Vivo')} • Capturado em tempo real.",
+                    "desc": f"{source} • Capturado em tempo real.",
                     "niche": topic_key,
                 })
-                if len(cards) >= 4:
-                    break
+                break
     except Exception:
         pass
 

@@ -28,6 +28,8 @@ vendor-research/
 *.bin
 *.jpg
 *.png
+!assets/luts/*.png
+!assets/fonts/*
 !docs/images/*.png
 !docs/images/*.jpg
 !docs/images/*.svg

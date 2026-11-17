@@ -12,8 +12,14 @@ from .subtitles import escape_ffmpeg_filter_path
 
 
 def find_default_font() -> Optional[str]:
-    """Locate a reliable TTF font across Termux/Android, Linux, and Windows."""
+    """Locate a reliable TTF font across extracted mobile assets, Termux/Android, Linux, and Windows."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    extracted_tiktok = repo_root / "assets" / "fonts" / "TikTokSans-VF.otf"
+    extracted_ig = repo_root / "assets" / "fonts" / "Optimistic_VF_App_Lite.ttf"
     candidates = [
+        str(extracted_tiktok),
+        str(extracted_ig),
+        "/data/data/com.termux/files/home/auto-shorts-android/assets/fonts/TikTokSans-VF.otf",
         "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
         "/data/data/com.termux/files/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/system/fonts/Roboto-Bold.ttf",
