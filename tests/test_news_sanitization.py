@@ -246,4 +246,33 @@ def test_hype_engine_boosts_gta6_launch_window_in_nov_2026():
     assert "games_gta6" in {niche1, niche_odd} or topic_odd == "games" or topic1 == "games"
 
 
+def test_build_brazil_news_story_pack_supports_tiktok_rewards_60s_target(monkeypatch):
+    import auto_shorts.world_news as wn
+
+    captured_prompts = []
+    long_roteiro = " ".join(["Notícia urgente detalhada sobre inteligência artificial no Brasil."] * 22)
+
+    def fake_llm(prompt: str) -> str:
+        captured_prompts.append(prompt)
+        return (
+            '{"seo_title": "Avanço da IA no Brasil impacta mercado | Plantão Tech", '
+            '"hook_banner": "IA MUDA TUDO HOJE", '
+            f'"roteiro": "{long_roteiro}"}}'
+        )
+
+    monkeypatch.setattr(wn, "is_llm_configured", lambda: True)
+    monkeypatch.setattr(wn, "call_gemini_or_openai", fake_llm)
+
+    story = {
+        "title": "Avanço da IA no Brasil acelera produtividade em empresas",
+        "summary": "Pesquisa mostra adoção acelerada em tecnologia. Especialistas detalham os impactos nos empregos e na economia digital brasileira.",
+        "source": "TechBR",
+        "lang": "pt",
+        "category": "tech",
+    }
+    pack = build_brazil_news_story_pack(story, use_llm=True, target_platform="tiktok_rewards")
+    assert "150 a 185 palavras" in captured_prompts[0]
+    assert len(pack["script"].split()) >= 115
+
+
 

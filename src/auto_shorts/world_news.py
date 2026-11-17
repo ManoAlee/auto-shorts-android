@@ -567,6 +567,7 @@ def build_brazil_news_story_pack(
     story: Dict,
     use_llm: bool = True,
     translator: Optional[Callable[[str], str]] = None,
+    target_platform: str = "tiktok_rewards",
 ) -> Dict:
     """Convert an international headline into an engaging, non-repetitive PT-BR breaking-news Short script."""
     import hashlib
@@ -697,25 +698,29 @@ def build_brazil_news_story_pack(
     )
     script = humanize_ptbr_script(immunize_spoken_script(raw_script, title=pt_title, summary=pt_summary))
 
+    is_tiktok_rewards = str(target_platform or "").strip().lower() == "tiktok_rewards"
     if use_llm and is_llm_configured():
+        dur_hint = "62-72s (OBRIGATÓRIO >= 61s para TikTok Creator Rewards)" if is_tiktok_rewards else "35-45s"
+        word_hint = "150 a 185 palavras" if is_tiktok_rewards else "70 a 100 palavras"
+        min_words, max_words = (115, 210) if is_tiktok_rewards else (35, 105)
         prompt = (
-            "Você é um jornalista de plantão internacional adaptando notícias reais para Shorts dinâmicos no Brasil (35-45s).\n"
+            f"Você é um jornalista de plantão internacional adaptando notícias reais para Shorts dinâmicos no Brasil ({dur_hint}).\n"
             f"Fonte: {source_name}\nManchete: {pt_title}\nResumo completo dos fatos: {pt_summary}\n\n"
             "ESTRUTURA OBRIGATÓRIA DO ROTEIRO (4 ATOS):\n"
-            "1. GANCHO (0-3s): Chame a atenção imediatamente com o fato principal.\n"
-            "2. O FATO: Explique objetivamente o que aconteceu.\n"
-            "3. O MOTIVO / EXPLICAÇÃO: Explique O PORQUÊ do fato ou o que o especialista/desenvolvedor/autoridade declarou (NUNCA pare em suspense ou deixe sem explicar!).\n"
-            "4. CONCLUSÃO & CTA: Dê o desfecho claro do caso e faça uma pergunta instigando comentários.\n\n"
-            "Regras: Português brasileiro natural e direto; use os fatos fornecidos sem alucinações; NUNCA corte frase no meio; o vídeo deve ter começo, meio, explicação e desfecho completo.\n"
+            "1. GANCHO (0-3s): Chame a atenção imediatamente com o fato principal ou contraste.\n"
+            "2. O FATO: Explique objetivamente o que aconteceu com dados concretos da matéria.\n"
+            "3. O MOTIVO / CONTEXTO: Explique O PORQUÊ do fato, repercussões e o que especialistas/autoridades declararam (NUNCA pare em suspense!).\n"
+            "4. CONCLUSÃO & CTA POLARIZADOR: Dê o desfecho claro e faça uma pergunta específica que gere debate nos comentários.\n\n"
+            "Regras: Português brasileiro natural e direto; use os fatos fornecidos sem alucinações; NUNCA corte frase no meio.\n"
             "Responda SOMENTE JSON válido:\n"
-            '{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS","roteiro":"texto falado 70 a 100 palavras completo com explicacao e conclusao"}'
+            f'{{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS","roteiro":"texto falado {word_hint} completo com explicacao e conclusao"}}'
         )
         try:
             raw = call_gemini_or_openai(prompt)
             m_start, m_end = raw.find("{"), raw.rfind("}")
             if m_start != -1 and m_end > m_start:
                 data = json.loads(raw[m_start:m_end + 1])
-                if isinstance(data, dict) and data.get("roteiro") and 35 <= len(str(data["roteiro"]).split()) <= 105:
+                if isinstance(data, dict) and data.get("roteiro") and min_words <= len(str(data["roteiro"]).split()) <= max_words:
                     script = humanize_ptbr_script(str(data["roteiro"]))
                 if data.get("seo_title") and str(data["seo_title"]).strip().lower() not in {"string", "max 80 chars"}:
                     seo_title = _clean_seo_title(str(data["seo_title"]).strip(), max_chars=80, suffix=cat_meta["seo_suffix"])
