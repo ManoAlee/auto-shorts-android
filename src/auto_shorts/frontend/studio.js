@@ -1404,6 +1404,23 @@
         acts.appendChild(btnCopyCap);
       }
 
+      const btnNativeApp = document.createElement('button');
+      btnNativeApp.type = 'button';
+      btnNativeApp.className = 'btn btn-secondary btn-sm';
+      btnNativeApp.title = 'Abrir direto no app TikTok do celular e copiar legenda';
+      btnNativeApp.textContent = 'App TT';
+      btnNativeApp.addEventListener('click', () => withBusyBtn(btnNativeApp, 'Abrindo...', async () => {
+        if (v.caption) await copyTextToClipboard(v.caption);
+        const r = await fetch('/api/videos/share-native', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: v.path || ('output/' + v.filename), platform: 'tiktok', caption: v.caption || '' }),
+        });
+        const d = await r.json();
+        showToast(d.ok ? 'Enviado para o app TikTok do celular (legenda copiada)!' : (d.error || 'Erro ao abrir app'), d.ok ? 'ok' : 'err');
+      }));
+      acts.appendChild(btnNativeApp);
+
       const btnInspect = document.createElement('button');
       btnInspect.type = 'button';
       btnInspect.className = 'btn btn-primary btn-sm';

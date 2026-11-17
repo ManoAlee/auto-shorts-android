@@ -205,6 +205,44 @@ NATIVE_STREAM_ENCODE_FLAGS: List[str] = [
     "-keyint_min", "60",
 ]
 
+_HW_ENCODER_CACHE: Optional[bool] = None
+
+
+def supports_h264_mediacodec() -> bool:
+    """Detect Android Termux MediaCodec hardware H.264 encoder once per process."""
+    global _HW_ENCODER_CACHE
+    if _HW_ENCODER_CACHE is not None:
+        return _HW_ENCODER_CACHE
+    import os
+    import shutil
+    import subprocess
+    if "ANDROID_ROOT" not in os.environ and "TERMUX_VERSION" not in os.environ:
+        _HW_ENCODER_CACHE = False
+        return False
+    if not shutil.which("ffmpeg"):
+        _HW_ENCODER_CACHE = False
+        return False
+    try:
+        out = subprocess.check_output(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+        _HW_ENCODER_CACHE = "h264_mediacodec" in out
+    except Exception:
+        _HW_ENCODER_CACHE = False
+    return _HW_ENCODER_CACHE
+
+
+def get_video_encode_args(quality: str = "mobile", force_sw: bool = False) -> List[str]:
+    """Return hardware MediaCodec args on Android when available, else tuned libx264 flags."""
+    q = QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])
+    if not force_sw and supports_h264_mediacodec():
+        bitrate = "6M" if quality == "high" else "4M"
+        return ["-c:v", "h264_mediacodec", "-b:v", bitrate, "-pix_fmt", "yuv420p", "-g", "60"]
+    return ["-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"], *NATIVE_STREAM_ENCODE_FLAGS]
+
 QUALITY_PRESETS: Dict[str, Dict[str, str]] = {
     "mobile": {"width": "720", "height": "1280", "preset": "veryfast", "crf": "23"},
     "high": {"width": "1080", "height": "1920", "preset": "fast", "crf": "19"},

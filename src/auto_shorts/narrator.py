@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .config import METADATA_SCRUB, NATIVE_STREAM_ENCODE_FLAGS, QUALITY_PRESETS, get_niche_badge
+from .config import METADATA_SCRUB, NATIVE_STREAM_ENCODE_FLAGS, QUALITY_PRESETS, get_niche_badge, get_video_encode_args
 from .renderer import find_default_font
 from .subtitles import generate_ass_subtitles
 from .thumbnail import generate_advanced_thumbnail
@@ -1425,7 +1425,7 @@ def build_narrated_short(
         "-t", f"{duration:.2f}",
         "-filter_complex", f"[0:v]{vf}[vout];{voice_chain};{mix_chain}",
         "-map", "[vout]", "-map", "[aout]",
-        "-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"], *NATIVE_STREAM_ENCODE_FLAGS,
+        *get_video_encode_args(quality),
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
         *METADATA_SCRUB,
@@ -1439,7 +1439,7 @@ def build_narrated_short(
         "-vf", vf,
         "-af", solo_voice_af,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"], *NATIVE_STREAM_ENCODE_FLAGS,
+        *get_video_encode_args(quality),
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
         *METADATA_SCRUB,
@@ -1468,7 +1468,7 @@ def build_narrated_short(
                 "[v_main][bgm_duck]amix=inputs=2:duration=first:weights=1 0.35:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=8[aout]"
             ),
             "-map", "[vout]", "-map", "[aout]",
-            "-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"], *NATIVE_STREAM_ENCODE_FLAGS,
+            *get_video_encode_args(quality),
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
             "-movflags", "+faststart",
             *METADATA_SCRUB,

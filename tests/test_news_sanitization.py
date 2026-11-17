@@ -299,4 +299,17 @@ def test_android_share_components_and_chip_mapping():
         assert (shared / "clip.mp4").is_file()
 
 
+def test_get_video_encode_args_hw_and_sw_fallback(monkeypatch):
+    import auto_shorts.config as cfg
+
+    monkeypatch.setattr(cfg, "supports_h264_mediacodec", lambda: True)
+    hw = cfg.get_video_encode_args("mobile")
+    assert "h264_mediacodec" in hw
+    assert "4M" in hw
+
+    sw = cfg.get_video_encode_args("mobile", force_sw=True)
+    assert "libx264" in sw
+    assert "yuv420p" in sw
+
+
 
