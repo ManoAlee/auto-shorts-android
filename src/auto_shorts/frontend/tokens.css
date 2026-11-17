@@ -57,8 +57,9 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
 
-  --font-sans: 'Plus Jakarta Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
-  --font-mono: 'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-display: 'Bricolage Grotesque', 'DM Sans', sans-serif;
+  --font-sans: 'DM Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 html[data-theme="light"] {
