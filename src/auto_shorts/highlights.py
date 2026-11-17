@@ -481,8 +481,9 @@ def _clean_source_title(raw_title: str) -> str:
         flags=re.IGNORECASE,
     )
     cleaned = re.sub(r"[>»]{1,3}", " ", cleaned)
+    cleaned = re.sub(r"\s*\.{2,}\s*", " — ", cleaned)
     cleaned = re.sub(r"!{2,}", "!", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:\"'“”")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:\"'“”.,—")
     return heal_proper_nouns_and_asr(cleaned)
 
 
@@ -517,7 +518,8 @@ def _build_clip_summary(texts: List[str], max_chars: int = 340) -> str:
     seen = set()
     ordered: List[str] = []
     for raw in texts:
-        line = sanitize_repetitive_text(heal_proper_nouns_and_asr(" ".join(str(raw).split()).strip()))
+        cleaned_raw = re.sub(r"(?:>>+|\[[^\]]{1,24}\])", " ", str(raw))
+        line = sanitize_repetitive_text(heal_proper_nouns_and_asr(" ".join(cleaned_raw.split()).strip()))
         if not line or line.lower() in seen:
             continue
         seen.add(line.lower())
@@ -779,8 +781,13 @@ def _build_clip_title(
     if hook_title and hook_title != "PRESTA ATENCAO NISSO":
         clean_hk = re.sub(r"^(?:E\s+O|MAS\s+O|ENTAO|POIS)\s+", "", hook_title.strip(), flags=re.I).strip()
         if clean_hk:
-            prefix = f"{clean_src[:32].rstrip(' -|:')} — " if clean_src else ""
-            return f"{prefix}{clean_hk.title()}{suffix}"[:90]
+            # Never splice an untranslated English prefix mid-word
+            if clean_src and not _looks_english_title(clean_src):
+                src_words = clean_src[:32].rsplit(" ", 1)[0].rstrip(" -|:,")
+                prefix = f"{src_words} — " if src_words else ""
+                return f"{prefix}{clean_hk.title()}{suffix}"[:90]
+            niche_short = niche.label.split(",")[0].strip()
+            return f"{clean_hk.title()} | {niche_short}{suffix}"[:90]
     if clean_src:
         base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
         return f"{base}{suffix}"

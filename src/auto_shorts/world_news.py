@@ -39,6 +39,9 @@ _SPAM_JUNK_PATTERNS = (
     "toque aqui", "vídeo do nosso parceiro", "video do nosso parceiro", "nosso parceiro",
     "whatsapp", "telegram", "canal no youtube", "quer ser avisado", "grupo vip", "avisos",
     "notícias no seu celular", "noticias no seu celular", "siga o canal", "inscreva-se no canal",
+    "ative nossas notificações", "ative nossas notificacoes", "notificações em tempo real",
+    "notificacoes em tempo real", "seções notícias", "secoes noticias", "brasil internacional economia",
+    "receber notificações", "receber notificacoes", "imagem. gerada por ia",
 )
 
 
@@ -100,7 +103,10 @@ def clean_truncate_to_sentence(text: str, max_chars: int = 750) -> str:
 _SHOPPING_PROMO_TERMS = (
     "cupom", "desconto", "em oferta", "oferta antecipada", "para comprar",
     "modelos para comprar", "guia de compra", "guia de compras", "black friday",
-    "black november", "menor preço em oferta", "melhor tv de", "melhores smart tvs",
+    "black november", "menor preço em oferta", "menor preco", "menor preço",
+    "melhor tv de", "melhores smart tvs", "em até 12x", "em ate 12x", "sem juros",
+    "aliexpress", "magalu", "mercado livre", "por menos de r$", "economize ",
+    "baixa 2", "baixa 3", "baixa 4", "baixa 5",
 )
 
 

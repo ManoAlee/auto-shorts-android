@@ -637,6 +637,14 @@ def audit_short_end_to_end(
     if leaks:
         reject_reasons.append(f"Conteudo/texto sujo detectado ({', '.join(leaks)}).")
 
+    # Skill Hard Gate: reject affiliate promos, portal menu leaks, or raw transcript markers
+    title_low = str(meta.get("title") or "").lower()
+    cap_low = str(meta.get("caption") or "").lower()
+    if any(t in title_low or t in cap_low for t in ("ative nossas notificações", "seções notícias", "cupom ", "aliexpress", "magalu")):
+        reject_reasons.append("Conteudo promocional/afiliado ou menu de portal vazado.")
+    if ">> " in cap_low:
+        reject_reasons.append("Marcadores brutos de transcricao ('>> ') vazados na legenda.")
+
     # Skill Hard Gate: reject dangling hooks or truncated titles ending in prepositions/conjunctions
     hook_chk = str(meta.get("hook_title") or "").strip().lower()
     if hook_chk:
