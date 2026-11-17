@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Setup paths
-repo_root = Path(__file__).resolve().parent
+repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root / "src"))
 
 from auto_shorts.config import load_dotenv_file
