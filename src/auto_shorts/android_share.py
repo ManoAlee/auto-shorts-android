@@ -55,7 +55,10 @@ def share_video_to_native_app(
         shutil.copy2(src, dest)
 
     if caption and shutil.which("termux-clipboard-set"):
-        subprocess.run(["termux-clipboard-set"], input=caption, text=True, check=False)
+        try:
+            subprocess.run(["termux-clipboard-set"], input=caption, text=True, check=False, timeout=2.0)
+        except Exception:
+            pass
 
     uri = f"file://{dest}"
     launched = False
