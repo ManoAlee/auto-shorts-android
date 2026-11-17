@@ -74,7 +74,7 @@ __INLINE_CSS__
           </button>
         </div>
         <div id="channel-telemetry" class="navbar-telemetry" aria-live="polite">
-          <span class="pill pill-ok">🟢 Piloto Ativo</span>
+          <span class="pill pill-ok"><span class="status-dot" aria-hidden="true"></span>Piloto Ativo</span>
           <span class="pill">Voz: Kokoro PT-BR</span>
         </div>
       </nav>
@@ -132,25 +132,33 @@ __INLINE_CSS__
       </div>
 
       <!-- SENTINELA INTELIGENTE GOOGLE DRIVE 5TB -->
-      <div id="sentinel-banner" class="sentinel-card" style="margin-bottom:20px;padding:16px 20px;background:linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,41,59,0.85));border:1px solid rgba(56,189,248,0.35);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div style="width:42px;height:42px;border-radius:10px;background:rgba(56,189,248,0.15);display:flex;align-items:center;justify-content:center;font-size:22px;">⚡</div>
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <strong style="font-size:15px;color:#f8fafc;">Sentinela Autônomo Google Drive (5TB)</strong>
-                <span id="sentinel-badge" style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.4);">🟢 ATIVO &amp; VIGIANDO</span>
+      <section id="sentinel-banner" class="sentinel-card" aria-label="Sentinela Autônomo Google Drive">
+        <div class="sentinel-row">
+          <div class="sentinel-brand">
+            <div class="sentinel-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div class="sentinel-copy">
+              <div class="sentinel-title-row">
+                <strong class="sentinel-title">Sentinela Autônomo Google Drive (5TB)</strong>
+                <span id="sentinel-badge" class="sentinel-badge">ATIVO &amp; VIGIANDO</span>
               </div>
-              <p id="sentinel-desc" style="margin:2px 0 0;font-size:12px;color:#94a3b8;">Monitorando <code>gdrive:Animes_Para_Cortar</code> a cada 45s. Basta colocar episódios no Drive para fatiar clímax com som original dos dubladores e salvar em <code>gdrive:Shorts_Finalizados</code>.</p>
+              <p id="sentinel-desc" class="sentinel-desc">Monitorando <code>gdrive:Animes_Para_Cortar</code> a cada 45s. Basta colocar episódios no Drive para fatiar clímax com som original dos dubladores e salvar em <code>gdrive:Shorts_Finalizados</code>.</p>
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button type="button" class="btn btn-sm btn-primary" id="btn-sentinel-pull" title="Puxar automaticamente uma cena épica dublada da web agora">⚡ Puxar Anime Automático</button>
-            <button type="button" class="btn btn-sm btn-secondary" id="btn-sentinel-scan" title="Fazer varredura agora no Drive">🔍 Checar Drive Agora</button>
-            <button type="button" class="btn btn-sm btn-outline" id="btn-sentinel-toggle">⏸️ Pausar</button>
+          <div class="sentinel-actions">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-sentinel-pull" title="Puxar automaticamente uma cena épica dublada da web agora">
+              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Puxar Anime</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-sentinel-scan" title="Fazer varredura agora no Drive">
+              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <span>Checar Drive</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-sentinel-toggle">Pausar</button>
           </div>
         </div>
-      </div>
+      </section>
 
       <section id="panel-cortes" role="tabpanel" aria-labelledby="tab-cortes" class="panel">
         <div class="workstation-grid">
@@ -172,71 +180,106 @@ __INLINE_CSS__
               </button>
             </div>
             <form id="cut-form" novalidate>
-              <div class="grid">
+              <div class="studio-config-grid">
                 <div>
                   <label for="cut-niche">Nicho do canal</label>
                   <select id="cut-niche" name="niche">__NICHE_OPTIONS__</select>
                 </div>
                 <div>
-                  <label for="cut-platform">Plataforma alvo (avancado)</label>
-                  <select id="cut-platform" name="platform">__PLATFORM_OPTIONS__</select>
-                </div>
-                <div>
-                  <label for="cut-layout">Enquadramento vertical 9:16</label>
-                  <select id="cut-layout" name="layout">
-                    <option value="blur_bg">Fundo desfocado tela cheia (blur_bg)</option>
-                    <option value="split_top_bottom">Podcast dividido topo/base</option>
-                    <option value="center_crop">Corte central com rastreio facial</option>
-                  </select>
-                  <div class="layout-picker" role="group" aria-label="Atalho visual de enquadramento">
-                    <button type="button" class="layout-tile" data-layout="blur_bg" aria-pressed="true">
-                      <span class="layout-glyph" aria-hidden="true"><span></span></span>
-                      <span>Blur 9:16</span>
-                    </button>
-                    <button type="button" class="layout-tile" data-layout="split_top_bottom" aria-pressed="false">
-                      <span class="layout-glyph g-split" aria-hidden="true"><span></span><span></span></span>
-                      <span>2 Telas</span>
-                    </button>
-                    <button type="button" class="layout-tile" data-layout="center_crop" aria-pressed="false">
-                      <span class="layout-glyph g-face" aria-hidden="true"><span></span></span>
-                      <span>Rasto Facial</span>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label for="cut-clips">Quantidade de cortes do episódio</label>
+                  <label for="cut-clips">Quantidade de cortes</label>
                   <input id="cut-clips" name="clips" type="number" min="1" max="10" value="3" />
                 </div>
               </div>
-              <div class="grid" style="margin-top:12px;">
-                <div>
-                  <label for="cut-source">Origem do Vídeo (YouTube, Google Drive 5TB, Episódio Completo ou Local)</label>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <input id="cut-source" name="source" type="text" placeholder="https://... ou gdrive:Animes_Para_Cortar/ep01.mp4" style="flex:1;min-width:200px;" />
-                    <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" title="Ver animes do seu Google Drive 5TB">📁 Drive 5TB</button>
-                    <button type="button" class="btn btn-primary" id="btn-search-full-episodes" title="Buscar episódios inteiros dublados no Archive.org e na web">🎬 Buscar Episódios Dublados</button>
-                  </div>
-                  <div id="gdrive-episodes-picker" style="margin-top:8px;padding:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;font-size:12px;" hidden></div>
-                  <div id="anime-search-picker" style="margin-top:8px;padding:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;font-size:12px;" hidden></div>
-                  <div class="hint" style="color:var(--text-muted);font-size:12px;margin-top:4px;">✨ <b>Áudio Oficial:</b> Cortes de animes preservam 100% o áudio nativo dos dubladores (Briggs, Wendel, etc.) sem voz de robô, com loudnorm -14 LUFS e legendas dinâmicas.</div>
+
+              <div class="layout-section">
+                <label for="cut-layout">Enquadramento vertical 9:16</label>
+                <div class="layout-picker" role="group" aria-label="Atalho visual de enquadramento">
+                  <button type="button" class="layout-tile" data-layout="blur_bg" aria-pressed="true">
+                    <span class="layout-glyph" aria-hidden="true"><span></span></span>
+                    <span>Blur 9:16</span>
+                  </button>
+                  <button type="button" class="layout-tile" data-layout="split_top_bottom" aria-pressed="false">
+                    <span class="layout-glyph g-split" aria-hidden="true"><span></span><span></span></span>
+                    <span>2 Telas</span>
+                  </button>
+                  <button type="button" class="layout-tile" data-layout="center_crop" aria-pressed="false">
+                    <span class="layout-glyph g-face" aria-hidden="true"><span></span></span>
+                    <span>Rasto Facial</span>
+                  </button>
                 </div>
-                <div>
-                  <label for="cut-playlist">Playlist / Série</label>
-                  <input id="cut-playlist" name="playlist" type="text" placeholder="Ex: Animes e Batalhas Épicas - Shorts" />
+                <select id="cut-layout" name="layout" class="sr-only" tabindex="-1" aria-hidden="true">
+                  <option value="blur_bg">Fundo desfocado tela cheia (blur_bg)</option>
+                  <option value="split_top_bottom">Podcast dividido topo/base</option>
+                  <option value="center_crop">Corte central com rastreio facial</option>
+                </select>
+              </div>
+
+              <div class="source-section">
+                <label for="cut-source">Origem do Vídeo (YouTube, Drive 5TB, Episódio ou Local)</label>
+                <div class="source-input-group">
+                  <input id="cut-source" name="source" type="text" placeholder="https://... ou gdrive:Animes_Para_Cortar/ep01.mp4" />
+                  <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" title="Ver animes do seu Google Drive 5TB">
+                    <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span>Drive 5TB</span>
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="btn-search-full-episodes" title="Buscar episódios inteiros dublados no Archive.org e na web">
+                    <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                    <span>Episódios Dublados</span>
+                  </button>
+                </div>
+                <div id="gdrive-episodes-picker" class="picker-drawer" hidden></div>
+                <div id="anime-search-picker" class="picker-drawer" hidden></div>
+                <div class="hint-banner">
+                  <svg class="hint-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z"/></svg>
+                  <span><strong>Áudio Oficial:</strong> Cortes de animes preservam 100% o áudio nativo dos dubladores com loudnorm -14 LUFS e legendas dinâmicas.</span>
                 </div>
               </div>
+
+              <details class="advanced-fold">
+                <summary>Opções avançadas (Plataforma, Série &amp; Publicação)</summary>
+                <div class="advanced-fold-body">
+                  <div class="studio-config-grid">
+                    <div>
+                      <label for="cut-platform">Plataforma alvo (detalhado)</label>
+                      <select id="cut-platform" name="platform">__PLATFORM_OPTIONS__</select>
+                    </div>
+                    <div>
+                      <label for="cut-playlist">Playlist / Série</label>
+                      <input id="cut-playlist" name="playlist" type="text" placeholder="Ex: Animes e Batalhas Épicas - Shorts" />
+                    </div>
+                  </div>
+                </div>
+              </details>
+
               <div class="check-row">
                 <input id="cut-auto-publish" name="auto_publish" type="checkbox" checked />
-                <label for="cut-auto-publish">Validar midia/visao e publicar automaticamente no canal alvo</label>
+                <label for="cut-auto-publish">Validar mídia/visão e publicar automaticamente no canal alvo</label>
               </div>
-              <div class="actions">
-                <button type="submit" class="btn btn-primary" id="btn-run-cut">Gerar Short Agora</button>
-                <button type="button" class="btn btn-secondary" id="btn-scan-climax">🎯 Escanear Climax (Opus AI)</button>
-                <button type="button" class="btn btn-tiktok" id="btn-open-story-modal">🎬 Episodio 2.5D / Story IA</button>
-                <button type="button" class="btn btn-secondary" id="btn-horizon-radar">Atualizar Horizontes</button>
-                <button type="button" class="btn btn-secondary" id="btn-anime-radar">Radar Animes</button>
-                <button type="button" class="btn btn-secondary" id="btn-world-news">Noticias BR</button>
+
+              <div class="actions-primary">
+                <button type="submit" class="btn btn-primary btn-cta-hero" id="btn-run-cut">
+                  <svg class="btn-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                  <span>Gerar Short Agora</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-scan-climax">
+                  <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                  <span>Escanear Clímax</span>
+                </button>
+                <button type="button" class="btn btn-tiktok" id="btn-open-story-modal">
+                  <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  <span>Episódio 2.5D / Story IA</span>
+                </button>
               </div>
+
+              <div class="actions-tools-wrap">
+                <span class="tools-label">Radar &amp; Descoberta Rápida</span>
+                <div class="actions-tools">
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-horizon-radar">Atualizar Horizontes</button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-anime-radar">Radar Animes</button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-world-news">Notícias BR</button>
+                </div>
+              </div>
+
               <div id="clipper-candidates-box" class="item-grid" style="margin-top:14px;" hidden aria-live="polite"></div>
             </form>
           </div>
@@ -247,6 +290,7 @@ __INLINE_CSS__
             </div>
             <div class="phone-preview-frame" id="phone-preview-frame" data-layout="blur_bg">
               <img id="phone-preview-bg" class="phone-preview-bg" alt="" aria-hidden="true" hidden />
+              <div class="phone-safe-top" aria-hidden="true"><span>Zona Segura Topo (Y ≥ 140px)</span></div>
               <div class="hook-preview-pill" id="preview-hook-title">GANCHO DE RETENCAO 3S</div>
               <div class="phone-preview-stage" id="phone-preview-stage">
                 <div class="phone-zone-card">Corte 16:9 Centralizado + Fundo Desfocado</div>
@@ -257,6 +301,7 @@ __INLINE_CSS__
                 <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg></span>
               </div>
               <div class="karaoke-preview-text" id="preview-subs-line">PALAVRA POR PALAVRA</div>
+              <div class="phone-safe-bottom" aria-hidden="true"><span>Margem Segura UI (MarginV 300px)</span></div>
             </div>
             <div class="check-row" style="margin-top:0; justify-content:space-between; flex-wrap:wrap;">
               <div>
