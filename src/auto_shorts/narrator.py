@@ -1363,30 +1363,50 @@ def build_narrated_short(
     )
     bg_style_used = ""
     if str(bg_video or "auto").strip().lower() in {"auto", "gameplay"}:
-        from .gameplay import _extract_style_tag, pick_evolving_background
-        gp_pick = pick_evolving_background(
-            out_path.parent,
-            niche=niche,
-            topic=hook_title or script_text[:80],
-            min_duration=duration,
-            auto_download=(resolved_bg.name == "clean_studio_bg.mp4" or str(bg_video).lower() == "gameplay"),
-        )
-        if gp_pick is not None:
-            resolved_bg, rand_start, bg_style_used = gp_pick
-            bg_has_subs = False
-            if bg_start <= 0.0:
-                bg_start = rand_start
-            if os.getenv("AUTOSHORTS_MULTISCENE_BROLL", "0") in {"1", "true"} and niche not in {"games", "games_gta6", "gameplay"}:
-                multi_bg, multi_style = _build_multiscene_broll(
-                    out_path.parent, resolved_bg, bg_style_used, duration, work_dir,
-                    width=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["width"]),
-                    height=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["height"]),
-                    niche=niche,
+        semantic_bg = None
+        if str(bg_video or "auto").strip().lower() == "auto" and os.getenv("AUTOSHORTS_SEMANTIC_VISUALS", "1") in {"1", "true"}:
+            try:
+                from .semantic_visual_engine import build_semantic_visual_sequence
+                semantic_bg = build_semantic_visual_sequence(
+                    pt_title=custom_title or hook_title or script_text[:80],
+                    summary=script_text,
+                    category=niche,
+                    target_duration=duration,
+                    work_dir=work_dir / "_semantic",
                 )
-                if multi_bg != resolved_bg:
-                    resolved_bg = multi_bg
-                    bg_style_used = multi_style
-                    bg_start = 0.0
+            except Exception:
+                semantic_bg = None
+
+        if semantic_bg is not None and semantic_bg.is_file():
+            resolved_bg = semantic_bg
+            bg_style_used = "semantic_topic_broll"
+            bg_has_subs = False
+            bg_start = 0.0
+        else:
+            from .gameplay import _extract_style_tag, pick_evolving_background
+            gp_pick = pick_evolving_background(
+                out_path.parent,
+                niche=niche,
+                topic=hook_title or script_text[:80],
+                min_duration=duration,
+                auto_download=(resolved_bg.name == "clean_studio_bg.mp4" or str(bg_video).lower() == "gameplay"),
+            )
+            if gp_pick is not None:
+                resolved_bg, rand_start, bg_style_used = gp_pick
+                bg_has_subs = False
+                if bg_start <= 0.0:
+                    bg_start = rand_start
+                if os.getenv("AUTOSHORTS_MULTISCENE_BROLL", "0") in {"1", "true"} and niche not in {"games", "games_gta6", "gameplay"}:
+                    multi_bg, multi_style = _build_multiscene_broll(
+                        out_path.parent, resolved_bg, bg_style_used, duration, work_dir,
+                        width=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["width"]),
+                        height=int(QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])["height"]),
+                        niche=niche,
+                    )
+                    if multi_bg != resolved_bg:
+                        resolved_bg = multi_bg
+                        bg_style_used = multi_style
+                        bg_start = 0.0
     elif bg_start <= 0.0 and "assets" in resolved_bg.parts:
         from .gameplay import _extract_style_tag, probe_video_duration
         import random
