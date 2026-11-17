@@ -349,6 +349,7 @@ html[data-theme="light"] .copilot-bar {
 .render-badge {
   font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: var(--radius-pill);
   background: var(--surface-soft); color: var(--ink-muted); letter-spacing: 0.04em; text-transform: uppercase;
+  white-space: nowrap; flex-shrink: 0;
 }
 .render-bar.is-running .render-badge { background: var(--primary-hover); color: #FFFFFF; }
 .render-meta {
@@ -1114,12 +1115,13 @@ dialog.inspector-dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-f
     flex: 0 1 auto;
     width: 100%;
     max-width: none;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 44px auto auto;
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
-  .search-wrap { grid-column: 1 / -1; width: 100%; min-width: 0; }
-  .btn-quick-create { justify-content: center; padding-left: 12px; padding-right: 12px; }
+  .search-wrap { flex: 1 1 100%; width: 100%; min-width: 0; }
+  .header-controls .btn-quick-create { flex: 1 1 auto; justify-content: center; padding-left: 12px; padding-right: 12px; }
   .mobile-nav-btn { min-width: 0; font-size: 0.66rem; line-height: 1.1; }
   .mobile-nav-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
