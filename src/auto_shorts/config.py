@@ -196,6 +196,15 @@ METADATA_SCRUB: List[str] = [
 # Calibrated to TikTok / Shorts / Reels -14 LUFS target with -2.0 dBTP headroom for AAC.
 LOUDNORM_FILTER = "loudnorm=I=-14:TP=-2.0:LRA=11"
 
+# Calibrated to native mobile players (libttffmpeg.so / Cronet / Media3) for <100ms feed start.
+NATIVE_STREAM_ENCODE_FLAGS: List[str] = [
+    "-pix_fmt", "yuv420p",
+    "-profile:v", "high",
+    "-level", "4.1",
+    "-g", "60",
+    "-keyint_min", "60",
+]
+
 QUALITY_PRESETS: Dict[str, Dict[str, str]] = {
     "mobile": {"width": "720", "height": "1280", "preset": "veryfast", "crf": "23"},
     "high": {"width": "1080", "height": "1920", "preset": "fast", "crf": "19"},

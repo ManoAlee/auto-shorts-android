@@ -8,8 +8,63 @@ priority so the autonomous pilot boosts what is peaking right now instead of bli
 from __future__ import annotations
 
 import datetime as _dt
+import json
+import re
+import time
+import urllib.request
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
+
+_YT_CHIP_CACHE: Dict[str, object] = {"ts": 0.0, "chips": []}
+
+_CHIP_TO_NICHE: Tuple[Tuple[str, str], ...] = (
+    ("grand theft auto", "games_gta6"),
+    ("gta", "games_gta6"),
+    ("jogos", "games_gta6"),
+    ("gaming", "games_gta6"),
+    ("inteligência artificial", "ia_tech"),
+    ("ia", "ia_tech"),
+    ("gadgets", "ia_tech"),
+    ("monetiza", "financas"),
+    ("finan", "financas"),
+    ("podcast", "podcast"),
+    ("anime", "entretenimento_animes"),
+    ("notícias", "noticias_mundiais"),
+)
+
+
+def fetch_youtube_br_home_chips(timeout: float = 4.5, ttl_sec: int = 1800) -> List[str]:
+    """Extract live category chips from YouTube BR HTML (`ytInitialData`) without API v3 quota."""
+    now = time.time()
+    cached = _YT_CHIP_CACHE.get("chips")
+    if isinstance(cached, list) and cached and (now - float(_YT_CHIP_CACHE.get("ts") or 0.0)) < ttl_sec:
+        return list(cached)
+    try:
+        req = urllib.request.Request(
+            "https://www.youtube.com/?hl=pt&gl=BR",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            html_txt = resp.read().decode("utf-8", errors="ignore")
+        chips = re.findall(r'"chipCloudChipRenderer":\{"text":\{"simpleText":"([^"]+)"\}', html_txt)
+        clean_chips = [c for c in dict.fromkeys(chips) if c.lower() not in {"tudo", "ao vivo", "mixes"}][:16]
+        if clean_chips:
+            _YT_CHIP_CACHE["ts"] = now
+            _YT_CHIP_CACHE["chips"] = clean_chips
+        return clean_chips
+    except Exception:
+        return list(cached) if isinstance(cached, list) else []
+
+
+def map_chips_to_niche_boosts(chips: List[str]) -> List[str]:
+    """Map YouTube BR home chips into boosted AutoShorts niche keys."""
+    boosted: List[str] = []
+    for chip in chips:
+        low = chip.lower()
+        for kw, niche in _CHIP_TO_NICHE:
+            if kw in low and niche not in boosted:
+                boosted.append(niche)
+    return boosted
 
 
 @dataclass(frozen=True)

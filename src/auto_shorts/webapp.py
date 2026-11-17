@@ -424,6 +424,7 @@ def _run_autonomous_cycle_core(out_dir: Path, cfg: Dict) -> None:
                 topic=target_topic,
                 auto_publish=bool(cfg.get("auto_publish", True)),
                 use_llm=is_llm_configured(),
+                target_platform=str(cfg.get("platform") or "tiktok_rewards"),
             )
             if bool(cfg.get("auto_publish", True)):
                 _auto_crosspost_channels(res)
@@ -1432,6 +1433,18 @@ def make_handler(out_dir: Path):
                     self._send_json(200, {"enabled": False, "running": False, "mode": "uninitialized"})
                 return
 
+            if parsed.path == "/api/videos/share-native":
+                from .android_share import share_video_to_native_app
+                vpath = str(body.get("path") or body.get("video_path") or "").strip()
+                plat = str(body.get("platform") or "tiktok").strip()
+                cap = str(body.get("caption") or "").strip()
+                if not vpath:
+                    self._send_json(400, {"ok": False, "error": "Missing video path"})
+                    return
+                res = share_video_to_native_app(vpath, plat, caption=cap)
+                self._send_json(200, res)
+                return
+
             if parsed.path in {"/api/world-news", "/api/news/generate"}:
                 def news_worker():
                     _set_job_progress(2, 5, "2/5 Traduzindo jornais mundiais e gerando voz...", 38)
@@ -1442,6 +1455,7 @@ def make_handler(out_dir: Path):
                         style=str(body.get("style") or "podcast_female"),
                         auto_publish=bool(body.get("auto_publish", False)),
                         use_llm=is_llm_configured(),
+                        target_platform=str(body.get("platform") or "tiktok_rewards"),
                     )
                     _set_job_progress(5, 5, "5/5 Auditoria & Fila concluidas!", 100)
                     ds = str(res.get("delivery_status") or "")

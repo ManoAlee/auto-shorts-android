@@ -982,6 +982,7 @@ def produce_world_news_short(
     auto_publish: bool = False,
     playlist_name: Optional[str] = "Noticias Mundiais no Brasil - Shorts",
     use_llm: bool = True,
+    target_platform: str = "tiktok_rewards",
 ) -> Dict:
     """Fetch an unseen international news story, adapt to PT-BR, narrate, validate & optionally publish."""
     from .narrator import build_narrated_short
@@ -1021,7 +1022,7 @@ def produce_world_news_short(
     rejected: List[str] = []
     for picked in candidates:
         try:
-            pack = build_brazil_news_story_pack(picked, use_llm=use_llm)
+            pack = build_brazil_news_story_pack(picked, use_llm=use_llm, target_platform=target_platform)
             break
         except ValueError as exc:
             rejected.append(str(exc))

@@ -275,4 +275,28 @@ def test_build_brazil_news_story_pack_supports_tiktok_rewards_60s_target(monkeyp
     assert len(pack["script"].split()) >= 115
 
 
+def test_android_share_components_and_chip_mapping():
+    from auto_shorts.android_share import resolve_android_component, share_video_to_native_app
+    from auto_shorts.config import NATIVE_STREAM_ENCODE_FLAGS
+    from auto_shorts.hype_engine import map_chips_to_niche_boosts
+
+    assert "Shell_UploadActivity" in resolve_android_component("youtube_shorts")
+    assert "SystemShareActivity" in resolve_android_component("tiktok_rewards")
+    assert "ShareHandlerActivity" in resolve_android_component("instagram_reels")
+    assert "-g" in NATIVE_STREAM_ENCODE_FLAGS and "60" in NATIVE_STREAM_ENCODE_FLAGS
+
+    boosted = map_chips_to_niche_boosts(["Grand Theft Auto VI", "Monetizações", "Podcasts"])
+    assert boosted == ["games_gta6", "financas", "podcast"]
+
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as td:
+        src = Path(td) / "clip.mp4"
+        src.write_bytes(b"fake-mp4")
+        shared = Path(td) / "shared"
+        res = share_video_to_native_app(src, "tiktok", caption="Teste", shared_dir=shared)
+        assert res["ok"] is True
+        assert (shared / "clip.mp4").is_file()
+
+
 
