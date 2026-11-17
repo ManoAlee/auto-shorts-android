@@ -1426,13 +1426,14 @@ def make_handler(out_dir: Path):
                     self._send_json(200, {"enabled": False, "running": False, "mode": "uninitialized"})
                 return
 
-            if parsed.path == "/api/world-news":
+            if parsed.path in {"/api/world-news", "/api/news/generate"}:
                 def news_worker():
-                    _set_job_progress(2, 5, "2/5 Traduzindo jornais mundiais e gerando voz Kokoro...", 38)
+                    _set_job_progress(2, 5, "2/5 Traduzindo jornais mundiais e gerando voz...", 38)
                     res = produce_world_news_short(
                         out_dir=out_dir,
                         topic=str(body.get("topic") or "world"),
                         bg_video=str(body.get("bg_video") or "auto"),
+                        style=str(body.get("style") or "podcast_female"),
                         auto_publish=bool(body.get("auto_publish", False)),
                         use_llm=is_llm_configured(),
                     )
@@ -1446,7 +1447,7 @@ def make_handler(out_dir: Path):
                     _JOB_STATE.update({"last_status": msg, "last_result": res})
 
                 pos = _enqueue_job("Traduzindo jornais mundiais e gerando video em PT-BR...", news_worker)
-                self._send_json(202, {"message": f"Noticia mundial adicionada (fila: {pos})!", "queued": pos})
+                self._send_json(202, {"ok": True, "message": f"Noticia mundial adicionada (fila: {pos})!", "queued": pos})
                 return
 
             if parsed.path == "/api/team/brief":
