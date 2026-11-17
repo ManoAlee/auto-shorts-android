@@ -115,6 +115,17 @@ VOICE_STYLES: Dict[str, VoiceStyle] = {
         kokoro_voice="pm_santa",
         direction="Voz extremamente imponente, grave, sombria e aterrorizante de vilão soberano de anime (Ryomen Sukuna).",
     ),
+    "minha_voz": VoiceStyle(
+        key="minha_voz",
+        label="Minha Voz Clonada PT-BR (Chatterbox Grátis)",
+        voice="pt-BR-AntonioNeural",
+        rate="+2%",
+        pitch="+0Hz",
+        openai_voice="ash",
+        elevenlabs_voice="pNInz6obpgDQGcFmaJgB",
+        kokoro_voice="pm_alex",
+        direction="Sua própria voz clonada em PT-BR via HuggingFace Chatterbox-pt-br com fallback Kokoro-82M.",
+    ),
     "dublador_gojo": VoiceStyle(
         key="dublador_gojo",
         label="Dublador Satoru Gojo (Jujutsu Kaisen) — Voz Confiante, Sedutora e Poderosa PT-BR",
@@ -946,6 +957,15 @@ def synthesize_narration(
     if not synthesized_external and gpt_sovits_url:
         try:
             synthesized_external = _synthesize_gpt_sovits(clean_text, out_mp3, gpt_sovits_url, style.key)
+        except Exception:
+            synthesized_external = False
+
+    if not synthesized_external and (style.key == "minha_voz" or os.getenv("USE_USER_VOICE_CLONE", "").strip() == "1"):
+        try:
+            from .voice_clone_hf import synthesize_chatterbox_hf_space
+            synthesized_external = synthesize_chatterbox_hf_space(clean_text, out_mp3)
+            if synthesized_external:
+                _trim_tts_dead_air(out_mp3)
         except Exception:
             synthesized_external = False
 

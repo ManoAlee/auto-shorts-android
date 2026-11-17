@@ -211,4 +211,20 @@ def test_karaoke_subtitles_highlight_power_numbers_and_keywords():
     assert "32%" in content
 
 
+def test_voice_clone_hf_chunker_and_style_registered():
+    from auto_shorts.narrator import VOICE_STYLES
+    from auto_shorts.voice_clone_hf import split_text_for_chatterbox
+
+    assert "minha_voz" in VOICE_STYLES
+    long_pt = (
+        "Primeira notícia urgente do Brasil sobre inteligência artificial e economia. "
+        "Segunda frase detalhando o impacto nos mercados financeiros e tecnologia móvel. "
+        "Terceira frase explicando por que desenvolvedores estão adotando modelos offline no celular. "
+        "Quarta frase concluindo com uma pergunta direta para os comentários."
+    )
+    chunks = split_text_for_chatterbox(long_pt, max_chars=140)
+    assert len(chunks) >= 2
+    assert all(len(c) <= 140 for c in chunks)
+
+
 
