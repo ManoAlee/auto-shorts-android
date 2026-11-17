@@ -111,7 +111,7 @@ def generate_advanced_thumbnail(
     out = Path(out_jpg)
     out.parent.mkdir(parents=True, exist_ok=True)
     font_path = find_default_font()
-    vf = build_thumbnail_filter(width, height, hook_title, badge=badge, font_path=font_path)
+    vf = "eq=contrast=1.05:saturation=1.10," + build_thumbnail_filter(width, height, hook_title, badge=badge, font_path=font_path)
 
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",

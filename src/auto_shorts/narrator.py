@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .config import METADATA_SCRUB, NATIVE_STREAM_ENCODE_FLAGS, QUALITY_PRESETS, get_niche_badge, get_video_encode_args
+from .config import METADATA_SCRUB, NATIVE_STREAM_ENCODE_FLAGS, QUALITY_PRESETS, get_niche_badge, get_niche_color_grade, get_video_encode_args
 from .renderer import find_default_font
 from .subtitles import generate_ass_subtitles
 from .thumbnail import generate_advanced_thumbnail
@@ -1390,6 +1390,9 @@ def build_narrated_short(
         font_path=find_default_font(),
         punch_zoom=1.05,
     )
+    grade_fx = get_niche_color_grade(niche)
+    if ";" not in vf:
+        vf = f"{vf},{grade_fx}"
 
     bg_input_flags = ["-stream_loop", "-1"]
     if bg_start > 0:

@@ -312,5 +312,9 @@ def test_get_video_encode_args_hw_and_sw_fallback(monkeypatch):
     assert "libx264" in sw
     assert "yuv420p" in sw
 
+    assert "saturation=1.12" in cfg.get_niche_color_grade("games_gta6")
+    assert "colorbalance=" in cfg.get_niche_color_grade("noticias_mundiais")
+    assert "saturation=1.15" in cfg.get_niche_color_grade("entretenimento_animes")
+
 
 

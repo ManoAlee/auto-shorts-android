@@ -243,6 +243,26 @@ def get_video_encode_args(quality: str = "mobile", force_sw: bool = False) -> Li
         return ["-c:v", "h264_mediacodec", "-b:v", bitrate, "-pix_fmt", "yuv420p", "-g", "60"]
     return ["-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"], *NATIVE_STREAM_ENCODE_FLAGS]
 
+
+NICHE_COLOR_GRADES: Dict[str, str] = {
+    "pop_boost": "eq=contrast=1.06:saturation=1.12:brightness=0.01,unsharp=5:5:0.45:5:5:0.0",
+    "documentary": "eq=contrast=1.05:saturation=1.04,colorbalance=rs=-0.02:bs=0.03",
+    "silverscreen": "eq=contrast=1.07:saturation=1.15,unsharp=5:5:0.50:5:5:0.0",
+    "crisp": "eq=contrast=1.04:saturation=1.06",
+}
+
+
+def get_niche_color_grade(niche: str) -> str:
+    """Return FFmpeg color-grading filter preset inspired by Shorts/Reels LUT profiles."""
+    key = str(niche or "").strip().lower()
+    if key in {"games", "games_gta6", "gameplay", "ia_tech", "tech_ia", "humor_memes"}:
+        return NICHE_COLOR_GRADES["pop_boost"]
+    if key in {"noticias_mundiais", "world", "economia", "financas", "concursos"}:
+        return NICHE_COLOR_GRADES["documentary"]
+    if key in {"entretenimento_animes", "anime", "ciencia_espaco"}:
+        return NICHE_COLOR_GRADES["silverscreen"]
+    return NICHE_COLOR_GRADES["crisp"]
+
 QUALITY_PRESETS: Dict[str, Dict[str, str]] = {
     "mobile": {"width": "720", "height": "1280", "preset": "veryfast", "crf": "23"},
     "high": {"width": "1080", "height": "1920", "preset": "fast", "crf": "19"},
