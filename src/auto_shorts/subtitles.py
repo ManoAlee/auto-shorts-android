@@ -79,6 +79,20 @@ def _split_into_short_lines(text: str, max_words: int = 4) -> List[str]:
     return groups
 
 
+_POWER_TOKEN_RE = re.compile(
+    r"^(?:R\$|\d+(?:[.,]\d+)?%?|MILH[ÕO]ES|BILH[ÕO]ES|URGENTE|ALERTA|REVELADO|PROIBIDO|RECORDE|EXCLUSIVO|GTA|IA)$",
+    re.I,
+)
+
+
+def _format_karaoke_token(token: str, dur_cs: int, trailing: str = " ") -> str:
+    """Apply progressive karaoke sweep plus semantic color pop on numbers and power words."""
+    clean_core = token.strip(".,!?;:\"'()[]")
+    if clean_core and _POWER_TOKEN_RE.match(clean_core):
+        return rf"{{\kf{dur_cs}\c&H0000FFFF&}}{token}{{\r}}{trailing}"
+    return rf"{{\kf{dur_cs}}}{token}{trailing}"
+
+
 def _style_karaoke_group(group: List[Dict], base_start: float) -> str:
     r"""Build progressive word-by-word {\kf} ASS karaoke fill + kinetic entrance pop."""
     parts: List[str] = [r"{\fad(25,20)\fscx94\fscy94\t(0,85,\fscx103\fscy103)\t(85,170,\fscx100\fscy100)}"]
@@ -93,7 +107,7 @@ def _style_karaoke_group(group: List[Dict], base_start: float) -> str:
         if gap_cs > 0:
             parts.append(rf"{{\k{gap_cs}}}")
         dur_cs = max(6, int(round((w_end - w_start) * 100)))
-        parts.append(rf"{{\kf{dur_cs}}}{token} ")
+        parts.append(_format_karaoke_token(token, dur_cs, " "))
         cursor = w_end
     return "".join(parts).rstrip()
 
@@ -105,7 +119,10 @@ def _style_weighted_karaoke_phrase(phrase: str, dur_sec: float) -> str:
         return ""
     if len(words) == 1:
         dur_cs = max(10, int(round(dur_sec * 100)))
-        return rf"{{\fad(25,20)\fscx94\fscy94\t(0,85,\fscx103\fscy103)\t(85,170,\fscx100\fscy100)\kf{dur_cs}}}{words[0]}"
+        return (
+            r"{\fad(25,20)\fscx94\fscy94\t(0,85,\fscx103\fscy103)\t(85,170,\fscx100\fscy100)}"
+            + _format_karaoke_token(words[0], dur_cs, "")
+        )
     weights = [max(2, len(w)) for w in words]
     tot_w = sum(weights)
     tot_cs = max(12, int(round(dur_sec * 100)))
@@ -113,7 +130,7 @@ def _style_weighted_karaoke_phrase(phrase: str, dur_sec: float) -> str:
     for idx, (word, wt) in enumerate(zip(words, weights)):
         cs = max(6, int(round((wt / tot_w) * tot_cs)))
         suffix = " " if idx + 1 < len(words) else ""
-        parts.append(rf"{{\kf{cs}}}{word}{suffix}")
+        parts.append(_format_karaoke_token(word, cs, suffix))
     return "".join(parts)
 
 

@@ -1394,7 +1394,9 @@ def build_narrated_short(
     )
     mix_chain = (
         f"[0:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={bg_volume:.2f}[bg_a];"
-        "[voice_a][bg_a]amix=inputs=2:duration=first:weights=1 0.25:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=8[aout]"
+        "[voice_a]asplit=2[v_main][v_key];"
+        "[bg_a][v_key]sidechaincompress=threshold=0.025:ratio=6:attack=15:release=250[bg_duck];"
+        "[v_main][bg_duck]amix=inputs=2:duration=first:weights=1 0.35:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=8[aout]"
     )
 
     cmd: List[str] = [

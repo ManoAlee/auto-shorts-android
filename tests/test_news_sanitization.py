@@ -189,3 +189,26 @@ def test_build_brazil_news_story_pack_rejects_1sentence_stubs_and_promos():
         build_brazil_news_story_pack(promo_story, use_llm=False)
 
 
+def test_karaoke_subtitles_highlight_power_numbers_and_keywords():
+    import tempfile
+    from pathlib import Path
+    from auto_shorts.subtitles import generate_ass_subtitles
+
+    with tempfile.TemporaryDirectory() as td:
+        ass_out = Path(td) / "power.ass"
+        generate_ass_subtitles(
+            [{"start": 0.0, "end": 2.4, "text": "URGENTE 32% EM IA"}],
+            0.0,
+            2.4,
+            ass_out,
+            width=720,
+            height=1280,
+        )
+        content = ass_out.read_text(encoding="utf-8")
+    assert r"\kf" in content
+    assert r"\c&H0000FFFF&" in content
+    assert "URGENTE" in content
+    assert "32%" in content
+
+
+
