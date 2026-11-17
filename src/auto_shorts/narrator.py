@@ -950,24 +950,6 @@ def synthesize_narration(
     word_events: List[Dict] = []
     synthesized_external = False
 
-    # Explicit CapCut and Edge HD neural styles synthesize directly with ultra-low latency & true timbre
-    if style.key.startswith("capcut_") or style.key in {"thalita_hd", "francisca_hd", "narrador_pro", "andrew_hd", "brian_hd"}:
-        try:
-            word_events, _raw_srt = asyncio.run(
-                _edge_tts_synth_async(
-                    text=clean_text,
-                    out_mp3=out_mp3,
-                    voice=style.voice,
-                    rate=style.rate,
-                    pitch=style.pitch,
-                )
-            )
-            synthesized_external = True
-            if _raw_srt and _raw_srt.strip():
-                out_srt.write_text(_raw_srt, encoding="utf-8")
-        except Exception:
-            synthesized_external = False
-
     if not synthesized_external and eleven_key:
         try:
             synthesized_external = _synthesize_elevenlabs(clean_text, out_mp3, style, eleven_key)
@@ -1002,6 +984,24 @@ def synthesize_narration(
     if not synthesized_external and gpt_sovits_url:
         try:
             synthesized_external = _synthesize_gpt_sovits(clean_text, out_mp3, gpt_sovits_url, style.key)
+        except Exception:
+            synthesized_external = False
+
+    # Explicit CapCut neural styles synthesize directly via Edge-TTS before voice-clone/Kokoro fallbacks
+    if not synthesized_external and style.key.startswith("capcut_"):
+        try:
+            word_events, _raw_srt = asyncio.run(
+                _edge_tts_synth_async(
+                    text=clean_text,
+                    out_mp3=out_mp3,
+                    voice=style.voice,
+                    rate=style.rate,
+                    pitch=style.pitch,
+                )
+            )
+            synthesized_external = True
+            if _raw_srt and _raw_srt.strip():
+                out_srt.write_text(_raw_srt, encoding="utf-8")
         except Exception:
             synthesized_external = False
 
