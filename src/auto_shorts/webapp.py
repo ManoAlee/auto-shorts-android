@@ -80,7 +80,7 @@ from .world_news import fetch_world_news_headlines, produce_world_news_short
 from .yt_algorithm import rank_feed_for_channel, score_short_for_youtube_algorithm
 
 
-_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9À-ÿ._ -]{1,128}$")
 _MAX_POST_BYTES = 1_048_576
 
 

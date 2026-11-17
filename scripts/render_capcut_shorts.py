@@ -17,7 +17,7 @@ from auto_shorts.validator import validate_generated_short
 
 VIDEOS = [
     {
-        "stem": "short_games_red_dead_mistério",
+        "stem": "short_games_red_dead_misterio",
         "title": "O Mistério Mais Bizarro de Red Dead 2",
         "hook": "O Segredo Oculto no Pântano",
         "style": "capcut_cleyton",
