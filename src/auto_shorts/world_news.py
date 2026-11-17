@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from .highlights import call_gemini_or_openai
 from .mahoraga import MahoragaEngine, clean_word_boundary_hook, immunize_spoken_script
@@ -46,39 +46,78 @@ _SPAM_JUNK_PATTERNS = (
 
 
 def sanitize_news_lead_text(raw_text: str) -> str:
-    """Strip promotional blog junk, Google Discover/News CTAs, emojis, and incomplete fragments."""
+    """Strip promotional blog junk, inline nav menus, photo/AI credits, duplicate phrases, and fragments."""
     if not raw_text:
         return ""
     txt = _clean_text(raw_text)
     # Strip raw attention emojis, arrows and variation selectors: ➡️, ▶️, 🔥, ⚡, 🚨, 👉, 👇, 💥, etc.
     txt = re.sub(r"[\u2700-\u27BF\U0001F300-\U0001F9FF\u2190-\u21FF\u2600-\u26FF\uFE00-\uFE0F]", " ", txt)
+    # Strip parenthetical photo / AI / agency credits BEFORE sentence splitting
+    # (prevents "(imagem. Divulgação/LG)" or "(Imagem. Gerada por IA...)" from splitting mid-credit)
+    txt = re.sub(
+        r"\([^)]*(?:imagem|foto|cr[eé]dito|reprodu[cç][aã]o|divulga[cç][aã]o|gerada por ia|ag[eê]ncia brasil|reuters|ap photo|afp|getty)[^)]*\)",
+        " ",
+        txt,
+        flags=re.I,
+    )
+    # Strip inline portal navigation menus (BBC/G1/UOL) concatenated without punctuation
+    txt = re.sub(
+        r"\b(?:Se[cç][õo]es\s+)?(?:Not[ií]cias\s+)?(?:Brasil|Internacional|Economia|Sa[uú]de|Ci[eê]ncia|Tecnologia|Pol[ií]tica|Esportes|Cultura|Mundo)(?:\s+(?:Brasil|Internacional|Economia|Sa[uú]de|Ci[eê]ncia|Tecnologia|Pol[ií]tica|Esportes|Cultura|Mundo)){2,}",
+        " ",
+        txt,
+        flags=re.I,
+    )
+    # Strip inline notification banners & photo/credit prefixes concatenated before real text
+    txt = re.sub(
+        r"(?:\bMenu\s+)?Ative nossas notifica[cç][õo]es\s+Você quer ficar por dentro das not[ií]cias mais importantes e receber notifica[cç][õo]es em tempo real\??",
+        " ",
+        txt,
+        flags=re.I,
+    )
+    txt = re.sub(
+        r"\bCr[eé]dito[,:]\s*[A-ZÀ-ÿ][A-Za-zÀ-ÿ0-9/.\-]{1,30}(?:\s+[A-ZÀ-ÿ][A-Za-zÀ-ÿ0-9/.\-]{1,20}){0,2}(?=\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])",
+        " ",
+        txt,
+    )
+    txt = re.sub(
+        r"(?:—\s*)?(?:Foto|Imagem)[.:]\s*[^.\n]{2,70}?(?:Arquivo|Divulga[cç][aã]o|Ag[eê]ncia Brasil|Reuters|AFP|AP)\b",
+        " ",
+        txt,
+        flags=re.I,
+    )
     # Split promo colons into sentence boundaries ("...vídeo do parceiro SanInPlay : A Rockstar confirmou...")
     txt = re.sub(r":\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])", ". ", txt)
     # Clean irregular spacing around punctuation (e.g., "Nvidia , empresários" -> "Nvidia, empresários")
     txt = re.sub(r"\s+([,.:;!?])", r"\1", txt)
-    # Strip author bylines and portal timestamps (e.g. "Jornalista e comentarista da GloboNews. 16/11/2026 15h36 Atualizado 16/11/2026")
+    # Strip author bylines and portal timestamps
     txt = re.sub(r"\bJornalista e comentarista d[aoe]\s+[A-Za-zÀ-ÿ0-9\s]+\.?", " ", txt, flags=re.I)
     txt = re.sub(r"\b\d{2}/\d{2}/\d{4}\s+\d{1,2}h\d{2}(?:\s+Atualizado\s+\d{2}/\d{2}/\d{4}(?:\s+\d{1,2}h\d{2})?)?", " ", txt, flags=re.I)
+    # Strip trailing bare publisher tags left by Google News RSS ("...se declara culpado G1", "...vai funcionar UOL")
+    txt = re.sub(r"\s+(?:G1|UOL|R7|Folha|Estadão|Terra|CNN Brasil|BBC News Brasil|BBC)\s*$", "", txt)
     txt = re.sub(r"\s+", " ", txt).strip()
-    # Split into discrete sentences
+    # Collapse adjacent repeated phrases even when no period separates them
+    txt = re.sub(r"\b(.{18,120}?)\s+\1\b", r"\1", txt, flags=re.I)
+    # Split into discrete sentences and deduplicate
     sentences = re.split(r"(?<=[.!?])\s+", txt)
     clean: List[str] = []
+    seen_sent: Set[str] = set()
     for s in sentences:
         s_str = s.strip()
         if len(s_str) < 16:
             continue
         s_low = s_str.lower()
-        # Drop breadcrumbs like "Página Inicial - Viciados - GTA 6"
         if s_str.count(" - ") >= 2:
             continue
-        # Drop sentences matching any blog spam / Google Discover / Partner CTA pattern
         if any(pat in s_low for pat in _SPAM_JUNK_PATTERNS):
             continue
-        # Drop sentences that are pure navigation fragments or end with a trailing partner colon
         if s_low.startswith(("página inicial", "pagina inicial", "seguir +", "clique aqui", "toque aqui")):
             continue
         if re.search(r":\s*$", s_str):
             continue
+        norm_key = re.sub(r"\W+", "", s_low)
+        if norm_key in seen_sent:
+            continue
+        seen_sent.add(norm_key)
         clean.append(s_str)
     res = " ".join(clean).strip()
     return re.sub(r"\s+", " ", res).strip()
@@ -534,6 +573,8 @@ def build_brazil_news_story_pack(
     import os
 
     tx = translator or translate_en_to_ptbr
+    if _is_commercial_roundup(story):
+        raise ValueError(f"Notícia descartada por ser oferta/cupom comercial: '{story.get('title', '')}'.")
     source_name = str(story.get("source") or "Imprensa Internacional").strip()
     orig_title = str(story.get("title") or "").strip()
     orig_summary = str(story.get("summary") or "").strip()
@@ -575,21 +616,11 @@ def build_brazil_news_story_pack(
     else:
         effective_category = "mundo"
 
-    # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", etc.
-    clean_t = re.sub(r"\s+[-–|]\s+.*$", "", pt_title).strip().lower()
-    clean_s = re.sub(r"\s+[-–|]\s+.*$", "", pt_summary).strip().lower()
-    if not pt_summary or clean_s == clean_t or len(clean_s.split()) < 6:
-        # The summary is empty or identical to the headline; generate clean headline-derived context
-        if effective_category == "games" or any(k in pt_title.lower() for k in ("gta", "rockstar", "jogo")):
-            pt_summary = f"{pt_title}. As principais novidades e repercussões no universo dos games e lançamentos da indústria foram detalhadas pela imprensa especializada."
-        elif effective_category == "tech_ia" or any(k in pt_title.lower() for k in ("ia", "inteligencia artificial", "nvidia", "openai")):
-            pt_summary = f"{pt_title}. Os desdobramentos tecnológicos e os impactos no ecossistema digital foram acompanhados por especialistas e analistas do setor."
-        elif effective_category == "economia":
-            pt_summary = f"{pt_title}. Os reflexos nos mercados financeiros e as projeções econômicas movimentaram investidores e analistas nesta semana."
-        elif effective_category == "ciencia_espaco":
-            pt_summary = f"{pt_title}. A descoberta e os dados científicos divulgados chamaram a atenção de pesquisadores e centros de exploração global."
-        else:
-            pt_summary = f"{pt_title}. Os fatos e os detalhes apurados repercutiram nos principais veículos internacionais e acompanham o cenário global."
+    # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", or bare " G1" / " UOL"
+    clean_t = re.sub(r"\s+(?:[-–|]\s+.*|G1|UOL|R7|Folha|Estadão|Terra|BBC)$", "", pt_title).strip().lower()
+    clean_s = re.sub(r"\s+(?:[-–|]\s+.*|G1|UOL|R7|Folha|Estadão|Terra|BBC)$", "", pt_summary).strip().lower()
+    if pt_summary:
+        pt_summary = sanitize_news_lead_text(pt_summary) or pt_summary
 
     # Deduplicate if pt_summary repeats pt_title at the start
     clean_pt_title = _clean_alnum(pt_title[:35])
@@ -600,10 +631,16 @@ def build_brazil_news_story_pack(
         elif pt_summary.lower().startswith(pt_title.lower()):
             pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
 
-    # A headline alone is not enough evidence for a news script. Never pad it with invented context.
-    if not pt_summary or len(pt_summary) < 50 or pt_summary.lower() == pt_title.lower():
+    # A headline alone (or a 1-sentence Google News RSS stub) is NEVER enough for a news Short.
+    if (
+        not pt_summary
+        or clean_s == clean_t
+        or len(pt_summary) < 85
+        or len(pt_summary.split()) < 14
+        or pt_summary.lower() == pt_title.lower()
+    ):
         raise ValueError(
-            f"Notícia descartada: {source_name} não forneceu um resumo verificável para '{pt_title}'."
+            f"Notícia descartada: {source_name} forneceu apenas manchete/stub insuficiente para '{pt_title}'."
         )
 
     cat_meta_map = {

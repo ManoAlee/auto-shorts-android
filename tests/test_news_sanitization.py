@@ -141,3 +141,51 @@ def test_thumbnail_and_video_safe_zones():
         margin_v = int(m_margin.group(1))
         assert margin_v >= 280, f"Subtitle MarginV ({margin_v}) is too low, will overlap TikTok caption (< 280)"
 
+
+def test_sanitize_news_lead_strips_bbc_nav_credits_notifications_and_dups():
+    raw = (
+        "No Reino Unido, a recomendação é sobreviver por três dias. "
+        "Seções Notícias Brasil Internacional Economia Saúde Ciência Tecnologia "
+        "Brasil Internacional Economia Saúde Ciência Tecnologia "
+        "Por que a Europa pediu kits de emergência? Crédito, Reuters "
+        "Nas últimas semanas, governos na Europa têm pedido que cidadãos se preparem. "
+        "Menu Ative nossas notificações Você quer ficar por dentro das notícias mais importantes "
+        "e receber notificações em tempo real? A decisão foi confirmada hoje. "
+        "LG QNED70 promete cores vibrantes (imagem. Divulgação/LG) A nova linha chega em 2026. "
+        "Economize 32% na oferta do Magalu no AliExpress Economize 32% na oferta do Magalu no AliExpress."
+    )
+    cleaned = sanitize_news_lead_text(raw)
+    low = cleaned.lower()
+    assert "seções notícias" not in low
+    assert "crédito, reuters" not in low
+    assert "ative nossas notificações" not in low
+    assert "divulgação/lg" not in low
+    assert "imagem." not in low
+    assert cleaned.count("Economize 32% na oferta do Magalu no AliExpress") <= 1
+    assert "No Reino Unido" in cleaned
+    assert "Nas últimas semanas" in cleaned
+    assert "A decisão foi confirmada hoje." in cleaned
+
+
+def test_build_brazil_news_story_pack_rejects_1sentence_stubs_and_promos():
+    stub_story = {
+        "title": "Às vésperas de GTA VI, hacker responsável por vazamento do jogo se declara culpado - G1",
+        "summary": "Às vésperas de GTA VI, hacker responsável por vazamento do jogo se declara culpado G1",
+        "source": "Google News",
+        "lang": "pt",
+        "category": "games",
+    }
+    with pytest.raises(ValueError):
+        build_brazil_news_story_pack(stub_story, use_llm=False)
+
+    promo_story = {
+        "title": "TV LG QNED 65 com Mini LED baixa 32% em até 12x no mês",
+        "summary": "Economize 32% na oferta do Magalu no AliExpress usando cupom AEMEGA8 por R$ 3.399.",
+        "source": "TechTudo",
+        "lang": "pt",
+        "category": "tech",
+    }
+    with pytest.raises(ValueError):
+        build_brazil_news_story_pack(promo_story, use_llm=False)
+
+
