@@ -1396,7 +1396,7 @@ def build_narrated_short(
         bg_input_flags.extend(["-ss", f"{bg_start:.2f}"])
 
     # For cloned human voice ("minha_voz"), preserve natural timbre without Kokoro's +2.8dB 145Hz bass boost.
-    if style.key == "minha_voz":
+    if str(voice_style).strip().lower() == "minha_voz":
         eq_stage = "highpass=f=80,"
     else:
         eq_stage = "highpass=f=75,equalizer=f=145:t=q:w=1.0:g=2.8,equalizer=f=3400:t=q:w=1.5:g=-2.2,equalizer=f=9500:t=q:w=1.2:g=1.8,"
