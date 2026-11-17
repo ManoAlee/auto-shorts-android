@@ -576,8 +576,9 @@ def _find_leaked_garbage(pack: Dict, sub_text: str = "") -> List[str]:
         if pat in haystack:
             found.append(pat)
     padded = f" {re.sub(r'[^a-zA-ZÀ-ÿ0-9 ]+', ' ', haystack)} "
-    en_leaks = sum(1 for tok in (" the ", " they ", " ask ", " craft ", " spoken ", " write ", " prompt ", " script ") if tok in padded)
-    if en_leaks >= 3:
+    # Require >= 4 non-tech English instruction tokens to avoid false positives on bilingual AI/tech titles ("prompt", "script", etc.)
+    en_leaks = sum(1 for tok in (" the ", " they ", " ask ", " craft ", " spoken ", " write ", " should ", " output ") if tok in padded)
+    if en_leaks >= 4:
         found.append("prompt_leak_english")
     return found
 

@@ -23,6 +23,8 @@ def _to_seconds(hours: str | None, minutes: str, seconds: str, millis: str) -> f
 def _clean_caption_text(raw: str) -> str:
     text = html.unescape(_TAG_RE.sub("", raw or ""))
     text = _BRACKET_NOISE_RE.sub(" ", text)
+    # Strip YouTube VTT speaker-change markers ('>> ', '>>> ') so they never leak into captions/subtitles
+    text = re.sub(r"(?:^|\s)[<>]{2,}\s*", " ", text)
     return " ".join(text.replace("\ufeff", "").replace("\xa0", " ").split()).strip()
 
 
