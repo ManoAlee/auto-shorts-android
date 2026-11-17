@@ -1333,6 +1333,9 @@ def make_handler(out_dir: Path):
                 self._safe_write(data)
                 return
 
+            if parsed.path.startswith("/api/"):
+                self._send_error(404, "NOT_FOUND", f"Endpoint nao encontrado: {parsed.path}")
+                return
             self.send_error(404, "Not found")
 
         def do_POST(self):
@@ -2127,6 +2130,9 @@ def make_handler(out_dir: Path):
                 self._send_json(202, {"message": f"Geracao adicionada na fila ({pos})!"})
                 return
 
+            if parsed.path.startswith("/api/"):
+                self._send_error(404, "NOT_FOUND", f"Endpoint nao encontrado: {parsed.path}")
+                return
             self.send_error(404, "Not found")
 
         def log_message(self, format, *args):

@@ -317,4 +317,16 @@ def test_get_video_encode_args_hw_and_sw_fallback(monkeypatch):
     assert "saturation=1.15" in cfg.get_niche_color_grade("entretenimento_animes")
 
 
+def test_is_valid_media_file_rejects_empty_and_corrupt():
+    import tempfile
+    from pathlib import Path
+    from auto_shorts.downloader import _is_valid_media_file
+
+    with tempfile.TemporaryDirectory() as td:
+        bad = Path(td) / "source.mp4"
+        bad.write_bytes(b"corrupt-partial-mp4")
+        assert _is_valid_media_file(bad) is False
+        assert _is_valid_media_file(None) is False
+
+
 

@@ -217,6 +217,24 @@ def move_gdrive_episode(source_remote_path: str, dest_folder: str = "gdrive:Anim
     return proc.returncode == 0
 
 
+def _is_valid_media_file(path: Optional[Path]) -> bool:
+    """Verify via ffprobe that a downloaded media file has a valid container/moov atom."""
+    if path is None or not path.is_file() or path.stat().st_size < 10_000:
+        return False
+    if not shutil.which("ffprobe"):
+        return True
+    try:
+        out = subprocess.check_output(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=10,
+        ).strip()
+        return float(out or 0.0) > 0.5
+    except Exception:
+        return False
+
+
 def download_video_and_subs(
     url: str,
     work_dir: Path,
@@ -226,6 +244,10 @@ def download_video_and_subs(
 ) -> Tuple[Path, Optional[Path]]:
     """Download video + available subtitles via yt-dlp without requiring heavy Python libs."""
     work_dir.mkdir(parents=True, exist_ok=True)
+    # Purge stale corrupted/incomplete downloads (missing moov atom) before fetching
+    for stale in work_dir.glob("source.*"):
+        if stale.suffix.lower() in {".mp4", ".mkv", ".webm", ".part"} and not _is_valid_media_file(stale):
+            stale.unlink(missing_ok=True)
     out_tpl = str(work_dir / "source.%(ext)s")
     fmt = (
         f"bestvideo[height<={max_height}][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/"
@@ -368,7 +390,15 @@ def transcribe_with_whisper_cpp(
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(wav_path),
     ])
-    subprocess.run(ffmpeg_cmd, check=True)
+    try:
+        subprocess.run(ffmpeg_cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        if video_path.parent == work_dir and video_path.name.startswith("source"):
+            video_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Arquivo de origem inválido ou sem trilha de áudio ({video_path.name}); "
+            "download parcial foi removido para nova tentativa limpa."
+        ) from exc
 
     detected_lang = language
     if language in ("pt", "auto"):
