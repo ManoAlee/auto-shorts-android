@@ -2510,6 +2510,26 @@
 
   syncWorkstationPreview();
   loadChannelTelemetry();
+
+  async function hydrateLiveHypeCards() {
+    try {
+      const r = await fetch('/api/hype/live');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d || !Array.isArray(d.cards) || d.cards.length === 0) return;
+      const domCards = document.querySelectorAll('.gta6-topic-card');
+      domCards.forEach((el, idx) => {
+        const item = d.cards[idx];
+        if (!item) return;
+        el.setAttribute('data-topic', item.niche || 'games');
+        const h = el.querySelector('h4, strong');
+        const p = el.querySelector('p');
+        if (h) h.textContent = item.title;
+        if (p) p.textContent = item.desc;
+      });
+    } catch (e) {}
+  }
+  hydrateLiveHypeCards();
   loadScheduler();
   loadVideos();
   refreshStatus();

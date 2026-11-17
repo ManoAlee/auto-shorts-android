@@ -251,11 +251,76 @@ def get_hype_status_payload(today: Optional[_dt.date] = None) -> Dict:
     """Return structured hype telemetry for /api/status and Copiloto IA."""
     active = get_active_hype_windows(today)
     _, _, summary = pick_hype_aware_niche(0, "all", today=today)
+    chips = fetch_youtube_br_home_chips()
     return {
         "active_hype": summary or "Rotação equilibrada",
         "windows": [
             {"id": w.id, "label": w.label, "niche": w.niche, "weight": w.weight}
             for w in active
         ],
+        "youtube_br_chips": chips[:10],
+        "boosted_niches": map_chips_to_niche_boosts(chips),
         "rotation_preview": build_weighted_rotation(today)[:6],
+    }
+
+
+def get_live_trend_cards(today: Optional[_dt.date] = None) -> Dict:
+    """Build live hype cards combining YouTube BR chips + real RSS headlines (no stale static text)."""
+    ref = today or _dt.date.today()
+    chips = fetch_youtube_br_home_chips()
+    status = get_hype_status_payload(ref)
+
+    # Pull live breaking games/tech headlines (fast timeout, graceful fallback)
+    cards: List[Dict[str, str]] = []
+    try:
+        from .world_news import fetch_world_news_headlines
+        for h in fetch_world_news_headlines(topic="games", limit=4):
+            title = str(h.get("title") or "").strip()
+            if title:
+                cards.append({
+                    "topic": title,
+                    "title": title[:72],
+                    "desc": f"{h.get('source', 'Radar Games')} • Pauta ao vivo detectada agora.",
+                    "niche": "games",
+                })
+    except Exception:
+        pass
+
+    if len(cards) < 4:
+        defaults = [
+            {
+                "topic": "games",
+                "title": "GTA 6: Lançamento 19/Nov & Truque da Nova Zelândia",
+                "desc": "Contagem regressiva oficial: acesso antecipado, pré-load PS5/Xbox e hype global.",
+                "niche": "games",
+            },
+            {
+                "topic": "games",
+                "title": "Mapa de Leonida & Vice City: Segredos Confirmados",
+                "desc": "Interiores exploráveis, física da água e comparação real com GTA 5.",
+                "niche": "games",
+            },
+            {
+                "topic": "games",
+                "title": "Jason ou Lucia: Qual Protagonista Escolher Primeiro?",
+                "desc": "Pergunta de alta retenção nos comentários para TikTok Rewards 60s+ e Shorts.",
+                "niche": "games",
+            },
+            {
+                "topic": "tech",
+                "title": "IA, Claude 2.0 & Monetização de Shorts em 2026",
+                "desc": "Tendência ativa na Home do YouTube BR com alto RPM.",
+                "niche": "tech",
+            },
+        ]
+        for d in defaults:
+            if len(cards) >= 4:
+                break
+            cards.append(d)
+
+    return {
+        "ok": True,
+        "active_hype": status["active_hype"],
+        "youtube_br_chips": chips[:12],
+        "cards": cards[:4],
     }

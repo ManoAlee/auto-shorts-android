@@ -389,7 +389,7 @@ def _save_scheduler_cfg(out_dir: Path, cfg: Dict) -> Dict:
     return cfg
 
 
-from .hype_engine import get_hype_status_payload, pick_hype_aware_niche
+from .hype_engine import get_hype_status_payload, get_live_trend_cards, pick_hype_aware_niche
 
 _AUTO_NICHE_ROTATION = (
     "games_gta6",
@@ -1071,6 +1071,10 @@ def make_handler(out_dir: Path):
                 except Exception:
                     st["hype"] = {"active_hype": "Rotação equilibrada", "windows": []}
                 self._send_json(200, st)
+                return
+
+            if parsed.path == "/api/hype/live":
+                self._send_json(200, get_live_trend_cards())
                 return
 
             if parsed.path == "/api/mahoraga":
