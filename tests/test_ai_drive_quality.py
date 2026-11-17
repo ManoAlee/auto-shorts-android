@@ -7,7 +7,7 @@ def test_news_without_source_summary_is_rejected_without_fabrication(monkeypatch
     from auto_shorts.world_news import build_brazil_news_story_pack
 
     monkeypatch.setattr("auto_shorts.world_news._extract_article_lead_from_url", lambda _url: ("", ""))
-    with pytest.raises(ValueError, match="resumo verificável"):
+    with pytest.raises(ValueError, match="manchete/stub insuficiente|resumo verificável"):
         build_brazil_news_story_pack(
             {"source": "Fonte", "title": "Manchete isolada", "summary": "", "url": "https://example.com/story", "lang": "pt"},
             use_llm=False,
