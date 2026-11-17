@@ -22,14 +22,14 @@ VIDEOS = [
         "hook": "O Segredo Oculto no Pântano",
         "style": "capcut_cleyton",
         "niche": "games",
-        "bg": "gp_drone_cinema_DesiBXmyCBQ.mp4",
+        "bg": "gp_rdr2_agnes_dowd.mp4",
         "script": (
-            "Você sabia que a Rockstar escondeu um dos mistérios mais perturbadores em Red Dead Redemption 2? "
-            "Se você cavalgar até o pântano de Bluewater Marsh exatamente às duas da manhã com neblina, você escuta o choro de uma mulher. "
-            "Ao se aproximar, você encontra o fantasma de Agnes Dowd vagando entre as árvores, repetindo as últimas palavras antes da sua tragédia. "
-            "O mais bizarro é que existem dezesseis aparições diferentes, e cada vez ela revela uma parte sombria da sua história. "
-            "A Rockstar levou o nível de realismo a um patamar que nenhum outro estúdio conseguiu alcançar. "
-            "Qual mistério dos games mais te deu arrepios? Comenta aí e segue a AleplayTV!"
+            "Mano, olha o detalhe bizarro que a Rockstar escondeu em Red Dead 2. "
+            "Se você cavalgar no pântano de Bluewater Marsh de madrugada com neblina, começa a ouvir o choro de uma mulher. "
+            "Quando você chega perto, dá de cara com o fantasma da Agnes Dowd vagando entre as árvores. "
+            "E o mais doido: são dezesseis aparições diferentes, e cada vez ela conta um pedaço da tragédia dela. "
+            "O nível de loucura que a Rockstar colocou nesse jogo não existe em nenhum outro lugar. "
+            "Já trombou com ela no jogo? Comenta aí e segue a AleplayTV!"
         ),
     },
     {
@@ -38,15 +38,15 @@ VIDEOS = [
         "hook": "O Segredo do Trunks do Futuro",
         "style": "capcut_julia",
         "niche": "entretenimento_animes",
-        "bg": "gp_space_cosmos_0i9wZ-xDC04.mp4",
+        "bg": "gp_dbz_trunks_real.mp4",
         "script": (
-            "Presta atenção nessa teoria que vai explodir a sua cabeça sobre Dragon Ball! "
-            "Você já parou para pensar por que o Trunks do futuro tinha uma força tão absurda mesmo sem treinar na Sala do Tempo? "
-            "Segundo Akira Toriyama, os Saiyajins híbridos nascem sem cauda quando herdam um potencial genético muito superior. "
-            "Mas o detalhe que quase ninguém percebeu é que o Trunks cresceu em um mundo devastado pela perda e pelo trauma. "
-            "A dor desbloqueou o poder oculto dele muito antes do Gohan. "
-            "Ele não lutava para superar limites, ele lutava pela sobrevivência da humanidade. "
-            "Qual seu guerreiro favorito de anime? Deixa nos comentários e segue a AleplayTV!"
+            "Cara, repara nessa loucura sobre o Trunks do futuro em Dragon Ball. "
+            "Muita gente não entende como ele ficou tão forte sem nem pisar na Sala do Tempo. "
+            "O Toriyama explicou que Saiyajin híbrido que nasce sem cauda já herda um potencial genético absurdo. "
+            "Só que o Trunks cresceu vendo todo mundo que ele amava morrer. "
+            "A dor da perda destravou o poder oculto dele muito antes do Gohan. "
+            "Ele não tava treinando pra ficar forte, tava lutando pra não ser extinto. "
+            "Quem é o guerreiro mais brabo de anime pra você? Deixa aí nos comentários e segue a AleplayTV!"
         ),
     },
 ]

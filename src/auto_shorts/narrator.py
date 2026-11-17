@@ -280,7 +280,12 @@ _PTBR_DIACRITICS = {
 
 
 def humanize_ptbr_script(text: str) -> str:
-    """Restore Portuguese accents for natural neural pronunciation and clean breathing rhythm."""
+    """Restore Portuguese accents and apply blader/humanizer de-AI patterns for authentic speech."""
+    try:
+        from .humanizer import humanize_script
+        text = humanize_script(text)
+    except Exception:
+        pass
     cleaned = " ".join(str(text or "").split()).strip()
     cleaned = re.sub(r"\s+([,;:.!?])", r"\1", cleaned)
     if not cleaned:
@@ -945,7 +950,25 @@ def synthesize_narration(
     word_events: List[Dict] = []
     synthesized_external = False
 
-    if eleven_key:
+    # Explicit CapCut and Edge HD neural styles synthesize directly with ultra-low latency & true timbre
+    if style.key.startswith("capcut_") or style.key in {"thalita_hd", "francisca_hd", "narrador_pro", "andrew_hd", "brian_hd"}:
+        try:
+            word_events, _raw_srt = asyncio.run(
+                _edge_tts_synth_async(
+                    text=clean_text,
+                    out_mp3=out_mp3,
+                    voice=style.voice,
+                    rate=style.rate,
+                    pitch=style.pitch,
+                )
+            )
+            synthesized_external = True
+            if _raw_srt and _raw_srt.strip():
+                out_srt.write_text(_raw_srt, encoding="utf-8")
+        except Exception:
+            synthesized_external = False
+
+    if not synthesized_external and eleven_key:
         try:
             synthesized_external = _synthesize_elevenlabs(clean_text, out_mp3, style, eleven_key)
         except Exception:
@@ -982,7 +1005,7 @@ def synthesize_narration(
         except Exception:
             synthesized_external = False
 
-    if not synthesized_external and (style.key == "minha_voz" or os.getenv("USE_USER_VOICE_CLONE", "").strip() == "1"):
+    if not synthesized_external and (style.key == "minha_voz" or (os.getenv("USE_USER_VOICE_CLONE", "").strip() == "1" and style.key == DEFAULT_STYLE_KEY)):
         try:
             from .voice_clone_hf import synthesize_chatterbox_hf_space
             synthesized_external = synthesize_chatterbox_hf_space(clean_text, out_mp3)
