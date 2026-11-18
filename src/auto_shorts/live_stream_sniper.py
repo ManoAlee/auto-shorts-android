@@ -203,10 +203,13 @@ def download_live_chunk(
     stream_url: str,
     output_path: str | Path,
     duration_sec: int = 45,
-    timeout_sec: int = 80,
+    timeout_sec: Optional[int] = None,
 ) -> bool:
     """Download a high-quality chunk directly from an active live stream."""
     yt_dlp_bin = shutil.which("yt-dlp") or "yt-dlp"
+    if timeout_sec is None:
+        timeout_sec = max(90, int(duration_sec * 1.5) + 30)
+
     cmd = [
         yt_dlp_bin,
         "-f", "311+234/312+234/bestvideo+bestaudio/best",
@@ -318,7 +321,7 @@ def snip_streamer_highlight(
 
     # 1. Download live sample proportional to requested clips
     requested_clips = max(1, min(5, int(num_clips)))
-    buffer_sec = max(50, min(300, int(requested_clips * (clip_duration + 12))))
+    buffer_sec = max(45, min(120, int(requested_clips * (clip_duration + 4))))
     ok = download_live_chunk(stream_url, raw_sample, duration_sec=buffer_sec)
     if not ok or not raw_sample.is_file():
         return None
@@ -334,7 +337,7 @@ def snip_streamer_highlight(
             "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
             "-f", "s16le", "-"
         ]
-        pcm_proc = subprocess.run(pcm_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30)
+        pcm_proc = subprocess.run(pcm_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=max(45, buffer_sec + 30))
         raw_pcm = pcm_proc.stdout
         chunk_size = 16000 * 2  # 1 second
         spikes: List[Tuple[float, float]] = []
