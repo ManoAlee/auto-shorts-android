@@ -395,7 +395,7 @@ def snip_streamer_highlight(
         "source_url": stream_url,
         "created_at": created_iso,
     }
-    publish_json = out_mp4.with_suffix(".mp4.publish.json")
+    publish_json = out_mp4.with_suffix(".publish.json")
     publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {
