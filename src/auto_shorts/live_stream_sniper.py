@@ -321,7 +321,7 @@ def snip_streamer_highlight(
 
     # 1. Download live sample proportional to requested clips
     requested_clips = max(1, min(5, int(num_clips)))
-    buffer_sec = max(45, min(120, int(requested_clips * (clip_duration + 4))))
+    buffer_sec = max(60, min(240, int(requested_clips * (clip_duration + 15))))
     ok = download_live_chunk(stream_url, raw_sample, duration_sec=buffer_sec)
     if not ok or not raw_sample.is_file():
         return None
