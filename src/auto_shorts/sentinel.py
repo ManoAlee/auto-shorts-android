@@ -390,14 +390,30 @@ class DriveSentinelEngine:
         from .world_news import produce_world_news_short
 
         try:
-            logger.info("DriveSentinel auto-pulling niche %s (topic=%s)...", niche_key, niche_topic)
-            fb = produce_world_news_short(
-                out_dir=self.out_dir,
-                topic=niche_topic,
-                auto_publish=True,
-                playlist_name=playlist_name,
-                use_llm=True,
-            )
+            fb = {}
+            if niche_key == "games":
+                try:
+                    from .live_stream_sniper import probe_and_snip_gta6_watchlist
+                    logger.info("DriveSentinel probing active GTA 6 / Gamer live streams...")
+                    sniper_res = probe_and_snip_gta6_watchlist(out_dir=self.out_dir)
+                    if sniper_res and sniper_res.get("video_path"):
+                        fb = {
+                            "output": sniper_res["video_path"],
+                            "title": sniper_res.get("title", ""),
+                            "pack": sniper_res.get("pack", {}),
+                        }
+                except Exception as sniper_err:
+                    logger.warning("Sentinel live sniper probe failed: %s; falling back to standard pipeline", sniper_err)
+
+            if not fb.get("output"):
+                logger.info("DriveSentinel auto-pulling niche %s (topic=%s)...", niche_key, niche_topic)
+                fb = produce_world_news_short(
+                    out_dir=self.out_dir,
+                    topic=niche_topic,
+                    auto_publish=True,
+                    playlist_name=playlist_name,
+                    use_llm=True,
+                )
 
             out_file = fb.get("output")
             if out_file and Path(out_file).is_file():

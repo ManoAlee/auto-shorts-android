@@ -1109,6 +1109,21 @@ def make_handler(out_dir: Path):
                 )
                 return
 
+            if parsed.path == "/api/sniper/status":
+                from .live_stream_sniper import GTA6_LAUNCH_WATCHLIST, check_streamer_is_live
+                results = []
+                for streamer in GTA6_LAUNCH_WATCHLIST:
+                    live_meta = check_streamer_is_live(streamer.channel_url)
+                    results.append({
+                        "name": streamer.name,
+                        "platform": streamer.platform,
+                        "channel_url": streamer.channel_url,
+                        "is_live": bool(live_meta),
+                        "meta": live_meta,
+                    })
+                self._send_json(200, {"ok": True, "streamers": results})
+                return
+
             if parsed.path == "/api/videos":
                 qs = urllib.parse.parse_qs(parsed.query)
                 status_flt = (qs.get("status") or ["all"])[0].strip().lower()
@@ -1842,6 +1857,35 @@ def make_handler(out_dir: Path):
                     ig_publisher=publish_pack_to_instagram_reels,
                 )
                 self._send_json(200, cycle)
+                return
+
+            if parsed.path == "/api/sniper/snip":
+                from .live_stream_sniper import GTA6_LAUNCH_WATCHLIST, snip_streamer_highlight, StreamerTarget
+                streamer_name = str(body.get("streamer") or "Davy Jones").strip()
+                direct_url = str(body.get("url") or "").strip() or None
+                hook_banner = str(body.get("hook_banner") or "").strip() or None
+                clip_duration = float(body.get("clip_duration") or 30.0)
+
+                target = next((t for t in GTA6_LAUNCH_WATCHLIST if t.name.lower() == streamer_name.lower()), None)
+                if not target:
+                    target = StreamerTarget(
+                        name=streamer_name or "Streamer",
+                        channel_url=direct_url or "https://www.youtube.com/@gameplayrj/live",
+                        platform="youtube",
+                        default_facecam_pos=str(body.get("facecam_pos") or "top_left"),
+                    )
+
+                snip_res = snip_streamer_highlight(
+                    target=target,
+                    out_dir=out_dir,
+                    hook_banner=hook_banner,
+                    clip_duration=clip_duration,
+                    direct_url=direct_url,
+                )
+                if snip_res:
+                    self._send_json(200, {"ok": True, "result": snip_res})
+                else:
+                    self._send_json(400, {"ok": False, "message": "Falha ao capturar ou streamer offline."})
                 return
 
             if parsed.path == "/api/optimize":

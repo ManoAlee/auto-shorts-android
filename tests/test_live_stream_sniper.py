@@ -10,6 +10,7 @@ from auto_shorts.live_stream_sniper import (
 
 def test_watchlist_contains_major_streamers():
     names = {s.name for s in GTA6_LAUNCH_WATCHLIST}
+    assert "Davy Jones" in names
     assert "Alanzoka" in names
     assert "Gaules" in names
     assert "Coringa" in names

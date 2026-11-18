@@ -35,6 +35,13 @@ class StreamerTarget:
 
 GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
     StreamerTarget(
+        name="Davy Jones",
+        channel_url="https://www.youtube.com/@gameplayrj/live",
+        platform="youtube",
+        default_facecam_pos="top_left",
+        niche="games_gta6",
+    ),
+    StreamerTarget(
         name="Alanzoka",
         channel_url="https://www.twitch.tv/alanzoka",
         platform="twitch",
@@ -154,15 +161,66 @@ def build_gamer_split_filter(
 def resolve_live_stream_url(stream_url: str) -> Optional[str]:
     """Resolve direct HLS/m3u8 stream URL using yt-dlp."""
     yt_dlp_bin = shutil.which("yt-dlp") or "yt-dlp"
-    cmd = [yt_dlp_bin, "-g", "-f", "best[ext=mp4]/best", stream_url]
+    cmd = [yt_dlp_bin, "-g", "-f", "311+234/312+234/bestvideo+bestaudio/best", stream_url]
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=12)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
         if res.returncode == 0:
             lines = [l.strip() for l in res.stdout.splitlines() if l.strip().startswith("http")]
             return lines[0] if lines else None
     except Exception:
         pass
     return None
+
+
+def check_streamer_is_live(channel_url: str) -> Optional[Dict[str, Any]]:
+    """Probe if a target streamer is currently broadcasting live."""
+    yt_dlp_bin = shutil.which("yt-dlp") or "yt-dlp"
+    cmd = [
+        yt_dlp_bin,
+        "--dump-json",
+        "--no-playlist",
+        channel_url,
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        if res.returncode == 0 and res.stdout.strip():
+            meta = json.loads(res.stdout.splitlines()[0])
+            is_live = meta.get("is_live") or meta.get("live_status") == "is_live"
+            if is_live:
+                return {
+                    "id": meta.get("id"),
+                    "title": meta.get("title", ""),
+                    "channel": meta.get("channel") or meta.get("uploader", ""),
+                    "url": meta.get("webpage_url") or f"https://www.youtube.com/watch?v={meta.get('id')}",
+                    "viewers": meta.get("view_count") or meta.get("concurrent_view_count") or 0,
+                }
+    except Exception:
+        pass
+    return None
+
+
+def download_live_chunk(
+    stream_url: str,
+    output_path: str | Path,
+    duration_sec: int = 45,
+    timeout_sec: int = 80,
+) -> bool:
+    """Download a high-quality chunk directly from an active live stream."""
+    yt_dlp_bin = shutil.which("yt-dlp") or "yt-dlp"
+    cmd = [
+        yt_dlp_bin,
+        "-f", "311+234/312+234/bestvideo+bestaudio/best",
+        "--downloader", "ffmpeg",
+        "--downloader-args", f"ffmpeg_i:-t {duration_sec}",
+        "-o", str(output_path),
+        "--no-playlist",
+        stream_url,
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
+        return res.returncode == 0 and os.path.isfile(output_path) and os.path.getsize(output_path) > 100000
+    except Exception:
+        return False
 
 
 def render_gamer_clip(
@@ -183,15 +241,22 @@ def render_gamer_clip(
     filter_complex = build_gamer_split_filter(facecam_pos=facecam_pos, facecam_pct=0.34)
     v_last = "v_out"
 
-    # Add hook banner at the top seam
+    # Add hook banner at the seam between webcam and gameplay
     font_path = find_default_font()
-    font_arg = f":fontfile='{font_path}'" if font_path else ""
+    if font_path:
+        font_path_esc = str(font_path).replace("\\", "/").replace(":", "\\:")
+        font_arg = f":fontfile='{font_path_esc}'"
+    else:
+        font_arg = ""
     safe_banner = hook_banner.replace("'", "").replace(":", "\\:").upper()
 
+    top_h = int(1920 * 0.34)
+    top_h = top_h if top_h % 2 == 0 else top_h + 1
+
     banner_filter = (
-        f";[{v_last}]drawbox=x=(w-980)/2:y=20:w=980:h=90:color=0x000000@0.75:t=fill,"
+        f";[{v_last}]drawbox=x=(w-980)/2:y={top_h + 16}:w=980:h=90:color=0x000000@0.75:t=fill,"
         f"drawtext=text='{safe_banner}'{font_arg}:fontcolor=0x00FFFF:fontsize=44:"
-        f"x=(w-text_w)/2:y=42[v_banner]"
+        f"x=(w-text_w)/2:y={top_h + 38}[v_banner]"
     )
     filter_complex += banner_filter
     v_last = "v_banner"
@@ -228,3 +293,128 @@ def render_gamer_clip(
         return res.returncode == 0 and os.path.isfile(out) and os.path.getsize(out) > 10000
     except Exception:
         return False
+
+
+def snip_streamer_highlight(
+    target: StreamerTarget,
+    out_dir: str | Path,
+    hook_banner: Optional[str] = None,
+    clip_duration: float = 30.0,
+    direct_url: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Snip a live reaction from a streamer and generate a publishable Short pack."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    stream_url = direct_url or target.channel_url
+    meta = check_streamer_is_live(stream_url)
+    if not meta and not direct_url:
+        return None
+
+    title_source = (meta.get("title") if meta else "") or "GTA 6 Gameplay Ao Vivo"
+    timestamp_tag = int(time.time())
+    raw_sample = out_dir / f"live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}_raw.mp4"
+
+    # 1. Download live sample
+    ok = download_live_chunk(stream_url, raw_sample, duration_sec=45)
+    if not ok or not raw_sample.is_file():
+        return None
+
+    # 2. Extract PCM audio and find reaction spike
+    analyzer = AudioEnergyAnalyzer(sample_rate=16000, spike_threshold_db=5.0, min_absolute_db=-25.0)
+    best_start = 2.0
+    try:
+        ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
+        pcm_cmd = [
+            ffmpeg_bin, "-y", "-i", str(raw_sample),
+            "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+            "-f", "s16le", "-"
+        ]
+        pcm_proc = subprocess.run(pcm_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=20)
+        raw_pcm = pcm_proc.stdout
+        chunk_size = 16000 * 2  # 1 second
+        spikes = []
+        for i in range(0, len(raw_pcm), chunk_size):
+            chunk = raw_pcm[i:i + chunk_size]
+            sec = i // chunk_size
+            is_spike, cur_db, avg_db = analyzer.evaluate_frame(chunk)
+            if is_spike:
+                spikes.append((sec, cur_db))
+        if spikes:
+            spikes.sort(key=lambda s: s[1], reverse=True)
+            peak_sec = spikes[0][0]
+            best_start = max(1.0, peak_sec - 2.0)
+    except Exception:
+        best_start = 2.0
+
+    best_start = min(best_start, 12.0)
+
+    # 3. Render 9:16 Short
+    out_mp4 = out_dir / f"short_live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}.mp4"
+    banner_text = hook_banner or f"{target.name.upper()}: A REAÇÃO AO GTA 6!"
+    rendered = render_gamer_clip(
+        source_video=raw_sample,
+        output_mp4=out_mp4,
+        start_sec=best_start,
+        duration_sec=clip_duration,
+        hook_banner=banner_text,
+        streamer_name=target.name,
+        facecam_pos=target.default_facecam_pos,
+    )
+
+    # Clean up raw sample
+    try:
+        raw_sample.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    if not rendered or not out_mp4.is_file():
+        return None
+
+    # 4. Generate metadata & .publish.json
+    clean_title = f"{target.name} Reage ao GTA 6 | Gameplay Ao Vivo #Shorts"
+    caption = (
+        f"A reação do {target.name} jogando GTA 6 ao vivo no lançamento!\n\n"
+        f"Transmissão original: {title_source}\n"
+        f"Canal do streamer: {target.channel_url}\n\n"
+        f"#GTA6 #DavyJones #GameplayRJ #GTA6Gameplay #ShortsBrasil #Games"
+    )
+    hashtags = ["#GTA6", "#DavyJones", "#GameplayRJ", "#GTA6Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
+
+    created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
+    pack_data = {
+        "title": clean_title,
+        "caption": caption,
+        "hashtags": hashtags,
+        "niche": "games_gta6",
+        "playlist": "Games e GTA 6 - Shorts",
+        "composite_score": 115.0,
+        "opus_score": 95,
+        "channel_algo_score": 98,
+        "streamer": target.name,
+        "source_url": stream_url,
+        "created_at": created_iso,
+    }
+    publish_json = out_mp4.with_suffix(".mp4.publish.json")
+    publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {
+        "video_path": str(out_mp4),
+        "publish_path": str(publish_json),
+        "title": clean_title,
+        "pack": pack_data,
+    }
+
+
+def probe_and_snip_gta6_watchlist(out_dir: str | Path) -> Optional[Dict[str, Any]]:
+    """Scan all streamers in the GTA6 launch watchlist and snip the first active live."""
+    for target in GTA6_LAUNCH_WATCHLIST:
+        try:
+            live_meta = check_streamer_is_live(target.channel_url)
+            if live_meta:
+                res = snip_streamer_highlight(target, out_dir=out_dir)
+                if res:
+                    return res
+        except Exception:
+            continue
+    return None
