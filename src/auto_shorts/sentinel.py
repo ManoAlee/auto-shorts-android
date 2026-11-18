@@ -211,6 +211,18 @@ class DriveSentinelEngine:
                 from .live_stream_sniper import probe_and_snip_gta6_watchlist
                 sniper_res = probe_and_snip_gta6_watchlist(out_dir=self.out_dir, num_clips=self.num_clips_per_episode)
                 if sniper_res and sniper_res.get("video_path"):
+                    clips = sniper_res.get("clips") or [sniper_res]
+                    try:
+                        from .downloader import build_drive_niche_folder, upload_to_rclone
+                        from .publisher import export_to_android_gallery
+                        dest_drive_folder = build_drive_niche_folder("gameplay")
+                        for c in clips:
+                            vp = Path(c.get("video_path", ""))
+                            if vp.is_file():
+                                upload_to_rclone(vp, dest_drive_folder)
+                                export_to_android_gallery(vp)
+                    except Exception:
+                        pass
                     with self._lock:
                         self._state["last_live_sniper_ts"] = time.time()
                         self._state["last_action"] = f"Live ativa detectada! Cortes gerados: {sniper_res.get('title', '')}"

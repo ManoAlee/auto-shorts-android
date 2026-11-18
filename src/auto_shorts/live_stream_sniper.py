@@ -46,30 +46,63 @@ GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
         channel_url="https://www.twitch.tv/alanzoka",
         platform="twitch",
         default_facecam_pos="bottom_right",
+        niche="games_gta6",
     ),
     StreamerTarget(
         name="Gaules",
         channel_url="https://www.twitch.tv/gaules",
         platform="twitch",
         default_facecam_pos="bottom_left",
+        niche="games_gta6",
+    ),
+    StreamerTarget(
+        name="Paulinho o Loko",
+        channel_url="https://www.twitch.tv/paulinhooloko",
+        platform="twitch",
+        default_facecam_pos="bottom_right",
+        niche="games_gta6",
     ),
     StreamerTarget(
         name="Coringa",
         channel_url="https://www.twitch.tv/loud_coringa",
         platform="twitch",
         default_facecam_pos="top_right",
+        niche="games_gta6",
+    ),
+    StreamerTarget(
+        name="Casimiro",
+        channel_url="https://www.twitch.tv/casimito",
+        platform="twitch",
+        default_facecam_pos="bottom_left",
+        niche="games_gta6",
+    ),
+    StreamerTarget(
+        name="LipaoGamer",
+        channel_url="https://www.youtube.com/@LipaoGamer/live",
+        platform="youtube",
+        default_facecam_pos="top_right",
+        niche="games_gta6",
+    ),
+    StreamerTarget(
+        name="BRKsEDU",
+        channel_url="https://www.youtube.com/@BRKsEDU/live",
+        platform="youtube",
+        default_facecam_pos="top_left",
+        niche="games_gta6",
     ),
     StreamerTarget(
         name="KaiCenat",
         channel_url="https://www.twitch.tv/kaicenat",
         platform="twitch",
         default_facecam_pos="bottom_right",
+        niche="games_gta6",
     ),
     StreamerTarget(
         name="xQc",
         channel_url="https://kick.com/xqc",
         platform="kick",
         default_facecam_pos="top_left",
+        niche="games_gta6",
     ),
 ]
 
@@ -256,13 +289,22 @@ def render_gamer_clip(
     top_h = int(1920 * 0.34)
     top_h = top_h if top_h % 2 == 0 else top_h + 1
 
+    safe_streamer = streamer_name.replace("'", "").replace(":", "\\:").upper()
+
     banner_filter = (
-        f";[{v_last}]drawbox=x=(w-980)/2:y={top_h + 16}:w=980:h=90:color=0x000000@0.75:t=fill,"
+        # 1. Sleek Live broadcast badge at top-left
+        f";[{v_last}]drawbox=x=28:y=28:w=380:h=52:color=0x000000@0.75:t=fill,"
+        f"drawtext=text='AO VIVO | {safe_streamer}'{font_arg}:fontcolor=0xFF4444:fontsize=24:"
+        f"x=44:y=42[v_badge]"
+        # 2. Viral Hook banner at divider seam
+        f";[v_badge]drawbox=x=(w-980)/2:y={top_h + 16}:w=980:h=90:color=0x000000@0.75:t=fill,"
         f"drawtext=text='{safe_banner}'{font_arg}:fontcolor=0x00FFFF:fontsize=44:"
         f"x=(w-text_w)/2:y={top_h + 38}[v_banner]"
+        # 3. Bottom interface safe-zone scrim to protect in-game subtitles from TikTok/Shorts UI
+        f";[v_banner]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
     )
     filter_complex += banner_filter
-    v_last = "v_banner"
+    v_last = "v_scrim"
 
     # Add subtitle burn if available
     if ass_subtitle_path and os.path.isfile(ass_subtitle_path):
@@ -282,6 +324,7 @@ def render_gamer_clip(
         "-filter_complex", filter_complex,
         "-map", f"[{v_last}]",
         "-map", "0:a?",
+        "-af", "loudnorm=I=-14:LRA=7:TP=-1.5",
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "22",
@@ -409,13 +452,14 @@ def snip_streamer_highlight(
         if rendered and out_mp4.is_file() and out_mp4.stat().st_size > 50000:
             part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
             clean_title = f"{target.name} Reage ao GTA 6{part_str} | Gameplay Ao Vivo #Shorts"
+            clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
+            hashtags = ["#GTA6", clean_tag, "#GTA6Gameplay", "#Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
             caption = (
                 f"A reação do {target.name} jogando GTA 6 ao vivo no lançamento!{part_str}\n\n"
                 f"Transmissão original: {title_source}\n"
                 f"Canal do streamer: {target.channel_url}\n\n"
-                f"#GTA6 #DavyJones #GameplayRJ #GTA6Gameplay #ShortsBrasil #Games #AleplayTV"
+                f"{' '.join(hashtags)}"
             )
-            hashtags = ["#GTA6", "#DavyJones", "#GameplayRJ", "#GTA6Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
             created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
 
             pack_data = {
@@ -432,6 +476,7 @@ def snip_streamer_highlight(
                 "part": idx,
                 "total_parts": len(selected_starts),
                 "created_at": created_iso,
+                "queued_for_auto_publish": True,
             }
             publish_json = out_mp4.with_suffix(".publish.json")
             publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -463,14 +508,25 @@ def snip_streamer_highlight(
     }
 
 
+_STREAMER_SNIPE_HISTORY: Dict[str, float] = {}
+
+
 def probe_and_snip_gta6_watchlist(out_dir: str | Path, num_clips: int = 3) -> Optional[Dict[str, Any]]:
-    """Scan all streamers in the GTA6 launch watchlist and snip multiple highlights from the first active live."""
-    for target in GTA6_LAUNCH_WATCHLIST:
+    """Scan all streamers in the GTA6 launch watchlist and snip multiple highlights with fair rotation."""
+    global _STREAMER_SNIPE_HISTORY
+    out_dir = Path(out_dir)
+    # Prioritize streamers least recently snipped to ensure healthy channel rotation
+    sorted_targets = sorted(
+        GTA6_LAUNCH_WATCHLIST,
+        key=lambda t: _STREAMER_SNIPE_HISTORY.get(t.name, 0.0),
+    )
+    for target in sorted_targets:
         try:
             live_meta = check_streamer_is_live(target.channel_url)
             if live_meta:
                 res = snip_streamer_highlight(target, out_dir=out_dir, num_clips=num_clips)
                 if res:
+                    _STREAMER_SNIPE_HISTORY[target.name] = time.time()
                     return res
         except Exception:
             continue
