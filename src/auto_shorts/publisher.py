@@ -474,6 +474,9 @@ def publish_pack_to_youtube(
     from .validator import validate_generated_short
 
     mp4 = Path(video_path)
+    if str(mp4).endswith(".publish.json"):
+        mp4 = Path(str(mp4)[:-len(".publish.json")])
+
     if not mp4.is_file():
         raise FileNotFoundError(f"Video nao encontrado: {mp4}")
 
@@ -489,8 +492,11 @@ def publish_pack_to_youtube(
     if not force and existing_yt.get("video_id"):
         return {**existing_yt, "status": "already_published_youtube", "skipped": True}
 
-    if os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower() == "cdp":
-        from .youtube_cdp import publish_pack_to_youtube_cdp
+    from .youtube_cdp import get_youtube_cdp_status, publish_pack_to_youtube_cdp
+    cdp_ready = get_youtube_cdp_status(mp4.parent).get("ready_to_publish", False)
+    mode = os.getenv("YOUTUBE_PUBLISH_MODE", "").strip().lower()
+
+    if mode == "cdp" or (mode != "api" and cdp_ready):
         cdp_res = publish_pack_to_youtube_cdp(mp4, privacy_status=(privacy_status or "PUBLIC"), force=force)
         if cdp_res.get("status") in ("published_youtube_cdp", "already_published_youtube", "deferred"):
             return cdp_res
@@ -521,13 +527,19 @@ def publish_pack_to_youtube(
         caption = f"{caption}\n#Shorts".strip()
     tags = pack.get("hashtags") or ["#Shorts", "#Brasil"]
 
-    yt_res = publish_youtube_short(
-        mp4,
-        title=title,
-        description=caption,
-        tags=tags,
-        privacy_status=privacy_status,
-    )
+    try:
+        yt_res = publish_youtube_short(
+            mp4,
+            title=title,
+            description=caption,
+            tags=tags,
+            privacy_status=privacy_status,
+        )
+    except Exception as yt_api_err:
+        if cdp_ready:
+            logger.warning("YouTube API OAuth failed (%s); automatic fallback to YouTube Studio CDP...", yt_api_err)
+            return publish_pack_to_youtube_cdp(mp4, privacy_status=(privacy_status or "PUBLIC"), force=force)
+        raise
     vid = yt_res.get("video_id")
     playlist_id = None
     thumb_uploaded = False
