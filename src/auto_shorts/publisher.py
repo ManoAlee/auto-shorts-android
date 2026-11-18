@@ -1,6 +1,7 @@
 """Multi-portal delivery packaging, Meta Graph API Reels publisher, and webhook dispatcher."""
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger("Publisher")
 
 from .config import NICHES, load_dotenv_file
 from .retention import get_retention_profile
