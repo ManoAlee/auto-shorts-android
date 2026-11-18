@@ -230,7 +230,7 @@ def render_gamer_clip(
     source_video: str | Path,
     output_mp4: str | Path,
     start_sec: float,
-    duration_sec: float,
+    duration_sec: float = 50.0,
     hook_banner: str = "GTA 6: O PRIMEIRO BUG!",
     streamer_name: str = "Alanzoka",
     facecam_pos: str = "bottom_right",
@@ -302,9 +302,9 @@ def snip_streamer_highlight(
     target: StreamerTarget,
     out_dir: str | Path,
     hook_banner: Optional[str] = None,
-    clip_duration: float = 30.0,
+    clip_duration: float = 50.0,
     direct_url: Optional[str] = None,
-    num_clips: int = 3,
+    num_clips: int = 2,
 ) -> Optional[Dict[str, Any]]:
     """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts."""
     out_dir = Path(out_dir)

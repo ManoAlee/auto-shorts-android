@@ -1864,7 +1864,7 @@ def make_handler(out_dir: Path):
                 streamer_name = str(body.get("streamer") or "Davy Jones").strip()
                 direct_url = str(body.get("url") or "").strip() or None
                 hook_banner = str(body.get("hook_banner") or "").strip() or None
-                clip_duration = float(body.get("clip_duration") or 30.0)
+                clip_duration = float(body.get("clip_duration") or 50.0)
                 num_clips = int(body.get("num_clips") or 3)
 
                 target = next((t for t in GTA6_LAUNCH_WATCHLIST if t.name.lower() == streamer_name.lower()), None)
