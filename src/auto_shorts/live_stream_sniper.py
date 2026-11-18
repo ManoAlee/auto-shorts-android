@@ -301,8 +301,9 @@ def snip_streamer_highlight(
     hook_banner: Optional[str] = None,
     clip_duration: float = 30.0,
     direct_url: Optional[str] = None,
+    num_clips: int = 3,
 ) -> Optional[Dict[str, Any]]:
-    """Snip a live reaction from a streamer and generate a publishable Short pack."""
+    """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -315,14 +316,17 @@ def snip_streamer_highlight(
     timestamp_tag = int(time.time())
     raw_sample = out_dir / f"live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}_raw.mp4"
 
-    # 1. Download live sample
-    ok = download_live_chunk(stream_url, raw_sample, duration_sec=45)
+    # 1. Download live sample proportional to requested clips
+    requested_clips = max(1, min(5, int(num_clips)))
+    buffer_sec = max(50, min(300, int(requested_clips * (clip_duration + 12))))
+    ok = download_live_chunk(stream_url, raw_sample, duration_sec=buffer_sec)
     if not ok or not raw_sample.is_file():
         return None
 
-    # 2. Extract PCM audio and find reaction spike
+    # 2. Extract PCM audio and find non-overlapping reaction spikes
     analyzer = AudioEnergyAnalyzer(sample_rate=16000, spike_threshold_db=5.0, min_absolute_db=-25.0)
-    best_start = 2.0
+    selected_starts: List[float] = []
+
     try:
         ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
         pcm_cmd = [
@@ -330,37 +334,111 @@ def snip_streamer_highlight(
             "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
             "-f", "s16le", "-"
         ]
-        pcm_proc = subprocess.run(pcm_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=20)
+        pcm_proc = subprocess.run(pcm_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30)
         raw_pcm = pcm_proc.stdout
         chunk_size = 16000 * 2  # 1 second
-        spikes = []
+        spikes: List[Tuple[float, float]] = []
         for i in range(0, len(raw_pcm), chunk_size):
             chunk = raw_pcm[i:i + chunk_size]
-            sec = i // chunk_size
+            sec = float(i // chunk_size)
             is_spike, cur_db, avg_db = analyzer.evaluate_frame(chunk)
             if is_spike:
                 spikes.append((sec, cur_db))
-        if spikes:
-            spikes.sort(key=lambda s: s[1], reverse=True)
-            peak_sec = spikes[0][0]
-            best_start = max(1.0, peak_sec - 2.0)
+
+        # Sort spikes by energy and greedily pick non-overlapping reaction points
+        spikes.sort(key=lambda s: s[1], reverse=True)
+        min_spacing = max(20.0, clip_duration - 4.0)
+
+        for sec, _ in spikes:
+            start_cand = max(1.0, sec - 2.0)
+            if not any(abs(start_cand - exist) < min_spacing for exist in selected_starts):
+                selected_starts.append(start_cand)
+                if len(selected_starts) >= requested_clips:
+                    break
     except Exception:
-        best_start = 2.0
+        pass
 
-    best_start = min(best_start, 12.0)
+    # If audio spikes were insufficient, space clips uniformly across the recorded buffer
+    step = clip_duration + 5.0
+    cand_offset = 2.0
+    while len(selected_starts) < requested_clips and (cand_offset + clip_duration) <= (buffer_sec - 2.0):
+        if not any(abs(cand_offset - exist) < (clip_duration - 2.0) for exist in selected_starts):
+            selected_starts.append(cand_offset)
+        cand_offset += step
 
-    # 3. Render 9:16 Short
-    out_mp4 = out_dir / f"short_live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}.mp4"
-    banner_text = hook_banner or f"{target.name.upper()}: A REAÇÃO AO GTA 6!"
-    rendered = render_gamer_clip(
-        source_video=raw_sample,
-        output_mp4=out_mp4,
-        start_sec=best_start,
-        duration_sec=clip_duration,
-        hook_banner=banner_text,
-        streamer_name=target.name,
-        facecam_pos=target.default_facecam_pos,
-    )
+    if not selected_starts:
+        selected_starts = [2.0]
+
+    selected_starts.sort()
+
+    # 3. Render each Short segment with dedicated hooks
+    banner_presets = [
+        f"{target.name.upper()}: O INÍCIO DO GTA 6!",
+        f"{target.name.upper()}: A REAÇÃO ÉPICA NO GTA 6!",
+        f"{target.name.upper()}: INSANO NO GTA 6!",
+        f"{target.name.upper()}: MOMENTO HISTÓRICO GTA 6!",
+        f"{target.name.upper()}: NUNCA VISTO NO GTA 6!",
+    ]
+
+    generated_clips: List[Dict[str, Any]] = []
+
+    for idx, start_sec in enumerate(selected_starts, start=1):
+        suffix = f"_p{idx:02d}" if len(selected_starts) > 1 else ""
+        out_mp4 = out_dir / f"short_live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}{suffix}.mp4"
+
+        if hook_banner and len(selected_starts) > 1:
+            current_banner = f"{hook_banner} (Parte {idx})"
+        elif hook_banner:
+            current_banner = hook_banner
+        else:
+            current_banner = banner_presets[(idx - 1) % len(banner_presets)]
+
+        rendered = render_gamer_clip(
+            source_video=raw_sample,
+            output_mp4=out_mp4,
+            start_sec=start_sec,
+            duration_sec=clip_duration,
+            hook_banner=current_banner,
+            streamer_name=target.name,
+            facecam_pos=target.default_facecam_pos,
+        )
+
+        if rendered and out_mp4.is_file() and out_mp4.stat().st_size > 50000:
+            part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
+            clean_title = f"{target.name} Reage ao GTA 6{part_str} | Gameplay Ao Vivo #Shorts"
+            caption = (
+                f"A reação do {target.name} jogando GTA 6 ao vivo no lançamento!{part_str}\n\n"
+                f"Transmissão original: {title_source}\n"
+                f"Canal do streamer: {target.channel_url}\n\n"
+                f"#GTA6 #DavyJones #GameplayRJ #GTA6Gameplay #ShortsBrasil #Games #AleplayTV"
+            )
+            hashtags = ["#GTA6", "#DavyJones", "#GameplayRJ", "#GTA6Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
+            created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+            pack_data = {
+                "title": clean_title,
+                "caption": caption,
+                "hashtags": hashtags,
+                "niche": "games_gta6",
+                "playlist": "Games e GTA 6 - Shorts",
+                "composite_score": 115.0,
+                "opus_score": 95,
+                "channel_algo_score": 98,
+                "streamer": target.name,
+                "source_url": stream_url,
+                "part": idx,
+                "total_parts": len(selected_starts),
+                "created_at": created_iso,
+            }
+            publish_json = out_mp4.with_suffix(".publish.json")
+            publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+            generated_clips.append({
+                "video_path": str(out_mp4),
+                "publish_path": str(publish_json),
+                "title": clean_title,
+                "pack": pack_data,
+            })
 
     # Clean up raw sample
     try:
@@ -368,51 +446,27 @@ def snip_streamer_highlight(
     except Exception:
         pass
 
-    if not rendered or not out_mp4.is_file():
+    if not generated_clips:
         return None
 
-    # 4. Generate metadata & .publish.json
-    clean_title = f"{target.name} Reage ao GTA 6 | Gameplay Ao Vivo #Shorts"
-    caption = (
-        f"A reação do {target.name} jogando GTA 6 ao vivo no lançamento!\n\n"
-        f"Transmissão original: {title_source}\n"
-        f"Canal do streamer: {target.channel_url}\n\n"
-        f"#GTA6 #DavyJones #GameplayRJ #GTA6Gameplay #ShortsBrasil #Games"
-    )
-    hashtags = ["#GTA6", "#DavyJones", "#GameplayRJ", "#GTA6Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
-
-    created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
-    pack_data = {
-        "title": clean_title,
-        "caption": caption,
-        "hashtags": hashtags,
-        "niche": "games_gta6",
-        "playlist": "Games e GTA 6 - Shorts",
-        "composite_score": 115.0,
-        "opus_score": 95,
-        "channel_algo_score": 98,
-        "streamer": target.name,
-        "source_url": stream_url,
-        "created_at": created_iso,
-    }
-    publish_json = out_mp4.with_suffix(".publish.json")
-    publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
-
+    first = generated_clips[0]
     return {
-        "video_path": str(out_mp4),
-        "publish_path": str(publish_json),
-        "title": clean_title,
-        "pack": pack_data,
+        "clips": generated_clips,
+        "count": len(generated_clips),
+        "video_path": first["video_path"],
+        "publish_path": first["publish_path"],
+        "title": first["title"],
+        "pack": first["pack"],
     }
 
 
-def probe_and_snip_gta6_watchlist(out_dir: str | Path) -> Optional[Dict[str, Any]]:
-    """Scan all streamers in the GTA6 launch watchlist and snip the first active live."""
+def probe_and_snip_gta6_watchlist(out_dir: str | Path, num_clips: int = 3) -> Optional[Dict[str, Any]]:
+    """Scan all streamers in the GTA6 launch watchlist and snip multiple highlights from the first active live."""
     for target in GTA6_LAUNCH_WATCHLIST:
         try:
             live_meta = check_streamer_is_live(target.channel_url)
             if live_meta:
-                res = snip_streamer_highlight(target, out_dir=out_dir)
+                res = snip_streamer_highlight(target, out_dir=out_dir, num_clips=num_clips)
                 if res:
                     return res
         except Exception:

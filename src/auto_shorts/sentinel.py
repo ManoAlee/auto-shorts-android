@@ -395,12 +395,13 @@ class DriveSentinelEngine:
                 try:
                     from .live_stream_sniper import probe_and_snip_gta6_watchlist
                     logger.info("DriveSentinel probing active GTA 6 / Gamer live streams...")
-                    sniper_res = probe_and_snip_gta6_watchlist(out_dir=self.out_dir)
+                    sniper_res = probe_and_snip_gta6_watchlist(out_dir=self.out_dir, num_clips=self.num_clips_per_episode)
                     if sniper_res and sniper_res.get("video_path"):
                         fb = {
                             "output": sniper_res["video_path"],
                             "title": sniper_res.get("title", ""),
                             "pack": sniper_res.get("pack", {}),
+                            "clips": sniper_res.get("clips", []),
                         }
                 except Exception as sniper_err:
                     logger.warning("Sentinel live sniper probe failed: %s; falling back to standard pipeline", sniper_err)
