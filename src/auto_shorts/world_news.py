@@ -479,7 +479,8 @@ def _clean_seo_title(title: str, max_chars: int = 76, suffix: str = " | Mundo Ho
         "com", "para", "por", "que", "se", "a", "o", "as", "os", "um", "uma", "uns", "umas",
         "sem", "sob", "sobre", "modo", "como", "da?", "de?", "do?", "e?",
         "pede", "diz", "afirma", "revela", "mostra", "faz", "vai", "pode", "quer", "tem",
-        "astro", "após", "entre", "contra", "até", "desde",
+        "astro", "após", "entre", "contra", "até", "desde", "durante", "enquanto",
+        "segundo", "mediante", "perante", "além", "através",
     }
     words = clipped.split()
     while words and (words[-1].lower().strip(",.:;!?—–-") in dangling_words or re.search(r"[,.:;!?—–-]$", words[-1])):
@@ -851,21 +852,37 @@ def _build_news_backdrop_video(image_url: str, work_dir: Path, duration_sec: flo
     return out_bg
 
 
-def _wrap_news_headline(text: str, line_chars: int = 34, max_lines: int = 2) -> str:
+def _wrap_news_headline(text: str, line_chars: int = 34, max_lines: int = 3) -> str:
     words = " ".join((text or "").split()).split()
     lines: List[str] = []
     cur: List[str] = []
-    for w in words:
+    truncated = False
+    for idx, w in enumerate(words):
         cand = " ".join([*cur, w])
         if len(cand) > line_chars and cur:
             lines.append(" ".join(cur))
             cur = [w]
             if len(lines) >= max_lines:
+                truncated = True
                 break
         else:
             cur.append(w)
     if cur and len(lines) < max_lines:
         lines.append(" ".join(cur))
+    elif cur and len(lines) >= max_lines:
+        truncated = True
+    # Avoid ending a truncated headline on a dangling PT-BR preposition/article
+    if truncated and lines:
+        dangling = {
+            "de", "da", "do", "das", "dos", "em", "na", "no", "nas", "nos",
+            "a", "o", "as", "os", "e", "ou", "com", "sem", "para", "por",
+            "pelo", "pela", "que", "um", "uma", "durante", "após", "entre",
+            "contra", "sobre", "até", "desde", "segundo", "enquanto",
+        }
+        last_words = lines[-1].split()
+        while len(last_words) > 1 and last_words[-1].lower().strip(",.:;!?—–-") in dangling:
+            last_words.pop()
+        lines[-1] = " ".join(last_words).rstrip(",.:;—–-")
     return "\n".join(lines)
 
 
@@ -916,23 +933,23 @@ def _build_news_over_gameplay_video(
     font_path = find_default_font()
     safe_font = escape_ffmpeg_filter_path(font_path) if font_path else ""
     src_badge = _escape_dt(f"MUNDO HOJE • {source_name}".upper()[:32])
-    headline = _escape_dt(_wrap_news_headline(pt_title, line_chars=30 if has_thumb else 40, max_lines=2))
+    headline = _escape_dt(_wrap_news_headline(pt_title, line_chars=30 if has_thumb else 42, max_lines=3))
     text_x = 224 if has_thumb else 44
 
     card_filters = [
         "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,eq=brightness=-0.05:contrast=1.08",
-        # Safe zone: card starts at Y=140 to remain strictly below phone notch, status bar & TikTok/Reels top bar
-        "drawbox=x=24:y=140:w=672:h=140:color=0x0B0F19@0.88:t=fill",
-        "drawbox=x=24:y=140:w=672:h=4:color=0xCC0000:t=fill",
+        # Safe zone: symmetric centered card strictly below phone notch, status bar & TikTok/Reels top bar
+        "drawbox=x=28:y=138:w=664:h=156:color=0x0B0F19@0.90:t=fill",
+        "drawbox=x=28:y=138:w=664:h=4:color=0xCC0000:t=fill",
     ]
     if safe_font:
         card_filters.append(
             f"drawtext=fontfile='{safe_font}':text='{src_badge}':"
-            f"fontsize=17:fontcolor=white:box=1:boxcolor=0xCC0000@0.95:boxborderw=6:x={text_x}:y=156"
+            f"fontsize=16:fontcolor=white:box=1:boxcolor=0xCC0000@0.95:boxborderw=6:x={text_x}:y=154"
         )
         card_filters.append(
             f"drawtext=fontfile='{safe_font}':text='{headline}':"
-            f"fontsize=20:fontcolor=white:borderw=2:bordercolor=black:line_spacing=6:x={text_x}:y=194"
+            f"fontsize=19:fontcolor=white:borderw=2:bordercolor=black:line_spacing=5:x={text_x}:y=188"
         )
 
     base_chain = ",".join(card_filters)

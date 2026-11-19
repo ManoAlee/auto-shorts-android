@@ -3,13 +3,46 @@
 from __future__ import annotations
 
 
-def render_analytics_dashboard_html() -> str:
-    return """<!doctype html>
+def render_analytics_dashboard_html(canonical_url: str = "/analytics") -> str:
+    base_url = canonical_url.rsplit("/analytics", 1)[0] if "/analytics" in canonical_url else ""
+    home_url = f"{base_url}/" if base_url else "/"
+    template = """<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AutoShorts Analytics &amp; Radar Global</title>
+  <title>Analytics Multiplataforma &amp; Radar de Tendências | AutoShorts</title>
+  <meta name="description" content="Acompanhe métricas de retenção, visualizações e tendências globais em tempo real para YouTube Shorts, TikTok e Instagram Reels no AutoShorts Studio." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="__CANONICAL_URL__" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#0b0f17" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="AutoShorts Studio" />
+  <meta property="og:title" content="Analytics Multiplataforma &amp; Radar de Tendências | AutoShorts" />
+  <meta property="og:description" content="Painel de telemetria e radar de tendências globais para escalar vídeos verticais no YouTube Shorts, TikTok e Reels." />
+  <meta property="og:url" content="__CANONICAL_URL__" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Analytics Multiplataforma &amp; Radar de Tendências | AutoShorts" />
+  <meta name="twitter:description" content="Métricas unificadas e radar de tendências globais para criadores de Shorts, Reels e TikTok." />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Analytics Multiplataforma & Radar de Tendências",
+    "url": "__CANONICAL_URL__",
+    "inLanguage": "pt-BR",
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "AutoShorts Studio", "item": "__HOME_URL__"},
+        {"@type": "ListItem", "position": 2, "name": "Analytics & Radar Global", "item": "__CANONICAL_URL__"}
+      ]
+    }
+  }
+  </script>
   <style>
     :root {
       --bg: #0b0f17;
@@ -292,4 +325,5 @@ def render_analytics_dashboard_html() -> str:
 </body>
 </html>
 """
+    return template.replace("__CANONICAL_URL__", canonical_url).replace("__HOME_URL__", home_url)
 

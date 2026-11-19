@@ -547,17 +547,28 @@ def snip_streamer_highlight(
             part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
             clean_title = f"{target.name} Reage ao GTA 6{part_str} | Gameplay Ao Vivo #Shorts"
             clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
-            hashtags = ["#GTA6", clean_tag, "#GTA6Gameplay", "#Gameplay", "#ShortsBrasil", "#Games", "#AleplayTV"]
+            # SEO-compliant 5-tag cap (satisfies YouTube 3-5, IG max 5, and TikTok discovery)
+            hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
+            clean_title = f"GTA 6 Ao Vivo: {target.name}{part_str} | Gameplay #Shorts"
             caption = (
-                f"A reação do {target.name} jogando GTA 6 ao vivo no lançamento!{part_str}\n\n"
+                f"{target.name} jogando GTA 6 ao vivo no lançamento!{part_str}\n\n"
                 f"Transmissão original: {title_source}\n"
                 f"Canal do streamer: {target.channel_url}\n\n"
                 f"{' '.join(hashtags)}"
             )
             created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
+            from .cross_platform_adapter import adapt_short_for_all_platforms
+            multi_platform = adapt_short_for_all_platforms(
+                title=clean_title.replace(" #Shorts", ""),
+                body_text=f"Reação de {target.name} jogando GTA 6 ao vivo no lançamento. {title_source}",
+                niche="games_gta6",
+                hook_banner=current_banner[:42],
+                source_url=target.channel_url,
+            )
 
             pack_data = {
                 "title": clean_title,
+                "hook_title": current_banner[:42],
                 "caption": caption,
                 "hashtags": hashtags,
                 "niche": "games_gta6",
@@ -571,6 +582,7 @@ def snip_streamer_highlight(
                 "total_parts": len(selected_starts),
                 "created_at": created_iso,
                 "queued_for_auto_publish": True,
+                "multi_platform": multi_platform,
             }
             publish_json = out_mp4.with_suffix(".publish.json")
             publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")

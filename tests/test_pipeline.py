@@ -169,7 +169,7 @@ def test_ass_generation_and_ffmpeg_command_safety(tmp_path):
     assert "C\\:/tmp/subs_01.ass" == escaped
 
     vf = build_video_filter("blur_bg", 720, 1280, ass_path=ass_path, hook_title="SEGREDO: 3 PASSOS", font_path="/tmp/font.ttf")
-    assert "boxblur=22:3" in vf
+    assert "scale=48:86,scale=720:1280:flags=bilinear" in vf
     assert "fontfile=" in vf
     assert "font=" not in vf.replace("fontfile=", "")
 

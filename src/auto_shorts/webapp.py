@@ -210,7 +210,45 @@ def _load_frontend_bundle() -> str:
     )
 
 
-def render_dashboard_html(out_dir: str | Path = "output") -> str:
+def render_robots_txt(base_url: str = "") -> str:
+    """Generate standards-compliant robots.txt allowing public UI and blocking private APIs."""
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Allow: /analytics",
+        "Disallow: /api/",
+        "Disallow: /mcp",
+        "Disallow: /v1/",
+        "Disallow: /media/",
+    ]
+    clean_base = (base_url or "").strip().rstrip("/")
+    if clean_base.startswith(("http://", "https://")):
+        lines.append(f"Sitemap: {clean_base}/sitemap.xml")
+    return "\n".join(lines) + "\n"
+
+
+def render_sitemap_xml(base_url: str = "http://127.0.0.1:8787") -> str:
+    """Generate valid XML sitemap for the public studio surface."""
+    clean_base = (base_url or "http://127.0.0.1:8787").strip().rstrip("/")
+    today = time.strftime("%Y-%m-%d")
+    urls = [
+        (f"{clean_base}/", "daily", "1.0"),
+        (f"{clean_base}/analytics", "daily", "0.8"),
+    ]
+    entries = "\n".join(
+        f"  <url>\n    <loc>{html.escape(u)}</loc>\n    <lastmod>{today}</lastmod>\n"
+        f"    <changefreq>{freq}</changefreq>\n    <priority>{prio}</priority>\n  </url>"
+        for u, freq, prio in urls
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}\n"
+        "</urlset>\n"
+    )
+
+
+def render_dashboard_html(out_dir: str | Path = "output", canonical_url: str = "/") -> str:
     niche_opts = ['<option value="all">Todos os nichos (rotacao automatica)</option>']
     for key, profile in NICHES.items():
         selected = ' selected' if key == "podcast" else ""
@@ -238,6 +276,7 @@ def render_dashboard_html(out_dir: str | Path = "output") -> str:
         .replace("__VOICE_OPTIONS__", "".join(voice_opts))
         .replace("__BG_OPTIONS__", "".join(bg_opts))
         .replace("__TTS_ENGINE__", html.escape(active_tts_engine_label()))
+        .replace("__CANONICAL_URL__", html.escape(canonical_url))
     )
 
 
@@ -868,6 +907,14 @@ def make_handler(out_dir: Path):
                         return None
             return "DENY"
 
+        def _resolve_base_url(self) -> str:
+            fixed = _read_tunnel_url(out_dir)
+            if fixed and fixed.startswith(("http://", "https://")):
+                return fixed.rstrip("/")
+            host = (self.headers.get("Host") or "127.0.0.1:8787").strip()
+            proto = (self.headers.get("X-Forwarded-Proto") or "http").strip()
+            return f"{proto}://{host}".rstrip("/")
+
         def do_GET(self):
             parsed = urllib.parse.urlparse(self.path)
             auth_res = self._check_tunnel_auth(parsed)
@@ -875,7 +922,8 @@ def make_handler(out_dir: Path):
                 self._send_json(403, {"message": "Acesso externo exige token valido do tunel."})
                 return
             if parsed.path == "/":
-                body = render_dashboard_html(out_dir=out_dir).encode("utf-8")
+                canonical = f"{self._resolve_base_url()}/"
+                body = render_dashboard_html(out_dir=out_dir, canonical_url=canonical).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -883,6 +931,24 @@ def make_handler(out_dir: Path):
                     self.send_header("Set-Cookie", f"studio_tok={auth_res}; Path=/; HttpOnly; SameSite=Lax")
                 self.end_headers()
                 self._safe_write(body)
+                return
+
+            if parsed.path == "/robots.txt":
+                txt = render_robots_txt(self._resolve_base_url()).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(txt)))
+                self.end_headers()
+                self._safe_write(txt)
+                return
+
+            if parsed.path == "/sitemap.xml":
+                xml = render_sitemap_xml(self._resolve_base_url()).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/xml; charset=utf-8")
+                self.send_header("Content-Length", str(len(xml)))
+                self.end_headers()
+                self._safe_write(xml)
                 return
 
             if parsed.path == "/favicon.ico":
@@ -893,7 +959,7 @@ def make_handler(out_dir: Path):
             if parsed.path == "/icon.svg":
                 svg = (
                     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'>"
-                    "<rect width='192' height='192' rx='40' fill='#CC0000'/>"
+                    "<rect width='192' height='192' rx='40' fill='#2563EB'/>"
                     "<polygon points='76,54 144,96 76,138' fill='#FFFFFF'/>"
                     "</svg>"
                 ).encode("utf-8")
@@ -906,12 +972,14 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/manifest.webmanifest":
                 manifest = {
-                    "name": "YouTube Studio — AutoShorts Mobile",
+                    "name": "AutoShorts Studio — Criador IA de Shorts, Reels e TikTok",
                     "short_name": "AutoShorts",
+                    "description": "Produção autônoma de YouTube Shorts, TikTok e Reels em 9:16 com voz PT-BR e corte de lives.",
+                    "lang": "pt-BR",
                     "start_url": "/",
                     "display": "standalone",
-                    "background_color": "#F9F9F9",
-                    "theme_color": "#CC0000",
+                    "background_color": "#070B12",
+                    "theme_color": "#070B12",
                     "icons": [
                         {"src": "/icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable"},
                         {"src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable"},
@@ -1022,7 +1090,8 @@ def make_handler(out_dir: Path):
 
             if parsed.path == "/analytics":
                 from .analytics_ui import render_analytics_dashboard_html
-                html = render_analytics_dashboard_html().encode("utf-8")
+                canonical = f"{self._resolve_base_url()}/analytics"
+                html = render_analytics_dashboard_html(canonical_url=canonical).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(html)))

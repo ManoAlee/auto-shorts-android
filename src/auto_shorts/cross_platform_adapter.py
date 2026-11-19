@@ -71,6 +71,21 @@ NICHE_TAG_POOLS: Dict[str, Dict[str, List[str]]] = {
         "tiktok": ["#GamerBrasil", "#GTA6", "#Gaming", "#Clipada"],
         "youtube": ["#Shorts", "#Gaming", "#GTA6"],
     },
+    "games_gta6": {
+        "instagram": ["#GTA6", "#GTA6Gameplay", "#GamerBrasil", "#GameplayAoVivo", "#ClipsGamer"],
+        "tiktok": ["#GTA6", "#GTA6Gameplay", "#GamerBrasil", "#Clipada"],
+        "youtube": ["#Shorts", "#GTA6", "#GTA6Gameplay"],
+    },
+    "desenvolvimento_pessoal": {
+        "instagram": ["#DesenvolvimentoPessoal", "#Mentalidade", "#PodcastBrasil", "#Produtividade", "#Sucesso"],
+        "tiktok": ["#DesenvolvimentoPessoal", "#Mentalidade", "#CortesDePodcast", "#MindsetBR"],
+        "youtube": ["#Shorts", "#DesenvolvimentoPessoal", "#PodcastBrasil"],
+    },
+    "podcast": {
+        "instagram": ["#PodcastBrasil", "#CortesDePodcast", "#Mentalidade", "#Reflexao", "#Entrevista"],
+        "tiktok": ["#CortesDePodcast", "#PodcastBrasil", "#CortesPodcast", "#ViralBR"],
+        "youtube": ["#Shorts", "#PodcastBrasil", "#CortesDePodcast"],
+    },
     "humor_memes": {
         "instagram": ["#MemesBrasil", "#ComediaBR", "#Humor", "#Risos", "#Engracado"],
         "tiktok": ["#MemesBrasil", "#HumorBR", "#Comedia", "#Engracado"],

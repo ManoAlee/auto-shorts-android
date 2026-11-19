@@ -123,10 +123,10 @@ def test_thumbnail_and_video_safe_zones():
     badge_y = int(m_badge.group(1))
     assert badge_y >= 140, f"Thumbnail badge Y ({badge_y}) is in unsafe top bar zone (< 140)"
 
-    # 2. Video hook banner on 720x1280 must position hook pill in top safe zone (>= 150px)
+    # 2. Video hook banner on 720x1280 must position hook card in top safe zone (>= 150px)
     vid_vf = build_video_filter(layout="blur_bg", width=720, height=1280, hook_title="DESENVOLVEDOR PS5 DÁ A REAL", font_path="C:/Windows/Fonts/arialbd.ttf")
-    m_hook = re.search(r"boxcolor=0x0B0F19@0.80.*?:y=(\d+)", vid_vf)
-    assert m_hook, "Hook banner drawtext not found"
+    m_hook = re.search(r"drawbox=x=\d+:y=(\d+):w=\d+:h=\d+:color=0x0B0F19@0\.86", vid_vf)
+    assert m_hook, "Hook banner card drawbox not found"
     hook_y = int(m_hook.group(1))
     assert hook_y >= 150, f"Hook banner Y ({hook_y}) is in unsafe top bar zone (< 150)"
 
