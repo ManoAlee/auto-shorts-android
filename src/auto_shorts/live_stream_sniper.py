@@ -38,7 +38,7 @@ GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
         name="Davy Jones",
         channel_url="https://www.youtube.com/@gameplayrj/live",
         platform="youtube",
-        default_facecam_pos="top_left",
+        default_facecam_pos="none",  # Gameplay walkthroughs without facecam
         niche="games_gta6",
     ),
     StreamerTarget(
@@ -80,14 +80,14 @@ GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
         name="LipaoGamer",
         channel_url="https://www.youtube.com/@LipaoGamer/live",
         platform="youtube",
-        default_facecam_pos="top_right",
+        default_facecam_pos="none",  # GTA gameplay without facecam
         niche="games_gta6",
     ),
     StreamerTarget(
         name="BRKsEDU",
         channel_url="https://www.youtube.com/@BRKsEDU/live",
         platform="youtube",
-        default_facecam_pos="top_left",
+        default_facecam_pos="none",  # Gameplay walkthroughs without facecam
         niche="games_gta6",
     ),
     StreamerTarget(
@@ -149,18 +149,50 @@ class AudioEnergyAnalyzer:
         return is_spike, round(cur_db, 1), round(avg_db, 1)
 
 
+def _format_banner_lines(banner: str, max_chars: int = 28) -> Tuple[str, str]:
+    """Split viral hook into 1 or 2 balanced typographic lines for mobile screens."""
+    clean = " ".join((banner or "").strip().split())
+    if len(clean) <= max_chars or " " not in clean:
+        return clean, ""
+    words = clean.split()
+    if len(words) <= 3:
+        return clean, ""
+    mid = len(words) // 2
+    return " ".join(words[:mid]), " ".join(words[mid:])
+
+
 def build_gamer_split_filter(
     facecam_pos: str = "bottom_right",
     facecam_pct: float = 0.34,
     canvas_w: int = 1080,
     canvas_h: int = 1920,
+    layout_mode: str = "auto",
 ) -> str:
-    """Build high-retention 9:16 Gamer Split-Screen FFmpeg filtergraph.
+    """Build high-retention 9:16 Gamer FFmpeg filtergraph for mobile feeds.
 
-    Top: Streamer Facecam (scaled & cropped to 1080x650)
-    Bottom: Centered 16:9 Gameplay (scaled & cropped to 1080x1270)
-    Accented with subtle divider bar.
+    - If layout_mode == 'ambient' or facecam_pos in ('none', None, ''):
+      Dynamic ambient blur background filling 1080x1920 with centered 16:9 gameplay.
+      Zero distortion, zero weird cropped corners, 100% of game UI & action visible.
+    - If layout_mode == 'split' or facecam_pos has webcam coordinates:
+      Top: Streamer Facecam (scaled & cropped to 1080x650)
+      Bottom: Centered 16:9 Gameplay (scaled & cropped to 1080x1270)
+      Accented with divider bar.
     """
+    is_ambient = (layout_mode == "ambient") or (facecam_pos in ("none", None, ""))
+
+    if is_ambient:
+        return (
+            f"[0:v]split=2[bg_raw][fg_raw];"
+            f"[bg_raw]scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
+            f"crop={canvas_w}:{canvas_h},"
+            f"boxblur=28:5,"
+            f"eq=brightness=-0.22:contrast=1.08:saturation=1.15[bg_blur];"
+            f"[fg_raw]scale={canvas_w}:-2[fg_scaled];"
+            f"[bg_blur][fg_scaled]overlay=0:(H-h)/2[v_base];"
+            f"[v_base]drawbox=x=0:y=(ih-round(iw*9/16))/2-2:w=iw:h=2:color=0xFFD700@0.65:t=fill,"
+            f"drawbox=x=0:y=(ih+round(iw*9/16))/2:w=iw:h=2:color=0xFFD700@0.65:t=fill[v_out]"
+        )
+
     top_h = int(canvas_h * facecam_pct)
     # Ensure even heights for YUV420p
     top_h = top_h if top_h % 2 == 0 else top_h + 1
@@ -268,41 +300,87 @@ def render_gamer_clip(
     streamer_name: str = "Alanzoka",
     facecam_pos: str = "bottom_right",
     ass_subtitle_path: Optional[str | Path] = None,
+    layout_mode: str = "auto",
 ) -> bool:
-    """Render a standalone 9:16 gamer short with facecam split, banner, and loudnorm."""
+    """Render a standalone 9:16 gamer short with facecam split or ambient immersion, viral banner, and loudnorm."""
     ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
     src = str(source_video)
     out = str(output_mp4)
 
-    filter_complex = build_gamer_split_filter(facecam_pos=facecam_pos, facecam_pct=0.34)
+    is_ambient = (layout_mode == "ambient") or (facecam_pos in ("none", None, ""))
+    filter_complex = build_gamer_split_filter(
+        facecam_pos=facecam_pos,
+        facecam_pct=0.34,
+        layout_mode=layout_mode,
+    )
     v_last = "v_out"
 
-    # Add hook banner at the seam between webcam and gameplay
     font_path = find_default_font()
     if font_path:
         font_path_esc = str(font_path).replace("\\", "/").replace(":", "\\:")
         font_arg = f":fontfile='{font_path_esc}'"
     else:
         font_arg = ""
+
     safe_banner = hook_banner.replace("'", "").replace(":", "\\:").upper()
-
-    top_h = int(1920 * 0.34)
-    top_h = top_h if top_h % 2 == 0 else top_h + 1
-
     safe_streamer = streamer_name.replace("'", "").replace(":", "\\:").upper()
+    line1, line2 = _format_banner_lines(safe_banner, max_chars=26)
 
-    banner_filter = (
-        # 1. Sleek Live broadcast badge at top-left
-        f";[{v_last}]drawbox=x=28:y=28:w=380:h=52:color=0x000000@0.75:t=fill,"
-        f"drawtext=text='AO VIVO | {safe_streamer}'{font_arg}:fontcolor=0xFF4444:fontsize=24:"
-        f"x=44:y=42[v_badge]"
-        # 2. Viral Hook banner at divider seam
-        f";[v_badge]drawbox=x=(w-980)/2:y={top_h + 16}:w=980:h=90:color=0x000000@0.75:t=fill,"
-        f"drawtext=text='{safe_banner}'{font_arg}:fontcolor=0x00FFFF:fontsize=44:"
-        f"x=(w-text_w)/2:y={top_h + 38}[v_banner]"
-        # 3. Bottom interface safe-zone scrim to protect in-game subtitles from TikTok/Shorts UI
-        f";[v_banner]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
-    )
+    if is_ambient:
+        # AMBIENT IMMERSION (Streamers without webcam or pure gameplay focus)
+        # Centered 16:9 gameplay at native aspect ratio.
+        # Top space (y=120..640) has Broadcaster Badge + High-Impact Viral Hook Card.
+        # Bottom space (y=1280..1800) has Call to Action & safe scrim.
+        if line2:
+            hook_text_filters = (
+                f"drawtext=text='{line1}'{font_arg}:fontcolor=0xFFD700:fontsize=40:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y=245,"
+                f"drawtext=text='{line2}'{font_arg}:fontcolor=0xFFFFFF:fontsize=36:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y=310"
+            )
+        else:
+            hook_text_filters = (
+                f"drawtext=text='{line1}'{font_arg}:fontcolor=0xFFD700:fontsize=42:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y=280"
+            )
+
+        banner_filter = (
+            # 1. Broadcaster Live Pill centered at y=130
+            f";[{v_last}]drawbox=x=(iw-480)/2:y=130:w=480:h=56:color=0xCC0000@0.95:t=fill,"
+            f"drawbox=x=(iw-480)/2:y=130:w=480:h=56:color=0xFFD700@0.9:t=2,"
+            f"drawtext=text='AO VIVO | {safe_streamer}'{font_arg}:fontcolor=white:fontsize=24:"
+            f"x=(w-text_w)/2:y=145[v_badge]"
+            # 2. Main Viral Hook Card centered at y=210..380
+            f";[v_badge]drawbox=x=(iw-1000)/2:y=210:w=1000:h=180:color=0x070B14@0.94:t=fill,"
+            f"drawbox=x=(iw-1000)/2:y=210:w=1000:h=6:color=0xFFD700:t=fill,"
+            f"{hook_text_filters}[v_banner]"
+            # 3. Bottom Accent & Engagement Card centered at y=1380
+            f";[v_banner]drawbox=x=(iw-880)/2:y=1380:w=880:h=76:color=0x070B14@0.88:t=fill,"
+            f"drawbox=x=(iw-880)/2:y=1380:w=880:h=4:color=0x00F0FF:t=fill,"
+            f"drawtext=text='LANCAMENTO HISTORICO | GTA 6 AO VIVO'{font_arg}:fontcolor=0x00F0FF:fontsize=26:"
+            f"borderw=2:bordercolor=black:x=(w-text_w)/2:y=1405[v_cta]"
+            # 4. TikTok UI bottom scrim
+            f";[v_cta]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
+        )
+    else:
+        # SPLIT-SCREEN (Streamer WITH facecam: Top webcam, Bottom gameplay)
+        top_h = int(1920 * 0.34)
+        top_h = top_h if top_h % 2 == 0 else top_h + 1
+        banner_filter = (
+            # 1. Sleek Live broadcast badge at top-left
+            f";[{v_last}]drawbox=x=32:y=120:w=420:h=56:color=0xCC0000@0.92:t=fill,"
+            f"drawbox=x=32:y=120:w=420:h=56:color=0xFFD700@0.9:t=2,"
+            f"drawtext=text='AO VIVO | {safe_streamer}'{font_arg}:fontcolor=white:fontsize=24:"
+            f"x=50:y=135[v_badge]"
+            # 2. Viral Hook banner at bottom of webcam (above divider line)
+            f";[v_badge]drawbox=x=(iw-1000)/2:y={top_h - 78}:w=1000:h=74:color=0x070B14@0.92:t=fill,"
+            f"drawbox=x=(iw-1000)/2:y={top_h - 4}:w=1000:h=4:color=0xFFD700:t=fill,"
+            f"drawtext=text='{safe_banner}'{font_arg}:fontcolor=0xFFD700:fontsize=36:"
+            f"borderw=2:bordercolor=black:x=(w-text_w)/2:y={top_h - 58}[v_banner]"
+            # 3. Bottom interface safe-zone scrim to protect in-game subtitles from TikTok/Shorts UI
+            f";[v_banner]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
+        )
+
     filter_complex += banner_filter
     v_last = "v_scrim"
 

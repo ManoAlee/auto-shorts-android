@@ -17,7 +17,7 @@ def test_watchlist_contains_major_streamers():
     assert "KaiCenat" in names
     for s in GTA6_LAUNCH_WATCHLIST:
         assert s.channel_url.startswith("http")
-        assert s.default_facecam_pos in ("top_left", "top_right", "bottom_left", "bottom_right")
+        assert s.default_facecam_pos in ("top_left", "top_right", "bottom_left", "bottom_right", "none")
 
 
 def test_audio_energy_analyzer_silence_vs_scream():
@@ -48,3 +48,10 @@ def test_build_gamer_split_filter():
     assert "vstack=inputs=2" in filt
     assert "1080" in filt
     assert "drawbox=" in filt
+
+    # Test ambient mode for streamers without webcam
+    filt_amb = build_gamer_split_filter(facecam_pos="none", canvas_w=1080, canvas_h=1920)
+    assert "[0:v]split=2" in filt_amb
+    assert "boxblur=" in filt_amb
+    assert "overlay=0:(H-h)/2" in filt_amb
+    assert "drawbox=" in filt_amb
