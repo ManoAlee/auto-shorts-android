@@ -52,6 +52,6 @@ def test_build_gamer_split_filter():
     # Test ambient mode for streamers without webcam
     filt_amb = build_gamer_split_filter(facecam_pos="none", canvas_w=1080, canvas_h=1920)
     assert "[0:v]split=2" in filt_amb
-    assert "boxblur=" in filt_amb
+    assert "scale=72:128" in filt_amb
     assert "overlay=0:(H-h)/2" in filt_amb
     assert "drawbox=" in filt_amb

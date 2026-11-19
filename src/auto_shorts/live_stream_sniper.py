@@ -45,7 +45,7 @@ GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
         name="Alanzoka",
         channel_url="https://www.twitch.tv/alanzoka",
         platform="twitch",
-        default_facecam_pos="bottom_right",
+        default_facecam_pos="none",  # Default to Ambient Immersion to prevent empty corner crops
         niche="games_gta6",
     ),
     StreamerTarget(
@@ -59,21 +59,21 @@ GTA6_LAUNCH_WATCHLIST: List[StreamerTarget] = [
         name="Paulinho o Loko",
         channel_url="https://www.twitch.tv/paulinhooloko",
         platform="twitch",
-        default_facecam_pos="bottom_right",
+        default_facecam_pos="none",
         niche="games_gta6",
     ),
     StreamerTarget(
         name="Coringa",
         channel_url="https://www.twitch.tv/loud_coringa",
         platform="twitch",
-        default_facecam_pos="top_right",
+        default_facecam_pos="none",
         niche="games_gta6",
     ),
     StreamerTarget(
         name="Casimiro",
         channel_url="https://www.twitch.tv/casimito",
         platform="twitch",
-        default_facecam_pos="bottom_left",
+        default_facecam_pos="none",
         niche="games_gta6",
     ),
     StreamerTarget(
@@ -185,7 +185,7 @@ def build_gamer_split_filter(
             f"[0:v]split=2[bg_raw][fg_raw];"
             f"[bg_raw]scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
             f"crop={canvas_w}:{canvas_h},"
-            f"boxblur=28:5,"
+            f"scale=72:128,scale={canvas_w}:{canvas_h}:flags=bilinear,"
             f"eq=brightness=-0.22:contrast=1.08:saturation=1.15[bg_blur];"
             f"[fg_raw]scale={canvas_w}:-2[fg_scaled];"
             f"[bg_blur][fg_scaled]overlay=0:(H-h)/2[v_base];"
@@ -357,7 +357,7 @@ def render_gamer_clip(
             # 3. Bottom Accent & Engagement Card centered at y=1380
             f";[v_banner]drawbox=x=(iw-880)/2:y=1380:w=880:h=76:color=0x070B14@0.88:t=fill,"
             f"drawbox=x=(iw-880)/2:y=1380:w=880:h=4:color=0x00F0FF:t=fill,"
-            f"drawtext=text='LANCAMENTO HISTORICO | GTA 6 AO VIVO'{font_arg}:fontcolor=0x00F0FF:fontsize=26:"
+            f"drawtext=text='LANÇAMENTO HISTÓRICO | GTA 6 AO VIVO'{font_arg}:fontcolor=0x00F0FF:fontsize=26:"
             f"borderw=2:bordercolor=black:x=(w-text_w)/2:y=1405[v_cta]"
             # 4. TikTok UI bottom scrim
             f";[v_cta]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
@@ -366,17 +366,32 @@ def render_gamer_clip(
         # SPLIT-SCREEN (Streamer WITH facecam: Top webcam, Bottom gameplay)
         top_h = int(1920 * 0.34)
         top_h = top_h if top_h % 2 == 0 else top_h + 1
+
+        if line2:
+            hook_split_draw = (
+                f"drawbox=x=(iw-1000)/2:y={top_h - 110}:w=1000:h=106:color=0x070B14@0.94:t=fill,"
+                f"drawbox=x=(iw-1000)/2:y={top_h - 4}:w=1000:h=4:color=0xFFD700:t=fill,"
+                f"drawtext=text='{line1}'{font_arg}:fontcolor=0xFFD700:fontsize=36:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y={top_h - 96},"
+                f"drawtext=text='{line2}'{font_arg}:fontcolor=0xFFFFFF:fontsize=30:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y={top_h - 50}[v_banner]"
+            )
+        else:
+            hook_split_draw = (
+                f"drawbox=x=(iw-1000)/2:y={top_h - 78}:w=1000:h=74:color=0x070B14@0.94:t=fill,"
+                f"drawbox=x=(iw-1000)/2:y={top_h - 4}:w=1000:h=4:color=0xFFD700:t=fill,"
+                f"drawtext=text='{line1}'{font_arg}:fontcolor=0xFFD700:fontsize=36:"
+                f"borderw=3:bordercolor=black:x=(w-text_w)/2:y={top_h - 58}[v_banner]"
+            )
+
         banner_filter = (
-            # 1. Sleek Live broadcast badge at top-left
-            f";[{v_last}]drawbox=x=32:y=120:w=420:h=56:color=0xCC0000@0.92:t=fill,"
-            f"drawbox=x=32:y=120:w=420:h=56:color=0xFFD700@0.9:t=2,"
+            # 1. Sleek Live broadcast badge centered at top
+            f";[{v_last}]drawbox=x=(iw-480)/2:y=120:w=480:h=56:color=0xCC0000@0.92:t=fill,"
+            f"drawbox=x=(iw-480)/2:y=120:w=480:h=56:color=0xFFD700@0.9:t=2,"
             f"drawtext=text='AO VIVO | {safe_streamer}'{font_arg}:fontcolor=white:fontsize=24:"
-            f"x=50:y=135[v_badge]"
+            f"x=(w-text_w)/2:y=135[v_badge]"
             # 2. Viral Hook banner at bottom of webcam (above divider line)
-            f";[v_badge]drawbox=x=(iw-1000)/2:y={top_h - 78}:w=1000:h=74:color=0x070B14@0.92:t=fill,"
-            f"drawbox=x=(iw-1000)/2:y={top_h - 4}:w=1000:h=4:color=0xFFD700:t=fill,"
-            f"drawtext=text='{safe_banner}'{font_arg}:fontcolor=0xFFD700:fontsize=36:"
-            f"borderw=2:bordercolor=black:x=(w-text_w)/2:y={top_h - 58}[v_banner]"
+            f";[v_badge]{hook_split_draw}"
             # 3. Bottom interface safe-zone scrim to protect in-game subtitles from TikTok/Shorts UI
             f";[v_banner]drawbox=x=0:y=1760:w=1080:h=160:color=0x000000@0.45:t=fill[v_scrim]"
         )
@@ -413,7 +428,8 @@ def render_gamer_clip(
     ]
 
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+        render_timeout = max(180, int(duration_sec * 3.5))
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=render_timeout)
         return res.returncode == 0 and os.path.isfile(out) and os.path.getsize(out) > 10000
     except Exception:
         return False
