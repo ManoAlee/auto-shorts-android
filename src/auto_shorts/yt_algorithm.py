@@ -34,7 +34,9 @@ def score_short_for_youtube_algorithm(
     else:
         tips.append("Encurte o banner do topo (hook) para 2 a 6 palavras (<= 42 chars) visiveis nos primeiros 1-3s.")
     if title and not title.lower().startswith("corte "):
-        hook_pts += 15
+        hook_pts += 15 if len(title) <= 62 else 12
+        if len(title) > 62:
+            tips.append("Mantenha o titulo abaixo de 55-60 caracteres para evitar truncamento no feed mobile.")
     else:
         tips.append("Troque o titulo generico 'Corte ...' por um titulo curioso com a palavra-chave nos primeiros 40 caracteres.")
     score += hook_pts
@@ -43,11 +45,11 @@ def score_short_for_youtube_algorithm(
     dur = float(v.get("duration") or 0.0)
     is_tiktok = "tiktok" in (str(p.get("platform") or "") + " " + str(p.get("output_path") or "") + " " + filename).lower()
     ret_pts = 0
-    if 13.0 <= dur <= 22.0 or 34.0 <= dur <= 58.0 or (is_tiktok and 60.0 <= dur <= 130.0):
+    if 15.0 <= dur <= 58.0 or (is_tiktok and 60.0 <= dur <= 130.0):
         ret_pts += 15
     elif 5.0 <= dur <= 60.0 or (is_tiktok and dur <= 180.0):
         ret_pts += 10
-        tips.append("Duracao ideal no algoritmo Shorts: 15-20s (alta conclusao) ou 35-55s (retencao narrativa).")
+        tips.append("Duracao ideal no algoritmo Shorts (2025/2026): 22-45s para equilibrar taxa de conclusao e rewatch.")
     elif dur > 60.0:
         tips.append("Video acima de 60s sofre risco de bloqueio por Content ID em musica e menor conclusao.")
 

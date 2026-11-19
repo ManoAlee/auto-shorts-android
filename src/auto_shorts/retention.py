@@ -32,11 +32,11 @@ RETENTION_PROFILES: Dict[str, RetentionProfile] = {
     ),
     "youtube_shorts": RetentionProfile(
         platform="youtube_shorts",
-        min_silence_sec=0.50,
-        pace_speed=1.03,
+        min_silence_sec=0.48,
+        pace_speed=1.04,
         punch_zoom=1.04,
-        target_min_sec=30,
-        target_max_sec=56,
+        target_min_sec=22,
+        target_max_sec=46,     # 2025/2026 Shorts completion & rewatch sweet spot (22-45s)
         reels_cta_hint="Se inscreve para acompanhar os proximos cortes e novidades todos os dias!",
     ),
     "tiktok_rewards": RetentionProfile(
@@ -55,10 +55,10 @@ def get_retention_profile(platform: str) -> RetentionProfile:
     return RETENTION_PROFILES.get(platform, RETENTION_PROFILES["instagram_reels"])
 
 
-def build_pattern_interrupt_filter(width: int, height: int, zoom: float = 1.05, interval_sec: int = 6) -> str:
+def build_pattern_interrupt_filter(width: int, height: int, zoom: float = 1.05, interval_sec: float = 3.5) -> str:
     """Return a zero-overhead FFmpeg scale+crop expression toggling subtle zoom every N seconds.
 
-    Breaks visual monotony every few seconds to hold attention and avoid static-reupload flags.
+    Breaks visual monotony every 2.5-3.5s (2025/2026 retention benchmark) to prevent swipe-aways.
     """
     if zoom <= 1.0:
         return ""

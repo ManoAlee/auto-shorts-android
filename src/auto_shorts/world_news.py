@@ -649,25 +649,25 @@ def build_brazil_news_story_pack(
         "humor_memes": {
             "niche": "humor_memes",
             "seo_suffix": " | Plantão Humor",
-            "hashtags": ["#MemesBrasil", "#HumorBR", "#Comedia", "#Engracado", "#Risos", "#Shorts"],
+            "hashtags": ["#Shorts", "#MemesBrasil", "#HumorBR", "#Comedia", "#Engracado"],
             "cta": "Manda pro amigo que precisa rir hoje e segue para mais memes!",
         },
         "games": {
             "niche": "games",
             "seo_suffix": " | Plantão Games",
-            "hashtags": ["#GTA6", "#GrandTheftAuto", "#GTA", "#Games", "#PlayStation", "#RockstarGames", "#Gamer", "#Shorts"],
+            "hashtags": ["#Shorts", "#GTA6", "#GamesBR", "#GamerBrasil", "#Gameplay"],
             "cta": "Comente sua expectativa sobre o jogo e siga o canal para mais novidades dos games!",
         },
         "tech_ia": {
             "niche": "tech_ia",
             "seo_suffix": " | Plantão Tech",
-            "hashtags": ["#Tecnologia", "#InteligenciaArtificial", "#Tech", "#Inovacao", "#IA", "#Shorts"],
+            "hashtags": ["#Shorts", "#Tecnologia", "#InteligenciaArtificial", "#Inovacao", "#TechBR"],
             "cta": "Comente o que achou dessa inovação e siga o canal para mais novidades de tecnologia e IA!",
         },
         "economia": {
             "niche": "economia",
             "seo_suffix": " | Plantão Economia",
-            "hashtags": ["#Economia", "#Financas", "#MercadoFinanceiro", "#Investimentos", "#Brasil", "#Shorts"],
+            "hashtags": ["#Shorts", "#Economia", "#Financas", "#Brasil", "#MercadoFinanceiro"],
             "cta": "Comente sua visão sobre o mercado e siga o canal para alertas econômicos diários!",
         },
         "ciencia_espaco": {

@@ -132,6 +132,18 @@ NICHE_MENTALISM_PLAYBOOKS: Dict[str, Dict] = {
         "recommended_layout": "center_crop",
         "hashtags": ["#gamesbr", "#gta6", "#playstation", "#gamerbrasil", "#jogos"],
     },
+    "games_gta6": {
+        "niche": "games_gta6",
+        "brain_trigger": "Reação Visceral ao Vivo + Curiosidade de Mundo Aberto",
+        "mentalism_technique": "Corte Direto no Pico Emocional ('Olha a reação ao vivo nesse momento do GTA 6')",
+        "visual_blueprint": "Ambient Immersion 16:9 íntegro em 60fps com borda dourada, pill AO VIVO centralizada e card dual-line de alto contraste.",
+        "eye_anchor": "Reação vocal/explosão nos primeiros 1.5s + título curto no topo.",
+        "comment_trigger": "Enquete rápida de comunidade ('Você já jogou ou está esperando a versão de PC?').",
+        "share_driver": "Mandar no grupo de amigos gamers / Discord.",
+        "ideal_bpm_cuts_sec": 2.4,
+        "recommended_layout": "ambient",
+        "hashtags": ["#gta6", "#gta6gameplay", "#gamerbrasil", "#clipada"],
+    },
     "geral": {
         "niche": "geral",
         "brain_trigger": "Lacuna de Curiosidade + Quebra de Expectativa no Climax",

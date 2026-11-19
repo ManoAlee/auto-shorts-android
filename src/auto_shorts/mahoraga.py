@@ -394,16 +394,16 @@ class MahoragaEngine:
         if sum_clean and not sum_clean.endswith((".", "!", "?")):
             sum_clean += "."
 
-        # Act 1: 8-Spoke High-Retention Narrative Openers
+        # Act 1: 8-Spoke Zero-Dead-Air 0-1.5s Keyword-First Openers (2025/2026 Swipe-Away & Speech-SEO)
         openings = (
-            f"Preste atenção nisto que acabou de ser confirmado: {title_clean}.",
-            f"O que está acontecendo agora chamou a atenção de todo o mundo: {title_clean}.",
-            f"Aqui estão os fatos apurados até o momento: {title_clean}.",
-            f"Isto veio à tona nas últimas horas e merece destaque: {title_clean}.",
-            f"Vamos direto ao que foi apurado com precisão: {title_clean}.",
-            f"O assunto principal que está repercutindo fortemente hoje: {title_clean}.",
-            f"Veja os fatos confirmados sobre este caso: {title_clean}.",
-            f"Entenda os detalhes deste acontecimento: {title_clean}.",
+            f"Urgente: {title_clean}.",
+            f"{title_clean} — e o motivo surpreendeu.",
+            f"Acabou de sair: {title_clean}.",
+            f"{title_clean}. Veja o que muda agora.",
+            f"Atenção: {title_clean}.",
+            f"{title_clean} — e quase ninguém percebeu esse detalhe.",
+            f"Confirmado agora: {title_clean}.",
+            f"{title_clean}. Olha o impacto disso.",
         )
         act1_hook = openings[spoke_idx % len(openings)]
 
