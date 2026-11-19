@@ -79,17 +79,41 @@ def _split_into_short_lines(text: str, max_words: int = 4) -> List[str]:
     return groups
 
 
-_POWER_TOKEN_RE = re.compile(
-    r"^(?:R\$|\d+(?:[.,]\d+)?%?|MILH[ÕO]ES|BILH[ÕO]ES|URGENTE|ALERTA|REVELADO|PROIBIDO|RECORDE|EXCLUSIVO|GTA|IA)$",
+_SPOKEN_FILLER_RE = re.compile(
+    r"^(?:eh+|ah+|uh+|hm+|hum+|hã+|é{2,}|ahn+)$",
+    re.I,
+)
+
+_GREEN_MONEY_RE = re.compile(
+    r"^(?:R\$|\d+(?:[.,]\d+)?%?|MILH[ÕO]ES|BILH[ÕO]ES|DINHEIRO|SUCESSO|LUCRO|RICO|GANHAR|RECORDE)$",
+    re.I,
+)
+_RED_ALERT_RE = re.compile(
+    r"^(?:URGENTE|ALERTA|PERIGO|ERRO|NUNCA|PROIBIDO|CRISE|BUG|CAOS|MORTE|GUERRA|CHOQUE)$",
+    re.I,
+)
+_GOLD_POWER_RE = re.compile(
+    r"^(?:REVELADO|EXCLUSIVO|SEGREDO|GTA|ROCKSTAR|IA|ALGORITMO|SA[ÚU]DE|MENTAL|MINDSET|FOCO|FUTURO)$",
     re.I,
 )
 
 
+def _strip_spoken_fillers(words: List[str]) -> List[str]:
+    """Submagic-style disfluency cleaner: removes standalone 'EH', 'AH', 'UH', 'HM' fillers."""
+    cleaned = [w for w in words if not _SPOKEN_FILLER_RE.match(w.strip(".,!?;:\"'()[]"))]
+    return cleaned if cleaned else words
+
+
 def _format_karaoke_token(token: str, dur_cs: int, trailing: str = " ") -> str:
-    """Apply progressive karaoke sweep plus semantic color pop on numbers and power words."""
+    """Apply progressive karaoke sweep plus Submagic multi-color semantic pop on power words."""
     clean_core = token.strip(".,!?;:\"'()[]")
-    if clean_core and _POWER_TOKEN_RE.match(clean_core):
-        return rf"{{\kf{dur_cs}\c&H0000FFFF&}}{token}{{\r}}{trailing}"
+    if clean_core:
+        if _GREEN_MONEY_RE.match(clean_core):
+            return rf"{{\kf{dur_cs}\c&H0069FF00&\fscx108\fscy108}}{token}{{\r}}{trailing}"
+        if _RED_ALERT_RE.match(clean_core):
+            return rf"{{\kf{dur_cs}\c&H004D4DFF&\fscx108\fscy108}}{token}{{\r}}{trailing}"
+        if _GOLD_POWER_RE.match(clean_core):
+            return rf"{{\kf{dur_cs}\c&H0000FFFF&\fscx106\fscy106}}{token}{{\r}}{trailing}"
     return rf"{{\kf{dur_cs}}}{token}{trailing}"
 
 
@@ -97,7 +121,12 @@ def _style_karaoke_group(group: List[Dict], base_start: float) -> str:
     r"""Build progressive word-by-word {\kf} ASS karaoke fill + kinetic entrance pop."""
     parts: List[str] = [r"{\fad(25,20)\fscx94\fscy94\t(0,85,\fscx103\fscy103)\t(85,170,\fscx100\fscy100)}"]
     cursor = base_start
-    for w in group:
+    non_fillers = [
+        w for w in group
+        if not _SPOKEN_FILLER_RE.match(str(w.get("word") or "").strip(".,!?;:\"'()[]"))
+    ]
+    effective_group = non_fillers if non_fillers else group
+    for w in effective_group:
         token = str(w.get("word") or "").strip().upper().replace("{", "(").replace("}", ")")
         if not token:
             continue
@@ -114,7 +143,8 @@ def _style_karaoke_group(group: List[Dict], base_start: float) -> str:
 
 def _style_weighted_karaoke_phrase(phrase: str, dur_sec: float) -> str:
     r"""Build smooth progressive {\kf} karaoke animation across words when timing is chunk-level."""
-    words = [w.strip() for w in phrase.replace("{", "(").replace("}", ")").split() if w.strip()]
+    raw_words = [w.strip() for w in phrase.replace("{", "(").replace("}", ")").split() if w.strip()]
+    words = _strip_spoken_fillers(raw_words)
     if not words:
         return ""
     if len(words) == 1:

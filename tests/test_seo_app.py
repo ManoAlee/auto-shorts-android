@@ -88,3 +88,36 @@ def test_video_seo_no_dangling_prepositions_and_platform_tag_limits():
         assert len(packs["instagram"]["hashtags"]) <= IG_MAX_TAGS
         assert len(packs["tiktok"]["hashtags"]) <= TIKTOK_MAX_TAGS
         assert len(packs["youtube"]["hashtags"]) <= YT_SHORTS_MAX_TAGS
+
+
+def test_submagic_filler_removal_multicolor_and_opusclip_virality_breakdown():
+    from auto_shorts.subtitles import _format_karaoke_token, _strip_spoken_fillers
+    from auto_shorts.yt_algorithm import score_short_for_youtube_algorithm
+
+    # 1. Submagic filler cleaner strips 'EH', 'AH', 'HUM' without touching real words
+    assert _strip_spoken_fillers(["EH", "REMETE", "AH,", "ISSO"]) == ["REMETE", "ISSO"]
+    assert _strip_spoken_fillers(["VOCÊ", "AH", "O", "ALGORITMO"]) == ["VOCÊ", "O", "ALGORITMO"]
+
+    # 2. Multi-color semantic power words (Green money, Red alert, Gold discovery)
+    assert r"\c&H0069FF00&" in _format_karaoke_token("MILHÕES", 20)
+    assert r"\c&H004D4DFF&" in _format_karaoke_token("URGENTE", 20)
+    assert r"\c&H0000FFFF&" in _format_karaoke_token("ALGORITMO", 20)
+
+    # 3. OpusClip-style explainable virality breakdown
+    scored = score_short_for_youtube_algorithm(
+        pack={
+            "title": "GTA 6 Ao Vivo: Davy Jones | Gameplay #Shorts",
+            "hook_title": "DAVY JONES NO GTA 6",
+            "caption": "Reacao ao vivo no lancamento do GTA 6 com gameplay completa em 60fps #Shorts",
+            "hashtags": ["#Shorts", "#GTA6", "#GamerBrasil"],
+        },
+        validation={"valid": True, "duration": 27.5, "subtitle_cues": 18, "subtitle_overlaps": 0, "mean_volume_db": -14.2},
+    )
+    assert scored["algo_score"] == 100
+    vb = scored["virality_breakdown"]
+    assert vb["hook_score"] == 30
+    assert vb["retention_score"] == 30
+    assert vb["seo_score"] == 20
+    assert vb["tech_score"] == 20
+    assert "Alto potencial" in vb["why_viral"]
+

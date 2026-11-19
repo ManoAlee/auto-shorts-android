@@ -105,12 +105,34 @@ def score_short_for_youtube_algorithm(
         tier = "Ajustar Hook antes de postar"
         viewed_forecast = "<60% (risco swipe-away)"
 
+    strengths: List[str] = []
+    if hook_pts >= 27:
+        strengths.append("hook forte nos primeiros 2s")
+    if ret_pts >= 25:
+        strengths.append("ritmo e legendas em faixa de alta retencao")
+    if seo_pts >= 17:
+        strengths.append("SEO e hashtags calibradas")
+    if tech_pts >= 18:
+        strengths.append("audio/video 9:16 prontos")
+    why_viral = (
+        "Alto potencial: " + ", ".join(strengths) + "."
+        if strengths
+        else "Precisa reforcar hook inicial, legendas ou duracao antes de escalar."
+    )
+
     return {
         "algo_score": score,
         "cascade_tier": tier,
         "viewed_forecast": viewed_forecast,
         "title_mobile_preview": title[:40] + ("..." if len(title) > 40 else ""),
         "tips": tips,
+        "virality_breakdown": {
+            "hook_score": hook_pts,
+            "retention_score": ret_pts,
+            "seo_score": seo_pts,
+            "tech_score": tech_pts,
+            "why_viral": why_viral,
+        },
     }
 
 

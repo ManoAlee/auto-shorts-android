@@ -57,13 +57,13 @@ def build_motion_graphics_lower_third(
 ) -> List[str]:
     """Build Remotion-inspired lower-third / headline card using pure FFmpeg drawbox & drawtext.
     
-    Safe zone placement: Top Y=64 to 200, strictly clear of platform top bars.
+    Safe zone placement: Top Y=140 to 278, strictly clear of phone status bars & TikTok/Reels tabs.
     """
     card_filters: List[str] = [
-        # Dark modern frosted card
-        "drawbox=x=24:y=60:w=672:h=138:color=0x0B0F19@0.88:t=fill",
-        # Accent indicator border (Neon Red/Cyan)
-        "drawbox=x=24:y=60:w=672:h=4:color=0x00E5FF:t=fill",
+        # Dark modern frosted card (symmetric 28px margins on 720p)
+        "drawbox=x=28:y=140:w=664:h=138:color=0x0B0F19@0.88:t=fill",
+        # Accent indicator border (Neon Cyan)
+        "drawbox=x=28:y=140:w=664:h=4:color=0x00E5FF:t=fill",
     ]
 
     safe_category = category_badge.upper().replace(":", "\\:").replace("'", "")[:24]
@@ -76,17 +76,17 @@ def build_motion_graphics_lower_third(
         badge_txt = f"  {safe_category}  "
         card_filters.append(
             f"drawtext=fontfile='{fp}':text='{badge_txt}':"
-            f"fontsize=16:fontcolor=white:box=1:boxcolor=0x00E5FF@0.9:boxborderw=4:x=40:y=76"
+            f"fontsize=16:fontcolor=white:box=1:boxcolor=0x00E5FF@0.9:boxborderw=4:x=44:y=156"
         )
         if safe_source:
             card_filters.append(
                 f"drawtext=fontfile='{fp}':text='FONTE\\: {safe_source}':"
-                f"fontsize=14:fontcolor=0xAAAAAA:x=220:y=78"
+                f"fontsize=14:fontcolor=0xAAAAAA:x=224:y=158"
             )
         # Headline text
         card_filters.append(
             f"drawtext=fontfile='{fp}':text='{safe_headline}':"
-            f"fontsize=20:fontcolor=white:borderw=2:bordercolor=black:x=40:y=118"
+            f"fontsize=20:fontcolor=white:borderw=2:bordercolor=black:x=44:y=198"
         )
 
     return card_filters
