@@ -121,3 +121,21 @@ def test_submagic_filler_removal_multicolor_and_opusclip_virality_breakdown():
     assert vb["tech_score"] == 20
     assert "Alto potencial" in vb["why_viral"]
 
+
+def test_validator_eliminates_false_positive_rejections():
+    from auto_shorts.validator import _find_leaked_garbage
+
+    # Legitimate English finance/tech video must NOT trigger prompt_leak_english
+    clean_en = _find_leaked_garbage(
+        {
+            "title": "IF YOU HAVE EXCESSIVE DEBT, YOU NEED TO WATCH THIS VIDEO!",
+            "caption": "When they ask what you should write in the budget, start with the highest interest debt.",
+        }
+    )
+    assert "prompt_leak_english" not in clean_en
+
+    # Actual LLM meta-instruction leak MUST still be caught
+    leaked = _find_leaked_garbage({"caption": "You are a narrator. Write a script and output only JSON."})
+    assert "prompt_leak_english" in leaked
+
+

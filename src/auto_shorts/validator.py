@@ -447,7 +447,7 @@ def inspect_video_visual_quality(
                 diffs = [abs(a[k] - b[k]) for k in range(0, n, 4)]
                 d_val = sum(diffs) / max(1, len(diffs))
                 deltas.append(d_val)
-                if d_val < 0.8:
+                if d_val < 0.25:
                     frozen_pairs += 1
                 # Center ROI (rows 14..50 of 64x64) ensures main scene moves, not only an edge progress bar
                 if n >= 4096:
@@ -460,8 +460,14 @@ def inspect_video_visual_quality(
         motion_delta = round(sum(deltas) / len(deltas), 2) if deltas else 0.0
         center_motion = round(sum(center_deltas) / len(center_deltas), 2) if center_deltas else motion_delta
 
-        not_black_or_blank = (12.0 <= luma_mean <= 246.0) and (luma_std >= 6.0)
-        has_motion = (motion_delta >= 1.2) and (center_motion >= 1.2) and (frozen_pairs < 2)
+        # Allow dark-studio podcasts & night GTA/anime scenes when contrast (luma_std) is healthy
+        not_black_or_blank = (
+            (12.0 <= luma_mean <= 246.0 and luma_std >= 6.0)
+            or (7.0 <= luma_mean < 12.0 and luma_std >= 10.0)
+        )
+        # Seated talking-head podcasts have gentle motion on fixed cameras (center_motion >= 0.45);
+        # reject only when center ROI is genuinely static or 3+ consecutive pairs are frozen (< 0.25).
+        has_motion = (center_motion >= 0.45) and (motion_delta >= 0.35 or center_motion >= 0.8) and (frozen_pairs < 3)
 
         vision_res: Optional[Dict] = None
         if vision_check and len(panel_jpegs) == 3:
@@ -575,10 +581,18 @@ def _find_leaked_garbage(pack: Dict, sub_text: str = "") -> List[str]:
     for pat in _LEAKED_GARBAGE_PATTERNS:
         if pat in haystack:
             found.append(pat)
-    padded = f" {re.sub(r'[^a-zA-ZÀ-ÿ0-9 ]+', ' ', haystack)} "
-    # Require >= 4 non-tech English instruction tokens to avoid false positives on bilingual AI/tech titles ("prompt", "script", etc.)
-    en_leaks = sum(1 for tok in (" the ", " they ", " ask ", " craft ", " spoken ", " write ", " should ", " output ") if tok in padded)
-    if en_leaks >= 4:
+    # Detect true LLM meta-instruction leaks in English without falsely rejecting normal English/bilingual transcripts
+    en_meta_phrases = (
+        "write a script",
+        "output only json",
+        "respond only with json",
+        "you are a",
+        "as an ai",
+        "must be strictly",
+        "spoken text",
+        "hook banner",
+    )
+    if any(phrase in haystack for phrase in en_meta_phrases):
         found.append("prompt_leak_english")
     return found
 
@@ -628,11 +642,14 @@ def audit_short_end_to_end(
                     reject_reasons.append("Video narrado sem nenhuma legenda (0 cues).")
                 elif sub_cov_pct < 40.0:
                     reject_reasons.append(f"Cobertura de legendas insuficiente ({sub_cov_pct:.0f}% < 40%; risco de dessincronia).")
-            # Skill Hard Gate (video-edit / skill-reel): enforce safe-zone MarginV >= 280 on 720x1280
+            # Skill Hard Gate (video-edit / skill-reel): enforce proportional safe-zone MarginV (>= 21% of PlayResY, e.g. 269px on 1280h)
             if sp and str(sp).endswith(".ass"):
+                m_res_y = re.search(r"^PlayResY:\s*(\d+)", sub_text, re.M)
+                play_res_y = int(m_res_y.group(1)) if m_res_y else 1280
+                min_mv = max(140, int(round(play_res_y * 0.21)))
                 m_mv = re.search(r"^Style:[^,]+,[^,]+,[^,]+,(?:[^,]*,){18}(\d+),", sub_text, re.M)
-                if m_mv and int(m_mv.group(1)) < 280:
-                    reject_reasons.append(f"Legenda fora da safe zone inferior (MarginV={m_mv.group(1)} < 280).")
+                if m_mv and int(m_mv.group(1)) < min_mv:
+                    reject_reasons.append(f"Legenda fora da safe zone inferior (MarginV={m_mv.group(1)} < {min_mv} para {play_res_y}p).")
             break
     leaks = _find_leaked_garbage(meta, sub_text=sub_text)
     if leaks:

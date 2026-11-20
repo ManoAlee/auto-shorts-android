@@ -655,7 +655,7 @@ def build_brazil_news_story_pack(
         "games": {
             "niche": "games",
             "seo_suffix": " | Plantão Games",
-            "hashtags": ["#Shorts", "#GTA6", "#GamesBR", "#GamerBrasil", "#Gameplay"],
+            "hashtags": ["#Shorts", "#GTA6", "#Games", "#GamerBrasil", "#Gameplay"],
             "cta": "Comente sua expectativa sobre o jogo e siga o canal para mais novidades dos games!",
         },
         "tech_ia": {
