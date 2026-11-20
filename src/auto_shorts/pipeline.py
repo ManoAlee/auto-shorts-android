@@ -358,23 +358,26 @@ def run_pipeline(
             pack["thumbnail_16x9"] = str(thumb_16x9)
         if cover_9x16 and cover_9x16.exists():
             pack["cover_9x16"] = str(cover_9x16)
-        from .validator import audit_short_end_to_end
+        from .validator import audit_short_end_to_end, purge_rejected_short
 
         visual_audit = audit_short_end_to_end(out_mp4, pack=pack, ass_path=ass_file if ass_file.is_file() else None, vision_check=False)
         pack["validation"] = validation
         pack["visual_audit"] = visual_audit
         pack["algorithm"] = score_short_for_youtube_algorithm(pack, validation, out_mp4.name)
         pack["queued_for_auto_publish"] = bool(visual_audit.get("approved"))
-        pack["delivery_status"] = "approved_queued" if visual_audit.get("approved") else "rejected_auto_audit"
-        pack_json = out_mp4.with_suffix(".publish.json")
-        pack_json.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+        pack["delivery_status"] = "approved_queued" if visual_audit.get("approved") else "rejected_and_deleted"
+        if visual_audit.get("approved"):
+            pack_json = out_mp4.with_suffix(".publish.json")
+            pack_json.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+        else:
+            purge_rejected_short(out_mp4)
 
         delivery_status = pack["delivery_status"]
         playlist_id = None
-        if not auto_publish:
-            delivery_status = "approved_queued" if visual_audit.get("approved") else "rejected_auto_audit"
-        elif not visual_audit.get("approved"):
-            delivery_status = f"rejected_auto_audit: {'; '.join(visual_audit.get('reject_reasons') or [])}"
+        if not visual_audit.get("approved"):
+            delivery_status = f"rejected_and_deleted: {'; '.join(visual_audit.get('reject_reasons') or [])}"
+        elif not auto_publish:
+            delivery_status = "approved_queued"
         elif not validation["valid"]:
             delivery_status = f"validation_blocked: {'; '.join(validation['errors'])}"
         else:

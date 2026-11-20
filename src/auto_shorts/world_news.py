@@ -1139,7 +1139,7 @@ def produce_world_news_short(
         except (OSError, json.JSONDecodeError):
             pass
 
-    from .validator import audit_short_end_to_end
+    from .validator import audit_short_end_to_end, purge_rejected_short
     saved_pack = {}
     if publish_json.is_file():
         try:
@@ -1150,18 +1150,24 @@ def produce_world_news_short(
     audit = audit_short_end_to_end(out_mp4, pack=saved_pack or pack, vision_check=True)
     res["visual_audit"] = audit
     approved = bool(audit.get("approved"))
+    if not approved:
+        purge_res = purge_rejected_short(out_mp4)
+        res["auto_deleted"] = purge_res.get("deleted", False)
+        res["delivery_status"] = f"rejected_and_deleted: {'; '.join(audit.get('reject_reasons') or [])[:160]}"
+        return res
+
     if publish_json.is_file():
         try:
             saved_pack["visual_audit"] = audit
             if bg_style_used:
                 saved_pack["background_style"] = bg_style_used
-            saved_pack["queued_for_auto_publish"] = approved
-            saved_pack["delivery_status"] = "approved_queued" if approved else "rejected_auto_audit"
+            saved_pack["queued_for_auto_publish"] = True
+            saved_pack["delivery_status"] = "approved_queued"
             publish_json.write_text(json.dumps(saved_pack, indent=2, ensure_ascii=False), encoding="utf-8")
         except (OSError, json.JSONDecodeError):
             pass
 
-    delivery_status = "approved_queued" if approved else f"rejected_auto_audit: {'; '.join(audit.get('reject_reasons') or [])[:160]}"
+    delivery_status = "approved_queued"
     if auto_publish and approved:
         from .publisher import publish_pack_to_youtube
         try:

@@ -139,3 +139,26 @@ def test_validator_eliminates_false_positive_rejections():
     assert "prompt_leak_english" in leaked
 
 
+def test_purge_rejected_short_removes_mp4_and_all_sidecars(tmp_path):
+    from auto_shorts.validator import purge_rejected_short
+
+    mp4 = tmp_path / "bad_clip.mp4"
+    sidecars = [
+        mp4,
+        tmp_path / "bad_clip.publish.json",
+        tmp_path / "bad_clip.ass",
+        tmp_path / "bad_clip_cover_9x16.jpg",
+        tmp_path / "bad_clip_thumb_16x9.jpg",
+        tmp_path / "bad_clip.mp4.jpg",
+    ]
+    for f in sidecars:
+        f.write_bytes(b"0" * 1024)
+
+    res = purge_rejected_short(mp4)
+    assert res["deleted"] is True
+    assert res["freed_bytes"] >= 6 * 1024
+    for f in sidecars:
+        assert not f.exists()
+
+
+

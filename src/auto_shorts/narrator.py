@@ -1596,7 +1596,7 @@ def build_narrated_short(
         "voice": active_voice_label(style_key, active_tts_engine_label()),
         "background_style": bg_style_used or "custom",
     }
-    from .validator import audit_short_end_to_end
+    from .validator import audit_short_end_to_end, purge_rejected_short
 
     visual_audit = audit_short_end_to_end(out_path, pack=pack, ass_path=ass_path, srt_path=srt_path, vision_check=False)
     if bg_style_used:
@@ -1611,21 +1611,25 @@ def build_narrated_short(
             pass
     pack["visual_audit"] = visual_audit
     pack["queued_for_auto_publish"] = bool(visual_audit.get("approved"))
-    pack["delivery_status"] = "approved_queued" if visual_audit.get("approved") else "rejected_auto_audit"
-    out_path.with_suffix(".publish.json").write_text(
-        json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    # Persist .ass alongside out_path and prune heavy intermediate _scene_*/broll MP4s immediately
-    if ass_path.is_file():
-        try:
-            shutil.copy2(ass_path, out_path.with_suffix(".ass"))
-        except OSError:
-            pass
-    for heavy_tmp in list(work_dir.glob("*.mp4")) + list(work_dir.glob("*.wav")):
-        try:
-            heavy_tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
+    pack["delivery_status"] = "approved_queued" if visual_audit.get("approved") else "rejected_and_deleted"
+    # World News performs its final enriched audit in world_news.py; purge non-news rejected shorts immediately
+    if not visual_audit.get("approved") and not out_path.stem.startswith("mundo_br_"):
+        purge_rejected_short(out_path)
+    else:
+        out_path.with_suffix(".publish.json").write_text(
+            json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        # Persist .ass alongside out_path and prune heavy intermediate _scene_*/broll MP4s immediately
+        if ass_path.is_file():
+            try:
+                shutil.copy2(ass_path, out_path.with_suffix(".ass"))
+            except OSError:
+                pass
+        for heavy_tmp in list(work_dir.glob("*.mp4")) + list(work_dir.glob("*.wav")):
+            try:
+                heavy_tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     return {
         "output": str(out_path),

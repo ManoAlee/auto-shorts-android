@@ -700,3 +700,25 @@ def audit_short_end_to_end(
         "visual": visual,
     }
 
+
+def purge_rejected_short(mp4_path: str | Path) -> Dict:
+    """Automatically delete a rejected Short and all its sidecars (.publish.json, .ass, covers, temp dirs).
+
+    Controlled by AUTO_DELETE_REJECTED (default '1' / enabled).
+    """
+    if os.getenv("AUTO_DELETE_REJECTED", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return {"deleted": False, "freed_bytes": 0, "reason": "disabled_by_env"}
+    p = Path(mp4_path)
+    from .retention import _delete_video_with_sidecars
+    freed = _delete_video_with_sidecars(p)
+    # Also remove legacy .mp4.jpg preview if present
+    extra_jpg = Path(str(p) + ".jpg")
+    if extra_jpg.is_file():
+        try:
+            freed += extra_jpg.stat().st_size
+            extra_jpg.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return {"deleted": not p.exists(), "freed_bytes": freed}
+
+
