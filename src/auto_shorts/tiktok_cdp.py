@@ -373,9 +373,12 @@ def _publish_single_in_cdp(
 
     cur_url = ""
     file_node_id = 0
-    for _ in range(36):
+    for _ in range(40):
         time.sleep(0.5)
-        cur_url = str(cdp.eval_js("window.location.href") or "")
+        try:
+            cur_url = str(cdp.eval_js("window.location.href") or "")
+        except Exception:
+            continue
         if "/login" in cur_url.lower():
             return {
                 "status": "login_required",
@@ -383,12 +386,20 @@ def _publish_single_in_cdp(
                 "current_url": cur_url,
                 "file": mp4.name,
             }
-        doc = cdp.call("DOM.getDocument", {"depth": -1})
-        root_id = doc["root"]["nodeId"]
-        inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
-        file_node_id = int(inp.get("nodeId") or 0)
-        if file_node_id:
-            break
+        try:
+            has_input = bool(cdp.eval_js("Boolean(document.querySelector(\"input[type='file']\"))"))
+            if not has_input:
+                continue
+            doc = cdp.call("DOM.getDocument", {"depth": 1})
+            root_id = doc.get("root", {}).get("nodeId", 0)
+            if not root_id:
+                continue
+            inp = cdp.call("DOM.querySelector", {"nodeId": root_id, "selector": "input[type='file']"})
+            file_node_id = int(inp.get("nodeId") or 0)
+            if file_node_id:
+                break
+        except Exception:
+            continue
 
     _sync_live_cookies(cdp, out_dir)
     if not file_node_id:
