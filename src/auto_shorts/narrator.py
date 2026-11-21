@@ -311,6 +311,19 @@ def _prepare_speech_text(text: str) -> str:
     """Normalize currency, percentages, PT-BR acronyms & breathing pauses (CosyVoice + FalaBrasil discipline)."""
     s = str(text or "").strip()
     s = re.sub(r"https?://\S+", "", s)
+    # Currency with scale words (e.g. R$ 11 trilhões -> 11 trilhões de reais)
+    s = re.sub(
+        r"R\$\s*(\d+(?:[.,]\d+)?)\s*(mil(?:hão|hões)?|bi(?:lhão|lhões)?|tri(?:lhão|lhões)?)\b",
+        r"\1 \2 de reais",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"US\$\s*(\d+(?:[.,]\d+)?)\s*(mil(?:hão|hões)?|bi(?:lhão|lhões)?|tri(?:lhão|lhões)?)\b",
+        r"\1 \2 de dólares",
+        s,
+        flags=re.IGNORECASE,
+    )
     s = re.sub(r"R\$\s*(\d+(?:[.,]\d+)?)", r"\1 reais", s)
     s = re.sub(r"US\$\s*(\d+(?:[.,]\d+)?)", r"\1 dólares", s)
     s = re.sub(r"(\d+(?:[.,]\d+)?)\s*%", r"\1 por cento", s)

@@ -1085,8 +1085,10 @@ def produce_world_news_short(
         detected_niche = "games_gta6" if (topic == "games" or any(k in (pack.get("pt_title", "") + " " + topic).lower() for k in ("gta", "rockstar", "jogo", "games", "gameplay", "playstation", "xbox"))) else ("ia_tech" if topic in ("tech", "ia") else "noticias_mundiais")
 
         comp = None
-        # For sensitive tragedy/death news, NEVER composite over playful video games (Minecraft/Subway Surfers)!
-        if is_sensitive_tragedy:
+        # For sensitive tragedy/death news or stories with authentic article photos, use journalistic photo ambient
+        # to ensure zero foreign text burn-ins, no awkward video loops, and 100% broadcast compliance.
+        has_news_photo = bool(str(picked.get("image_url") or "").startswith("http"))
+        if is_sensitive_tragedy or has_news_photo:
             bg_style_used = "journalistic_photo_ambient"
             resolved_bg = str(_build_news_backdrop_video(str(picked.get("image_url") or ""), bg_dir))
             burned_card = False
