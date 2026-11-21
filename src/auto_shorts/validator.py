@@ -670,6 +670,13 @@ def audit_short_end_to_end(
         if last_hw in {"de", "da", "do", "das", "dos", "e", "ou", "em", "no", "na", "para", "por", "com", "a", "o", "que"}:
             reject_reasons.append(f"Gancho cortado/pendente em preposicao ('{meta.get('hook_title')}').")
 
+    # Reverse Engineering Quality Guard: reject placeholder prompt leaks and English-only titles in PT-BR feed
+    title_raw = str(meta.get("title") or "")
+    if any(k in title_raw.lower() for k in ("curious title", "max 65 chars", "4-word hook", "gancho em 4 palavras")):
+        reject_reasons.append(f"Vazamento de prompt/placeholder no título: '{title_raw[:50]}'.")
+    if any(title_raw.lower().startswith(en_start) for en_start in ("if you have", "the funniest stories", "how to get", "top 10 reasons")):
+        reject_reasons.append(f"Vídeo em inglês sem dublagem/adaptação em PT-BR: '{title_raw[:50]}'.")
+
     # Editorial Integrity: Prohibit ludic gameplay (Minecraft/Subway/jogos) over sensitive tragedy or death news
     from .mahoraga import _TRAGEDY_SENSITIVE_KEYWORDS
     all_text = f"{title_low} {cap_low} {sub_text.lower()} {hook_chk}"
