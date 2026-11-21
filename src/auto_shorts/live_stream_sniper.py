@@ -22,6 +22,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from .renderer import find_default_font
 from .subtitles import escape_ffmpeg_filter_path
 from .viral_intelligence import AntiSlopHumanizer, score_hook
+from .validator import validate_generated_short, audit_short_end_to_end, purge_rejected_short
+from .re_engine import score_short_opus_runbook
 
 
 @dataclass
@@ -584,6 +586,18 @@ def snip_streamer_highlight(
                 "queued_for_auto_publish": True,
                 "multi_platform": multi_platform,
             }
+            # Validate and audit generated clip
+            val = validate_generated_short(out_mp4)
+            audit = audit_short_end_to_end(out_mp4, pack=pack_data, media_val=val, vision_check=False)
+            if not audit.get("approved"):
+                purge_rejected_short(out_mp4)
+                continue
+
+            pack_data["validation"] = val
+            pack_data["visual_audit"] = audit
+            pack_data["delivery_status"] = "approved_queued"
+            pack_data["opus_scorecard"] = score_short_opus_runbook(pack_data, validation=val)
+
             publish_json = out_mp4.with_suffix(".publish.json")
             publish_json.write_text(json.dumps(pack_data, ensure_ascii=False, indent=2), encoding="utf-8")
 

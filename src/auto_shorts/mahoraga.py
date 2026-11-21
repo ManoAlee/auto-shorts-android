@@ -133,6 +133,15 @@ _PLACEHOLDER_PATTERNS = (
 )
 
 
+_TRAGEDY_SENSITIVE_KEYWORDS = (
+    "morreu", "morte", "morto", "morta", "assassina", "assassinato", "vítima",
+    "vitima", "luto", "tragédia", "tragedia", "crime", "acidente", "polícia",
+    "policia", "preso", "prisão", "prisao", "hospital", "sepultado", "enterro",
+    "desaparecido", "chacina", "homicídio", "homicidio", "fatal", "baleado",
+    "tiroteio", "mal súbito", "mal subito", "passar mal", "falecimento", "cadáver", "cadaver"
+)
+
+
 def clean_word_boundary_hook(raw: str, max_chars: int = 32, fallback: str = "DESTAQUE DO DIA") -> str:
     """Build a complete, self-contained uppercase hook that NEVER slices mid-word or ends on a dangling word."""
     text = re.sub(r"\s+", " ", str(raw or "").strip()).strip(" .,:;!?-|\"'»«>")
@@ -394,27 +403,53 @@ class MahoragaEngine:
         if sum_clean and not sum_clean.endswith((".", "!", "?")):
             sum_clean += "."
 
-        # Act 1: 8-Spoke Zero-Dead-Air 0-1.5s Keyword-First Openers (2025/2026 Swipe-Away & Speech-SEO)
-        openings = (
-            f"Urgente: {title_clean}.",
-            f"{title_clean} — e o motivo surpreendeu.",
-            f"Acabou de sair: {title_clean}.",
-            f"{title_clean}. Veja o que muda agora.",
-            f"Atenção: {title_clean}.",
-            f"{title_clean} — e quase ninguém percebeu esse detalhe.",
-            f"Confirmado agora: {title_clean}.",
-            f"{title_clean}. Olha o impacto disso.",
+        # Check if story involves sensitive tragedy, crime, accident or death
+        is_sensitive_tragedy = any(
+            k in (title_clean + " " + sum_clean).lower()
+            for k in _TRAGEDY_SENSITIVE_KEYWORDS
         )
-        act1_hook = openings[spoke_idx % len(openings)]
 
-        # Act 4: Zeigarnik Loop / Audience Debate CTA
-        closings = (
-            "Qual é a sua visão sobre esse caso? Deixe sua opinião sincera nos comentários.",
-            "Você concorda com essa postura ou enxerga por outro ângulo? Comente aqui embaixo.",
-            "Essa situação ainda deve render novos capítulos. O que você acha que vai acontecer a partir de agora?",
-            "Deixe nos comentários a sua opinião e compartilhe com quem precisa saber disso.",
-        )
-        act4_cta = closings[spoke_idx % len(closings)]
+        if is_sensitive_tragedy:
+            # Respectful, sober broadcast hooks for sensitive news (replace colon with dash to avoid double colon)
+            clean_title_nobrk = title_clean.replace(":", " —", 1) if ":" in title_clean else title_clean
+            tragedy_openings = (
+                f"Atenção para as informações sobre o caso {clean_title_nobrk}.",
+                f"Informações confirmadas sobre {clean_title_nobrk}.",
+                f"Atualização importante sobre {clean_title_nobrk}.",
+                f"Caso em apuração: {clean_title_nobrk}.",
+            )
+            act1_hook = tragedy_openings[spoke_idx % len(tragedy_openings)]
+
+            # Sober, non-polarizing closings
+            tragedy_closings = (
+                "Acompanhe o canal para novas informações e comunicados oficiais sobre o caso.",
+                "Siga o perfil para acompanhar as atualizações confirmadas deste caso.",
+                "Compartilhe com quem precisa saber e siga para mais atualizações.",
+                "Acompanhe as próximas atualizações oficiais aqui no canal.",
+            )
+            act4_cta = tragedy_closings[spoke_idx % len(tragedy_closings)]
+        else:
+            # Act 1: 8-Spoke Zero-Dead-Air 0-1.5s Keyword-First Openers (2025/2026 Swipe-Away & Speech-SEO)
+            openings = (
+                f"Urgente: {title_clean}.",
+                f"{title_clean} — e o motivo surpreendeu.",
+                f"Acabou de sair: {title_clean}.",
+                f"{title_clean}. Veja o que muda agora.",
+                f"Atenção: {title_clean}.",
+                f"{title_clean} — e quase ninguém percebeu esse detalhe.",
+                f"Confirmado agora: {title_clean}.",
+                f"{title_clean}. Olha o impacto disso.",
+            )
+            act1_hook = openings[spoke_idx % len(openings)]
+
+            # Act 4: Zeigarnik Loop / Audience Debate CTA
+            closings = (
+                "Qual é a sua visão sobre esse caso? Deixe sua opinião sincera nos comentários.",
+                "Você concorda com essa postura ou enxerga por outro ângulo? Comente aqui embaixo.",
+                "Essa situação ainda deve render novos capítulos. O que você acha que vai acontecer a partir de agora?",
+                "Deixe nos comentários a sua opinião e compartilhe com quem precisa saber disso.",
+            )
+            act4_cta = closings[spoke_idx % len(closings)]
 
         # Viral Shorts Pacing: budget factual sentences so total script stays strictly between 75 and 98 words (40-54s)
         sentences = re.split(r"(?<=[.!?])\s+", sum_clean)
@@ -436,23 +471,32 @@ class MahoragaEngine:
         last_s = selected_sentences[-1].lower() if selected_sentences else ""
         cliffhanger_markers = ("jogou um balde", "surpreendeu", "gerou polêmica", "deixou dúvidas", "promete agitar", "tem se perguntado", "não parece")
         if any(m in last_s for m in cliffhanger_markers) or cur_words < 65:
-            cat_context = {
-                "games": "Especialistas e desenvolvedores destacam que as travas de segurança e as novas versões do console limitam a pirataria, reforçando que o foco deve ser no jogo original.",
-                "tech_ia": "A disputa por avanços tecnológicos segue em ritmo acelerado com investimentos bilionários e forte disputa entre as gigantes do setor.",
-                "economia": "Analistas de mercado monitoram os reflexos diretos nas projeções financeiras e no cenário econômico.",
-                "ciencia_espaco": "Novos dados científicos continuam sendo analisados por centros de pesquisa globais para confirmar as descobertas.",
-                "humor_memes": "O momento rapidamente repercutiu nas redes sociais e viralizou entre criadores e internautas com reações hilárias.",
-            }.get(category, "O desdobramento desse caso segue em acompanhamento atento pelos principais analistas internacionais.")
+            if is_sensitive_tragedy:
+                cat_context = "As autoridades e órgãos competentes seguem acompanhando o caso para os devidos esclarecimentos oficiais."
+            else:
+                cat_context = {
+                    "games": "Especialistas e desenvolvedores destacam que as travas de segurança e as novas versões do console limitam a pirataria, reforçando que o foco deve ser no jogo original.",
+                    "tech_ia": "A disputa por avanços tecnológicos segue em ritmo acelerado com investimentos bilionários e forte disputa entre as gigantes do setor.",
+                    "economia": "Analistas de mercado monitoram os reflexos diretos nas projeções financeiras e no cenário econômico.",
+                    "ciencia_espaco": "Novos dados científicos continuam sendo analisados por centros de pesquisa globais para confirmar as descobertas.",
+                    "humor_memes": "O momento rapidamente repercutiu nas redes sociais e viralizou entre criadores e internautas com reações hilárias.",
+                }.get(category, "Mais detalhes e atualizações continuam sendo apurados pelos principais veículos de imprensa.")
             selected_sentences.append(cat_context)
             cur_words += len(cat_context.split())
 
         budgeted_summary = " ".join(selected_sentences).strip()
         if budgeted_summary and not budgeted_summary.endswith((".", "!", "?")):
             budgeted_summary += "."
-        sum_lower_start = budgeted_summary[0].lower() + budgeted_summary[1:] if len(budgeted_summary) > 1 else budgeted_summary
+
+        # Preserve proper noun capitalization (e.g. Gabriel, FBI, STF, Polícia)
+        first_w = budgeted_summary.split()[0] if budgeted_summary.split() else ""
+        if len(budgeted_summary) > 1 and not first_w.istitle() and not first_w.isupper():
+            sum_styled_start = budgeted_summary[0].lower() + budgeted_summary[1:]
+        else:
+            sum_styled_start = budgeted_summary
 
         # Act 2 & 3: Journalistic Attribution + Budgeted Core Facts
-        act2_body = f"Segundo apuração divulgada por {source_name}, {sum_lower_start}"
+        act2_body = f"Segundo apuração divulgada por {source_name}, {sum_styled_start}"
 
         chosen_raw = f"{act1_hook} {act2_body} {act4_cta}"
         final_script = immunize_spoken_script(chosen_raw, title=title_clean, summary=budgeted_summary)

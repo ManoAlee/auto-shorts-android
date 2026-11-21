@@ -685,6 +685,16 @@ def build_brazil_news_story_pack(
     }
     cat_meta = cat_meta_map.get(effective_category, cat_meta_map["mundo"])
 
+    # Detect tragedy or sensitive news (accidents, crimes, deaths, medical emergencies)
+    from .mahoraga import _TRAGEDY_SENSITIVE_KEYWORDS
+    is_sensitive_tragedy = any(
+        k in (pt_title + " " + pt_summary).lower()
+        for k in _TRAGEDY_SENSITIVE_KEYWORDS
+    )
+    if is_sensitive_tragedy:
+        cat_meta = dict(cat_meta)
+        cat_meta["cta"] = "Acompanhe o canal para novas informações e comunicados oficiais sobre o caso."
+
     hook_banner = _build_complete_news_hook(pt_title, category=effective_category)
     seo_title = _clean_seo_title(pt_title, max_chars=76, suffix=cat_meta["seo_suffix"])
 
@@ -704,6 +714,13 @@ def build_brazil_news_story_pack(
         dur_hint = "62-72s (OBRIGATÓRIO >= 61s para TikTok Creator Rewards)" if is_tiktok_rewards else "35-45s"
         word_hint = "150 a 185 palavras" if is_tiktok_rewards else "70 a 100 palavras"
         min_words, max_words = (115, 210) if is_tiktok_rewards else (35, 105)
+        tragedy_instructions = (
+            "ATENÇÃO - NOTÍCIA DE TRAGÉDIA / MORTE / CRIME:\n"
+            "Mantenha tom 100% solene, sério, factual e respeitoso. NUNCA faça perguntas provocativas de debate sobre morte ou dor.\n"
+            "Explique com exatidão médica/oficial o que aconteceu segundo a fonte e conclua com as apurações das autoridades.\n"
+            if is_sensitive_tragedy else
+            "4. CONCLUSÃO & CTA POLARIZADOR: Dê o desfecho claro e faça uma pergunta específica que gere debate nos comentários.\n"
+        )
         prompt = (
             f"Você é um jornalista de plantão internacional adaptando notícias reais para Shorts dinâmicos no Brasil ({dur_hint}).\n"
             f"Fonte: {source_name}\nManchete: {pt_title}\nResumo completo dos fatos: {pt_summary}\n\n"
@@ -711,7 +728,7 @@ def build_brazil_news_story_pack(
             "1. GANCHO (0-3s): Chame a atenção imediatamente com o fato principal ou contraste.\n"
             "2. O FATO: Explique objetivamente o que aconteceu com dados concretos da matéria.\n"
             "3. O MOTIVO / CONTEXTO: Explique O PORQUÊ do fato, repercussões e o que especialistas/autoridades declararam (NUNCA pare em suspense!).\n"
-            "4. CONCLUSÃO & CTA POLARIZADOR: Dê o desfecho claro e faça uma pergunta específica que gere debate nos comentários.\n\n"
+            f"{tragedy_instructions}\n"
             "Regras: Português brasileiro natural e direto; use os fatos fornecidos sem alucinações; NUNCA corte frase no meio.\n"
             "Responda SOMENTE JSON válido:\n"
             f'{{"seo_title":"max 80 chars","hook_banner":"MAX 4 PALAVRAS MAIUSCULAS","roteiro":"texto falado {word_hint} completo com explicacao e conclusao"}}'
@@ -761,6 +778,7 @@ def build_brazil_news_story_pack(
         "source_url": orig_url,
         "pt_title": pt_title,
         "pt_summary": pt_summary,
+        "is_sensitive_tragedy": is_sensitive_tragedy,
         "multi_platform": multi_platform,
     }
 
@@ -1053,6 +1071,10 @@ def produce_world_news_short(
     burned_card = False
     is_auto = str(bg_video or "auto").strip().lower() in {"auto", "gameplay"}
     bg_style_used = ""
+    is_sensitive_tragedy = bool(pack.get("is_sensitive_tragedy")) or any(
+        k in (pack.get("pt_title", "") + " " + pack.get("script", "")).lower()
+        for k in ("morreu", "morte", "morto", "morta", "assassina", "assassinato", "vítima", "vitima", "luto", "tragédia", "tragedia", "mal súbito", "mal subito", "falecimento")
+    )
     if is_auto:
         import os
         from .gameplay import pick_evolving_background
@@ -1063,47 +1085,54 @@ def produce_world_news_short(
         detected_niche = "games_gta6" if (topic == "games" or any(k in (pack.get("pt_title", "") + " " + topic).lower() for k in ("gta", "rockstar", "jogo", "games", "gameplay", "playstation", "xbox"))) else ("ia_tech" if topic in ("tech", "ia") else "noticias_mundiais")
 
         comp = None
-        if os.getenv("AUTOSHORTS_SEMANTIC_VISUALS", "1") in {"1", "true"}:
-            semantic_bg = build_semantic_visual_sequence(
-                pt_title=pack.get("pt_title", ""),
-                summary=str(picked.get("summary") or pack.get("spoken_script", "")),
-                category=detected_niche,
-                target_duration=48.0,
-                work_dir=bg_dir / "_semantic",
-                thumb_url=str(picked.get("image_url") or ""),
-            )
-            if semantic_bg is not None and semantic_bg.is_file():
-                bg_style_used = "semantic_topic_broll"
-                comp = _build_news_over_gameplay_video(
-                    semantic_bg, 0.0,
-                    str(picked.get("image_url") or ""),
-                    pack["pt_title"],
-                    pack["source_name"],
-                    bg_dir,
-                )
-
-        if comp is None:
-            gp = pick_evolving_background(
-                out_root,
-                niche=detected_niche,
-                topic=pack.get("pt_title") or topic,
-                min_duration=52.0,
-                auto_download=True,
-            )
-            if gp is not None:
-                bg_style_used = gp[2]
-                comp = _build_news_over_gameplay_video(
-                    gp[0], gp[1],
-                    str(picked.get("image_url") or ""),
-                    pack["pt_title"],
-                    pack["source_name"],
-                    bg_dir,
-                )
-        if comp is not None:
-            resolved_bg = str(comp)
-            burned_card = True
-        else:
+        # For sensitive tragedy/death news, NEVER composite over playful video games (Minecraft/Subway Surfers)!
+        if is_sensitive_tragedy:
+            bg_style_used = "journalistic_photo_ambient"
             resolved_bg = str(_build_news_backdrop_video(str(picked.get("image_url") or ""), bg_dir))
+            burned_card = False
+        else:
+            if os.getenv("AUTOSHORTS_SEMANTIC_VISUALS", "1") in {"1", "true"}:
+                semantic_bg = build_semantic_visual_sequence(
+                    pt_title=pack.get("pt_title", ""),
+                    summary=str(picked.get("summary") or pack.get("spoken_script", "")),
+                    category=detected_niche,
+                    target_duration=48.0,
+                    work_dir=bg_dir / "_semantic",
+                    thumb_url=str(picked.get("image_url") or ""),
+                )
+                if semantic_bg is not None and semantic_bg.is_file():
+                    bg_style_used = "semantic_topic_broll"
+                    comp = _build_news_over_gameplay_video(
+                        semantic_bg, 0.0,
+                        str(picked.get("image_url") or ""),
+                        pack["pt_title"],
+                        pack["source_name"],
+                        bg_dir,
+                    )
+
+            if comp is None:
+                gp = pick_evolving_background(
+                    out_root,
+                    niche=detected_niche,
+                    topic=pack.get("pt_title") or topic,
+                    min_duration=52.0,
+                    auto_download=True,
+                )
+                if gp is not None:
+                    bg_style_used = gp[2]
+                    comp = _build_news_over_gameplay_video(
+                        gp[0], gp[1],
+                        str(picked.get("image_url") or ""),
+                        pack["pt_title"],
+                        pack["source_name"],
+                        bg_dir,
+                    )
+            if comp is not None:
+                resolved_bg = str(comp)
+                burned_card = True
+            else:
+                bg_style_used = "journalistic_photo_ambient"
+                resolved_bg = str(_build_news_backdrop_video(str(picked.get("image_url") or ""), bg_dir))
 
     target_niche = pack.get("niche") or ("games" if "games" in str(topic).lower() else "noticias_mundiais")
     res = build_narrated_short(

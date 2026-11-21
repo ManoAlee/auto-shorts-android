@@ -670,6 +670,15 @@ def audit_short_end_to_end(
         if last_hw in {"de", "da", "do", "das", "dos", "e", "ou", "em", "no", "na", "para", "por", "com", "a", "o", "que"}:
             reject_reasons.append(f"Gancho cortado/pendente em preposicao ('{meta.get('hook_title')}').")
 
+    # Editorial Integrity: Prohibit ludic gameplay (Minecraft/Subway/jogos) over sensitive tragedy or death news
+    from .mahoraga import _TRAGEDY_SENSITIVE_KEYWORDS
+    all_text = f"{title_low} {cap_low} {sub_text.lower()} {hook_chk}"
+    if any(k in all_text for k in _TRAGEDY_SENSITIVE_KEYWORDS):
+        bg_style = str(meta.get("background_style") or "").lower()
+        bg_video = str(meta.get("bg_video") or "").lower()
+        if any(g in bg_style or g in bg_video for g in ("gameplay", "gp_", "minecraft", "subway", "dragonball")):
+            reject_reasons.append("Incompatibilidade editorial: Proibido gameplay lúdico (Minecraft/jogos) sobre notícia trágica ou morte.")
+
     dur = float(media_val.get("duration") or 0.0)
     if p.stem.startswith(("narrated_", "mundo_br_")) and 0.0 < dur < 16.0:
         reject_reasons.append(f"Narracao curta demais ({dur:.1f}s < 16.0s; possivel truncamento).")

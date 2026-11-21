@@ -329,4 +329,51 @@ def test_is_valid_media_file_rejects_empty_and_corrupt():
         assert _is_valid_media_file(None) is False
 
 
+def test_tragedy_narrative_uses_sober_hook_and_respectful_cta(tmp_path):
+    from auto_shorts.mahoraga import MahoragaEngine
+
+    engine = MahoragaEngine(db_path=tmp_path / "test_evo.db")
+    title = "Gabriel Félix: quais sintomas indicam mal súbito e porque acontece"
+    summary = "Influenciador de 29 anos morreu após passar mal. Cardiologistas explicam quais sintomas durante o esforço exigem urgência."
+    source = "Metrópoles"
+
+    script, spoke = engine.compose_news_narrative(
+        pt_title=title,
+        pt_summary=summary,
+        source_name=source,
+        category="mundo",
+    )
+
+    # 1. Zero absurd hallucinated fillers
+    assert "analistas internacionais" not in script
+    # 2. Zero polarizing debate CTAs on a tragic death
+    assert "Você concorda com essa postura" not in script
+    assert "Qual é a sua visão sobre esse caso" not in script
+    # 3. Proper noun Gabriel must remain capitalized
+    assert "gabriel" not in script
+    assert "Gabriel" in script
+    # 4. Sober closing present
+    assert any(c in script for c in ("Acompanhe", "Siga", "oficiais", "atualizações"))
+
+
+def test_validator_rejects_gameplay_over_tragedy_news(tmp_path):
+    from auto_shorts.validator import audit_short_end_to_end
+
+    fake_mp4 = tmp_path / "mundo_br_test.mp4"
+    fake_mp4.write_bytes(b"fake_mp4_bytes")
+
+    pack = {
+        "title": "Gabriel Félix: influenciador de 29 anos morreu após passar mal",
+        "hook_title": "MAL SÚBITO",
+        "caption": "Influenciador morreu de mal súbito.",
+        "background_style": "gp_minecraft_parkour",
+    }
+    media_val = {"valid": True, "duration": 30.0, "width": 720, "height": 1280}
+
+    audit = audit_short_end_to_end(fake_mp4, pack=pack, media_val=media_val, vision_check=False)
+    assert audit["approved"] is False
+    assert any("Incompatibilidade editorial" in r for r in audit["reject_reasons"])
+
+
+
 
