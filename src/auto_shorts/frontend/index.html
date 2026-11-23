@@ -33,8 +33,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
-  <script>(function(){try{var t=localStorage.getItem('autoshorts_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=Figtree:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <script>(function(){try{var t=localStorage.getItem('autoshorts_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#F8FAFC':'#070B12');}}catch(e){}})();</script>
   <style>
 __INLINE_CSS__
   </style>
@@ -63,7 +63,7 @@ __INLINE_CSS__
             <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </button>
-          <a href="/analytics" class="btn-quick-create" id="btn-open-analytics" style="text-decoration:none;background:#0f172a;border:1px solid #22d3ee;color:#22d3ee;" aria-label="Abrir Analytics e Radar Global">Analytics</a>
+          <a href="/analytics" class="btn-quick-create btn-nav-analytics" id="btn-open-analytics" aria-label="Abrir Analytics e Radar Global">Analytics</a>
           <button type="button" class="btn-quick-create" id="btn-quick-create">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>+ Criar Vídeo</span>
@@ -307,7 +307,7 @@ __INLINE_CSS__
                 </div>
               </div>
 
-              <div id="clipper-candidates-box" class="item-grid" style="margin-top:14px;" hidden aria-live="polite"></div>
+              <div id="clipper-candidates-box" class="item-grid candidates-box" hidden aria-live="polite"></div>
             </form>
           </div>
           <div class="preview-card" aria-label="Previa visual 9 por 16">
@@ -330,10 +330,10 @@ __INLINE_CSS__
               <div class="karaoke-preview-text" id="preview-subs-line">PALAVRA POR PALAVRA</div>
               <div class="phone-safe-bottom" aria-hidden="true"><span>Margem Segura UI (MarginV 300px)</span></div>
             </div>
-            <div class="check-row" style="margin-top:0; justify-content:space-between; flex-wrap:wrap;">
+            <div class="check-row scheduler-row">
               <div>
                 <strong>Piloto 24/7</strong>
-                <div id="scheduler-info" style="font-size:0.77rem; color:var(--ink-muted);">Carregando...</div>
+                <div id="scheduler-info" class="scheduler-info">Carregando...</div>
               </div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-scheduler">Alternar</button>
@@ -343,7 +343,7 @@ __INLINE_CSS__
           </div>
         </div>
 
-        <hr style="border:none; border-top:1px solid var(--border); margin:20px 0 14px 0;" />
+        <hr class="panel-divider" />
         <div class="radar-header">
           <div style="flex:1 1 260px;">
             <label for="horizon-topic">Radar Inteligente de Pautas (clique para Cortar ou Narrar)</label>
@@ -417,8 +417,8 @@ __INLINE_CSS__
         <div id="brief-output" class="meta-pre" hidden></div>
         <div id="team-planner-grid" class="item-grid"></div>
 
-        <hr style="border:none; border-top:1px solid var(--border); margin:22px 0 16px 0;" />
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <hr class="panel-divider" />
+        <div class="section-header-row">
           <div>
             <h3 style="margin:0;">🎭 Biblia de Personagens &amp; Anime 2.5D Lab</h3>
             <p class="panel-lead" style="margin:4px 0 0 0;">Identidade visual persistente (paleta, tracos, voz) + 8 tecnicas cinematograficas de anime/manga.</p>
@@ -464,7 +464,7 @@ __INLINE_CSS__
             </div>
           </div>
           <div style="margin-top:12px;">
-            <label for="voice-script">Roteiro em portugues <span aria-hidden="true">*</span> <small id="voice-pace-meta" style="color:var(--ink-muted); font-weight:600;"></small></label>
+            <label for="voice-script">Roteiro em portugues <span aria-hidden="true">*</span> <small id="voice-pace-meta" class="voice-pace-meta"></small></label>
             <textarea id="voice-script" name="script" required aria-required="true" aria-describedby="voice-script-err" placeholder="Escreva frases curtas e diretas em portugues natural..."></textarea>
             <span id="voice-script-err" class="error-msg" role="alert" hidden>Digite o roteiro da narracao.</span>
           </div>
@@ -481,12 +481,12 @@ __INLINE_CSS__
             <button type="button" class="btn btn-secondary" id="btn-sync-gameplay">Baixar Novo Fundo</button>
             <button type="submit" class="btn btn-primary" id="btn-run-voice">Gerar Short &amp; Validar</button>
           </div>
-          <div id="voice-preview-box" style="margin-top:10px;" aria-live="polite"></div>
+          <div id="voice-preview-box" class="voice-preview-wrap" aria-live="polite"></div>
         </form>
       </section>
 
       <section id="panel-videos" role="tabpanel" aria-labelledby="tab-videos" class="panel" hidden>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div class="section-header-row">
           <div>
             <h2>Acervo Local, Visao &amp; Multi-Publicacao</h2>
             <p class="panel-lead" style="margin-bottom:0;">Envie direto para o TikTok (`@aleplaytv5`), YouTube ou inspecione o Scorecard 5D.</p>
@@ -778,8 +778,8 @@ __INLINE_CSS__
           <h3 id="story-result-title" style="margin:0; font-size:1.1rem; color:var(--text-strong);"></h3>
           <span id="story-retention-badge" class="chip chip-tt">Retencao 89/100</span>
         </div>
-        <div id="story-cast-box" style="margin-bottom:12px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.04); font-size:0.85rem;"></div>
-        <div id="story-scenes-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <div id="story-cast-box" class="story-cast-box"></div>
+        <div id="story-scenes-list" class="story-scenes-list"></div>
       </div>
     </div>
   </dialog>

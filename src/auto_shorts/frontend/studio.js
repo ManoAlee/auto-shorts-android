@@ -43,7 +43,7 @@
     if (iconSun) iconSun.hidden = isLight;
     if (iconMoon) iconMoon.hidden = !isLight;
     const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', isLight ? '#FFFFFF' : '#070B12');
+    if (metaTheme) metaTheme.setAttribute('content', isLight ? '#F8FAFC' : '#070B12');
     try { localStorage.setItem('autoshorts_theme', isLight ? 'light' : 'dark'); } catch (e) {}
   }
   applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
