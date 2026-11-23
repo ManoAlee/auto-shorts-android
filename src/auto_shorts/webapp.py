@@ -307,6 +307,8 @@ def list_generated_videos(out_dir: Path) -> List[Dict]:
             continue
         if st.st_size < 50000:
             continue
+        if mp4.name.startswith(("_", ".")) or ".raw_chunk" in mp4.name or ".part" in mp4.name or mp4.name.startswith("temp_"):
+            continue
         pack_file = mp4.with_suffix(".publish.json")
         if not pack_file.is_file():
             try:
