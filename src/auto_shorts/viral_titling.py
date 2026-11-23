@@ -45,12 +45,12 @@ _STREAMER_HOOK_TEMPLATES = [
     "A reação inacreditável do {streamer} ao vivo!",
     "O momento exato em que {streamer} descobriu isso!",
     "{streamer} ficou em choque total com essa cena!",
-    "Nem o {streamer} esperava por isso no jogo!",
-    "{streamer} perdeu o controle nessa missão!",
+    "Nem o {streamer} esperava por isso!",
+    "{streamer} perdeu o controle nessa hora!",
     "O {streamer} quase não acreditou no que viu!",
-    "Essa foi a jogada mais insana do {streamer}!",
-    "{streamer} descobriu esse segredo bizarro ao vivo!",
-    "A jogada do {streamer} que chocou todo mundo!",
+    "Esse foi o momento mais insano do {streamer}!",
+    "{streamer} descobriu esse segredo ao vivo!",
+    "A reação do {streamer} que chocou todo mundo!",
 ]
 
 # Story / Nosleep hook headline templates when extracting entity
@@ -257,9 +257,11 @@ def generate_smart_clip_title(
             return title[:85]
 
         if any(w in norm_clip for w in ("policia", "cop", "fugir", "estrelas", "tiro", "bomba", "tanque", "missao")):
-            title = f"O Maior Caos do {streamer_name} no GTA 6! #Shorts"
+            is_gta = "gta" in niche.lower() or any(k in norm_src for k in ("gta", "grand theft auto", "leonida", "vice city", "rockstar"))
+            game_suffix = " no GTA 6!" if is_gta else " ao Vivo!"
+            title = f"O Maior Caos do {streamer_name}{game_suffix} #Shorts"
             if part_num > 1:
-                title = f"Missão Insana do {streamer_name} (Parte {part_num}) #Shorts"
+                title = f"Momento Insano do {streamer_name} (Parte {part_num}) #Shorts"
             return title[:85]
 
         # Use deterministic hash of clip_text or part_num to guarantee non-repetitive viral title
