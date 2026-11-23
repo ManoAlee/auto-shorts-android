@@ -27,6 +27,22 @@ def load_client_credentials(json_path: str | None) -> Tuple[str, str]:
             raise ValueError(f"Invalid OAuth JSON structure in {json_path}")
         return cid, csec
 
+    # Check existing .env file first
+    env_file = Path(".env")
+    env_cid = os.getenv("YT_CLIENT_ID", "").strip()
+    env_csec = os.getenv("YT_CLIENT_SECRET", "").strip()
+    if not (env_cid and env_csec) and env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("YT_CLIENT_ID="):
+                env_cid = line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif line.startswith("YT_CLIENT_SECRET="):
+                env_csec = line.split("=", 1)[1].strip().strip('"').strip("'")
+
+    if env_cid and env_csec:
+        print(f"[*] Credenciais carregadas do .env (Client ID: {env_cid[:16]}...)")
+        return env_cid, env_csec
+
     cid = input("YT_CLIENT_ID: ").strip()
     csec = input("YT_CLIENT_SECRET: ").strip()
     if not cid or not csec:
