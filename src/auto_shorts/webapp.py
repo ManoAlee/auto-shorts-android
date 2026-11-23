@@ -873,6 +873,68 @@ def make_handler(out_dir: Path):
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
 
+        def _serve_file_with_range(self, safe_target: Path) -> None:
+            """Stream media files in 64KB chunks with full RFC 7233 HTTP Range support (206 Partial Content)."""
+            try:
+                file_size = safe_target.stat().st_size
+                ctype, _ = mimetypes.guess_type(str(safe_target))
+                if not ctype:
+                    ctype = "video/mp4" if safe_target.suffix == ".mp4" else "application/octet-stream"
+
+                range_header = self.headers.get("Range")
+                if range_header and range_header.startswith("bytes="):
+                    parts = range_header.replace("bytes=", "").split("-")
+                    start_str = parts[0].strip()
+                    end_str = parts[1].strip() if len(parts) > 1 else ""
+
+                    start = int(start_str) if start_str else 0
+                    end = int(end_str) if end_str else file_size - 1
+                    if start >= file_size or end >= file_size or start > end:
+                        self.send_response(416)
+                        self.send_header("Content-Range", f"bytes */{file_size}")
+                        self.end_headers()
+                        return
+
+                    length = end - start + 1
+                    self.send_response(206)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+                    self.send_header("Content-Length", str(length))
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.send_header("Cache-Control", "public, max-age=3600")
+                    self.end_headers()
+
+                    with safe_target.open("rb") as f:
+                        f.seek(start)
+                        remaining = length
+                        chunk_size = 65536
+                        while remaining > 0:
+                            to_read = min(chunk_size, remaining)
+                            buf = f.read(to_read)
+                            if not buf:
+                                break
+                            self.wfile.write(buf)
+                            remaining -= len(buf)
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(file_size))
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.send_header("Cache-Control", "public, max-age=3600")
+                    self.end_headers()
+
+                    with safe_target.open("rb") as f:
+                        chunk_size = 65536
+                        while True:
+                            buf = f.read(chunk_size)
+                            if not buf:
+                                break
+                            self.wfile.write(buf)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            except Exception as ex:
+                logger.warning("Error serving media %s: %s", safe_target.name, ex)
+
         def _send_json(self, code: int, payload: Dict) -> None:
             raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             try:
@@ -1397,13 +1459,7 @@ def make_handler(out_dir: Path):
                 if not safe_target or not safe_target.is_file():
                     self.send_error(404, "Preview nao encontrado")
                     return
-                ctype, _ = mimetypes.guess_type(str(safe_target))
-                data = safe_target.read_bytes()
-                self.send_response(200)
-                self.send_header("Content-Type", ctype or "audio/mpeg")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self._safe_write(data)
+                self._serve_file_with_range(safe_target)
                 return
 
             if parsed.path.startswith("/media/"):
@@ -1412,14 +1468,16 @@ def make_handler(out_dir: Path):
                 if not safe_target or not safe_target.is_file():
                     self.send_error(404, "Arquivo nao encontrado")
                     return
-                ctype, _ = mimetypes.guess_type(str(safe_target))
-                data = safe_target.read_bytes()
-                self.send_response(200)
-                self.send_header("Content-Type", ctype or "application/octet-stream")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self._safe_write(data)
+                self._serve_file_with_range(safe_target)
                 return
+
+            # Support direct root media paths like /q7E4XrfGGnE_short_13_youtube_shorts.mp4
+            clean_leaf = parsed.path.lstrip("/")
+            if clean_leaf and clean_leaf.endswith((".mp4", ".jpg", ".png", ".webp", ".svg")):
+                safe_target = _safe_child_path(out_dir, clean_leaf)
+                if safe_target and safe_target.is_file():
+                    self._serve_file_with_range(safe_target)
+                    return
 
             if parsed.path.startswith("/api/"):
                 self._send_error(404, "NOT_FOUND", f"Endpoint nao encontrado: {parsed.path}")

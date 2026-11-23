@@ -33,7 +33,7 @@ _CHIP_TO_NICHE: Tuple[Tuple[str, str], ...] = (
 )
 
 
-def fetch_youtube_br_home_chips(timeout: float = 4.5, ttl_sec: int = 1800) -> List[str]:
+def fetch_youtube_br_home_chips(timeout: float = 1.5, ttl_sec: int = 1800) -> List[str]:
     """Extract live category chips from YouTube BR HTML (`ytInitialData`) without API v3 quota."""
     now = time.time()
     cached = _YT_CHIP_CACHE.get("chips")
@@ -251,7 +251,10 @@ def get_hype_status_payload(today: Optional[_dt.date] = None) -> Dict:
     """Return structured hype telemetry for /api/status and Copiloto IA."""
     active = get_active_hype_windows(today)
     _, _, summary = pick_hype_aware_niche(0, "all", today=today)
-    chips = fetch_youtube_br_home_chips()
+    try:
+        chips = fetch_youtube_br_home_chips(timeout=1.5)
+    except Exception:
+        chips = []
     return {
         "active_hype": summary or "Rotação equilibrada",
         "windows": [
@@ -296,7 +299,10 @@ def fetch_google_trends_br(limit: int = 4, timeout: float = 4.0) -> List[Dict]:
 def get_live_trend_cards(today: Optional[_dt.date] = None) -> Dict:
     """Build live hype cards strictly from real YouTube BR chips + diversified RSS + Google Trends (zero hardcoded cards)."""
     ref = today or _dt.date.today()
-    chips = fetch_youtube_br_home_chips()
+    try:
+        chips = fetch_youtube_br_home_chips(timeout=1.5)
+    except Exception:
+        chips = []
     status = get_hype_status_payload(ref)
 
     cards: List[Dict[str, str]] = []
