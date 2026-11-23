@@ -868,10 +868,15 @@ def make_handler(out_dir: Path):
             super().end_headers()
 
         def _safe_write(self, data: bytes) -> None:
+            if getattr(self, "command", "GET") == "HEAD":
+                return
             try:
                 self.wfile.write(data)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
+
+        def do_HEAD(self):
+            return self.do_GET()
 
         def _serve_file_with_range(self, safe_target: Path) -> None:
             """Stream media files in 64KB chunks with full RFC 7233 HTTP Range support (206 Partial Content)."""
@@ -904,6 +909,9 @@ def make_handler(out_dir: Path):
                     self.send_header("Cache-Control", "public, max-age=3600")
                     self.end_headers()
 
+                    if getattr(self, "command", "GET") == "HEAD":
+                        return
+
                     with safe_target.open("rb") as f:
                         f.seek(start)
                         remaining = length
@@ -922,6 +930,9 @@ def make_handler(out_dir: Path):
                     self.send_header("Accept-Ranges", "bytes")
                     self.send_header("Cache-Control", "public, max-age=3600")
                     self.end_headers()
+
+                    if getattr(self, "command", "GET") == "HEAD":
+                        return
 
                     with safe_target.open("rb") as f:
                         chunk_size = 65536
