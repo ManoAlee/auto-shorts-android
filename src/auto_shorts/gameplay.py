@@ -57,12 +57,12 @@ GAMEPLAY_QUERIES: Dict[str, List[str]] = {
 NICHE_STYLE_AFFINITY: Dict[str, List[str]] = {
     "noticias_mundiais": ["drone_cinema", "urban_rain"],
     "ia_tech": ["space_cosmos", "urban_rain", "drone_cinema"],
-    "financas": ["finance_minimal", "drone_cinema", "gta_ramp", "subway", "minecraft"],
-    "desenvolvimento_pessoal": ["urban_rain", "drone_cinema", "satisfying", "minecraft", "subway"],
-    "saude_fitness": ["fitness_motion", "drone_cinema", "satisfying", "subway", "minecraft"],
-    "entretenimento_animes": ["minecraft", "subway", "gta_ramp", "beamng", "urban_rain"],
-    "podcast": ["subway", "minecraft", "gta_ramp", "satisfying", "urban_rain"],
-    "games_gta6": ["gta_6", "gta_ramp", "beamng", "urban_rain"],
+    "financas": ["finance_minimal", "drone_cinema", "urban_rain"],
+    "desenvolvimento_pessoal": ["urban_rain", "drone_cinema", "space_cosmos"],
+    "saude_fitness": ["fitness_motion", "drone_cinema"],
+    "entretenimento_animes": ["dbz_trunks_real", "urban_rain"],
+    "podcast": ["urban_rain", "drone_cinema", "rdr2_agnes_dowd"],
+    "games_gta6": ["gta6_trailer_official", "gta_6", "urban_rain"],
 }
 
 

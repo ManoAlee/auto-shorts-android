@@ -1096,19 +1096,83 @@ def list_clean_backgrounds(out_dir: Path) -> List[str]:
     return out_list
 
 
+def find_topic_relevant_asset(topic: str, script_text: str = "", assets_dir: Optional[Path] = None) -> Optional[Path]:
+    """Find authentic, topic-specific background footage if available, avoiding generic brainrot."""
+    combined = f"{topic} {script_text}".lower()
+    if assets_dir is None or not assets_dir.is_dir():
+        return None
+
+    mappings = [
+        # GTA 6 / Leonida / Vice City
+        (
+            ("gta 6", "gta vi", "leonida", "vice city", "lucia", "jason", "gta6"),
+            ["gp_gta6_trailer_official.mp4", "gp_gta_6.mp4"],
+        ),
+        # Red Dead Redemption 2 / Agnes Dowd
+        (
+            ("red dead", "rdr2", "lemoyne", "agnes dowd", "arthur morgan", "bluewater marsh"),
+            ["gp_rdr2_agnes_dowd.mp4"],
+        ),
+        # Anime / Jujutsu Kaisen / Dragon Ball / Manga
+        (
+            ("sukuna", "jujutsu", "gojo", "itadori", "anime", "manga", "dbz", "goku", "trunks"),
+            ["gp_dbz_trunks_real.mp4"],
+        ),
+        # Space / Cosmos / Astronomy / Radio Burst
+        (
+            ("espaço", "cósmico", "cosmico", "universo", "astronomo", "astrônomo", "galaxia", "galáxia", "estrela", "pulsar", "magnetar", "sinal de rádio", "telescópio"),
+            ["gp_space_cosmos_0i9wZ-xDC04.mp4", "gp_space_cosmos.mp4"],
+        ),
+        # Tech / Smartphone / Samsung / AI
+        (
+            ("samsung", "galaxy", "one ui", "smartphone", "biometria", "celular", "aplicativo", "app"),
+            ["gp_drone_cinema_DesiBXmyCBQ.mp4", "gp_urban_rain_ff2zAkzX82s.mp4"],
+        ),
+        # Cyberpunk / Night City
+        (
+            ("cyberpunk", "ia ", "inteligencia artificial", "algoritmo", "hack", "tecnologia"),
+            ["gp_urban_rain_ff2zAkzX82s.mp4", "gp_drone_cinema_DesiBXmyCBQ.mp4"],
+        ),
+    ]
+
+    for keywords, candidate_names in mappings:
+        if any(k in combined for k in keywords):
+            for name in candidate_names:
+                cand = assets_dir / name
+                if cand.is_file() and cand.stat().st_size > 100_000:
+                    return cand
+
+    return None
+
+
 def resolve_background_video(
     bg_video: str | Path, out_dir: Path, niche: str = "geral", topic: str = ""
 ) -> Tuple[Path, bool]:
-    """Resolve background video, rotating cached gameplays cleanly without repeating."""
+    """Resolve background video, prioritizing topic-specific real footage before falling back to generic B-roll."""
     from .gameplay import pick_gameplay_segment
 
     raw_str = str(bg_video or "").strip()
+    assets_dir = out_dir.parent / "assets" / "gameplay"
+    if not assets_dir.is_dir():
+        assets_dir = Path("assets/gameplay")
+
+    # 1. If topic is provided, always prioritize matching authentic real scenes
+    if topic:
+        relevant = find_topic_relevant_asset(topic, assets_dir=assets_dir)
+        if relevant and relevant.is_file():
+            return relevant, False
+
     if raw_str and raw_str.lower() not in {"auto", "gameplay"}:
         p = Path(raw_str)
         if not p.is_absolute() and not p.exists():
             alt = out_dir.parent / p
             if alt.exists():
                 p = alt
+        # Intercept generic brainrot when real subject footage is available
+        if ("ramp" in p.name or "subway" in p.name or "minecraft" in p.name) and topic:
+            relevant = find_topic_relevant_asset(topic, assets_dir=assets_dir)
+            if relevant and relevant.is_file():
+                return relevant, False
         may_have_subs = "_short_" in p.name or p.name.startswith(("narrado_", "narrated_"))
         return p, may_have_subs
 

@@ -26,10 +26,10 @@ def main():
             "custom_title": "Por que GTA 6 vai rodar a 30 FPS no PS5 e Xbox? O Segredo Técnico de Leonida",
             "style_key": "narrador_pro",
             "niche": "games_esports",
+            "force_rerender": True,
             "bg_candidates": [
-                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
+                repo_root / "assets" / "gameplay" / "gp_gta6_trailer_official.mp4",
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
-                repo_root / "assets" / "gameplay" / "gp_minecraft_7yl7Wc1dtWc.mp4",
             ],
             "script": (
                 "Você ainda acredita que o GTA 6 vai rodar a 60 quadros por segundo no seu PlayStation 5 "
@@ -153,7 +153,7 @@ def main():
 
         print(f"[BACKGROUND] {bg_path}")
         start_t = time.time()
-        if out_mp4.is_file() and out_mp4.stat().st_size > 5_000_000:
+        if not item.get("force_rerender") and out_mp4.is_file() and out_mp4.stat().st_size > 5_000_000:
             print(f"[EXISTS] {out_mp4.name} already rendered ({out_mp4.stat().st_size / (1024*1024):.2f} MB), skipping re-render.")
             audit = audit_short_end_to_end(out_mp4, max_duration=180.0, vision_check=False)
             elapsed = 0.1
