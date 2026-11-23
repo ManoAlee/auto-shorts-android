@@ -26,7 +26,7 @@ def main():
             "custom_title": "Por que GTA 6 vai rodar a 30 FPS no PS5 e Xbox? O Segredo Técnico de Leonida",
             "style_key": "narrador_pro",
             "niche": "games_esports",
-            "force_rerender": False,
+            "force_rerender": True,
             "bg_candidates": [
                 repo_root / "assets" / "gameplay" / "gp_gta6_trailer_official.mp4",
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
@@ -50,7 +50,7 @@ def main():
             "custom_title": "O Segredo Macabro de Agnes Dowd nos Pântanos de Red Dead Redemption 2",
             "style_key": "thalita_hd",
             "niche": "podcast",
-            "force_rerender": False,
+            "force_rerender": True,
             "bg_candidates": [
                 repo_root / "assets" / "gameplay" / "gp_rdr2_agnes_dowd.mp4",
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
@@ -72,7 +72,7 @@ def main():
             "custom_title": "Samsung Libera Bloqueio Individual de Apps com Biometria na One UI | Plantão Tech",
             "style_key": "narrador_pro",
             "niche": "ia_tech",
-            "force_rerender": False,
+            "force_rerender": True,
             "bg_candidates": [
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
             ],
