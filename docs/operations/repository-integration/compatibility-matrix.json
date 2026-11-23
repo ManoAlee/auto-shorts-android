@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "target_target": "Android aarch64 (Termux) + One UI 6 / Android 17",
+  "matrix": {
+    "cli-anything": {
+      "python_3_10_plus": true,
+      "termux_arm64": true,
+      "zero_native_deps": true,
+      "lmk_resilient": true,
+      "score": 100
+    },
+    "whisper.cpp": {
+      "python_3_10_plus": true,
+      "termux_arm64": true,
+      "neon_simd_supported": true,
+      "lmk_resilient": true,
+      "score": 98
+    },
+    "streamlink": {
+      "python_3_10_plus": true,
+      "termux_arm64": true,
+      "zero_native_deps": true,
+      "lmk_resilient": true,
+      "score": 95
+    },
+    "yt-dlp": {
+      "python_3_10_plus": true,
+      "termux_arm64": true,
+      "zero_native_deps": true,
+      "lmk_resilient": true,
+      "score": 96
+    },
+    "piper-tts": {
+      "python_3_10_plus": true,
+      "termux_arm64": true,
+      "onnx_arm64_supported": true,
+      "lmk_resilient": true,
+      "score": 92
+    },
+    "auto-editor (native)": {
+      "python_3_10_plus": true,
+      "termux_arm64": false,
+      "notes": "Pesado no Termux; adaptado via FFmpeg silencedetect nativo",
+      "score": 60
+    },
+    "pyscenedetect (native)": {
+      "python_3_10_plus": true,
+      "termux_arm64": false,
+      "notes": "Exige OpenCV; adaptado via FFmpeg scene filter",
+      "score": 55
+    },
+    "moviepy": {
+      "python_3_10_plus": true,
+      "termux_arm64": false,
+      "notes": "Alocação massiva de arrays em memória RAM. Causa LMK Kill",
+      "score": 20
+    }
+  }
+}

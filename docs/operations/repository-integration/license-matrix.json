@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "policy": "Permissive-First / Commercial-Safe Distribution",
+  "licenses": {
+    "cli-anything": {
+      "license": "MIT",
+      "commercial_use": true,
+      "distribution": "Permitted",
+      "status": "APPROVED"
+    },
+    "whisper.cpp": {
+      "license": "MIT",
+      "commercial_use": true,
+      "distribution": "Permitted",
+      "status": "APPROVED"
+    },
+    "streamlink": {
+      "license": "Simplified BSD (2-Clause)",
+      "commercial_use": true,
+      "distribution": "Permitted",
+      "status": "APPROVED"
+    },
+    "yt-dlp": {
+      "license": "The Unlicense",
+      "commercial_use": true,
+      "distribution": "Permitted",
+      "status": "APPROVED"
+    },
+    "piper-tts": {
+      "license": "GPLv3 (CLI) / MIT (ONNX Models)",
+      "commercial_use": true,
+      "distribution": "Separated process boundary via IPC/CLI",
+      "status": "APPROVED_BOUNDARY"
+    },
+    "auto-shorts-android": {
+      "license": "MIT",
+      "status": "PROPRIETARY_OPEN_ENGINE"
+    }
+  }
+}
