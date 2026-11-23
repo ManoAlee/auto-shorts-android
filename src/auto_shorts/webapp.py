@@ -1156,6 +1156,18 @@ def make_handler(out_dir: Path):
                 self._send_json(200, get_tiktok_cdp_status(out_dir))
                 return
 
+            if parsed.path == "/api/omega/status":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                self._send_json(200, orch.get_dashboard_telemetry())
+                return
+
+            if parsed.path == "/api/omega/tasks":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                self._send_json(200, {"tasks": [t.to_dict() for t in orch.list_tasks()]})
+                return
+
             if parsed.path == "/api/youtube/cdp/status":
                 from .youtube_cdp import get_youtube_cdp_status
                 self._send_json(200, get_youtube_cdp_status(out_dir))
@@ -1993,6 +2005,75 @@ def make_handler(out_dir: Path):
                     self._send_json(200, publish_pack_to_tiktok(target, mode=mode))
                 except Exception as exc:
                     self._send_json(500, {"message": str(exc)})
+                return
+
+            if parsed.path == "/api/omega/task/create":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                p = str(body.get("platform") or "youtube")
+                v = str(body.get("video_path") or "")
+                title = str(body.get("title") or "")
+                desc = str(body.get("description") or "")
+                auto_app = bool(body.get("auto_approve", False))
+                try:
+                    task = orch.create_task(
+                        platform=p,
+                        video_path=v,
+                        title=title,
+                        description=desc,
+                        require_approval=not auto_app,
+                    )
+                    self._send_json(200, {"ok": True, "task": task.to_dict()})
+                except Exception as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/omega/task/approve":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                tid = str(body.get("task_id") or "")
+                op = str(body.get("operator") or "operator_admin")
+                comm = str(body.get("comment") or "")
+                try:
+                    task = orch.approve_task(tid, operator=op, comment=comm)
+                    self._send_json(200, {"ok": True, "task": task.to_dict()})
+                except Exception as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/omega/task/reject":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                tid = str(body.get("task_id") or "")
+                op = str(body.get("operator") or "operator_admin")
+                reason = str(body.get("reason") or "")
+                try:
+                    task = orch.reject_task(tid, operator=op, reason=reason)
+                    self._send_json(200, {"ok": True, "task": task.to_dict()})
+                except Exception as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/omega/task/execute":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                tid = str(body.get("task_id") or "")
+                try:
+                    task = orch.execute_task(tid)
+                    self._send_json(200, {"ok": True, "task": task.to_dict()})
+                except Exception as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
+                return
+
+            if parsed.path == "/api/omega/task/verify":
+                from .omega_cdp import OmegaControlOrchestrator
+                orch = OmegaControlOrchestrator(out_dir)
+                tid = str(body.get("task_id") or "")
+                try:
+                    task = orch.verify_task(tid)
+                    self._send_json(200, {"ok": True, "task": task.to_dict()})
+                except Exception as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
                 return
 
             if parsed.path == "/api/autopublish/run":

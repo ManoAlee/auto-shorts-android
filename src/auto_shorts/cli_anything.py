@@ -212,6 +212,110 @@ def cmd_audit(args: argparse.Namespace, out_dir: Path) -> int:
     return 0 if scorecard.get("approved") else 1
 
 
+def cmd_omega(args: argparse.Namespace, out_dir: Path) -> int:
+    from .omega_cdp import OmegaControlOrchestrator
+    orch = OmegaControlOrchestrator(out_dir)
+    action = getattr(args, "omega_action", "status")
+
+    if not action or action == "status":
+        data = orch.get_dashboard_telemetry()
+        if args.json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== OMEGA CDP CONTROL ENGINE TELEMETRY ===")
+            print(f" Status : {data['status']}")
+            print(f" Tarefas: {data['task_counts']}")
+            print("==========================================\n")
+        return 0
+
+    elif action == "capabilities":
+        caps = orch.registry.list_capabilities()
+        if args.json:
+            print(json.dumps({"capabilities": caps}, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n=== CAPACIDADES DE PLATAFORMA ({len(caps)}) ===")
+            for c in caps:
+                print(f" Plataforma: {c['platform']} | Adaptador: {c['primary_adapter']} | Operações: {c['allowed_operations_count']}")
+            print("============================================\n")
+        return 0
+
+    elif action == "sessions":
+        sessions = orch.get_dashboard_telemetry().get("sessions", {})
+        if args.json:
+            print(json.dumps({"sessions": sessions}, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== PERFIS DE SESSAO CDP ===")
+            for p, s in sessions.items():
+                print(f" Plataforma: {p} | Autenticado: {s.get('ready_to_publish')}")
+            print("============================\n")
+        return 0
+
+    elif action == "tasks":
+        sub_act = getattr(args, "action", "list")
+        if sub_act == "list":
+            tasks = [t.to_dict() for t in orch.list_tasks(limit=getattr(args, "limit", 20))]
+            if args.json:
+                print(json.dumps({"tasks": tasks, "count": len(tasks)}, indent=2, ensure_ascii=False))
+            else:
+                print(f"\n=== TAREFAS OMEGA ({len(tasks)} encontradas) ===")
+                for t in tasks:
+                    print(f" [{t['task_id']}] {t['platform']} | Estado: {t['state']} | Título: {t['title'][:40]}")
+                print("================================================\n")
+            return 0
+
+        elif sub_act == "create":
+            if not getattr(args, "video", "") or not getattr(args, "title", ""):
+                err = {"error": "Parametros --video e --title sao obrigatorios"}
+                print(json.dumps(err) if args.json else err["error"], file=sys.stderr)
+                return 2
+            t = orch.create_task(
+                platform=getattr(args, "platform", "youtube"),
+                video_path=args.video,
+                title=args.title,
+                require_approval=not getattr(args, "auto_approve", False),
+            )
+            if args.json:
+                print(json.dumps({"task": t.to_dict()}, indent=2, ensure_ascii=False))
+            else:
+                print(f"[Omega] Tarefa criada com sucesso: {t.task_id} (Estado: {t.state.value})")
+            return 0
+
+        elif sub_act == "approve":
+            tid = getattr(args, "task_id", "")
+            if not tid:
+                return 2
+            t = orch.approve_task(tid, operator=getattr(args, "operator", "operator_admin"), comment=getattr(args, "comment", ""))
+            if args.json:
+                print(json.dumps({"task": t.to_dict()}, indent=2, ensure_ascii=False))
+            else:
+                print(f"[Omega] Tarefa {t.task_id} aprovada.")
+            return 0
+
+        elif sub_act == "reject":
+            tid = getattr(args, "task_id", "")
+            if not tid:
+                return 2
+            t = orch.reject_task(tid, operator=getattr(args, "operator", "operator_admin"), reason=getattr(args, "reason", ""))
+            if args.json:
+                print(json.dumps({"task": t.to_dict()}, indent=2, ensure_ascii=False))
+            else:
+                print(f"[Omega] Tarefa {t.task_id} rejeitada.")
+            return 0
+
+        elif sub_act == "verify":
+            tid = getattr(args, "task_id", "")
+            if not tid:
+                return 2
+            t = orch.verify_task(tid)
+            if args.json:
+                print(json.dumps({"task": t.to_dict()}, indent=2, ensure_ascii=False))
+            else:
+                print(f"[Omega] Tarefa {t.task_id} verificada. Estado: {t.state.value}")
+            return 0
+
+    return 2
+
+
 def build_cli_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="Saída em formato JSON estruturado (Agent-First)")
@@ -240,6 +344,24 @@ def build_cli_parser() -> argparse.ArgumentParser:
     p_audit = subparsers.add_parser("audit", parents=[common], help="Auditoria técnica e estética 5D de arquivo MP4")
     p_audit.add_argument("file", help="Caminho do arquivo MP4 a ser auditado")
 
+    # omega
+    p_omega = subparsers.add_parser("omega", parents=[common], help="Controle do Omega CDP Control Engine")
+    omega_sub = p_omega.add_subparsers(dest="omega_action", help="Ações do Omega CDP")
+    omega_sub.add_parser("status", parents=[common], help="Telemetria e status das tarefas e sessões")
+    omega_sub.add_parser("capabilities", parents=[common], help="Matriz de permissões e limites de plataforma")
+    omega_sub.add_parser("sessions", parents=[common], help="Perfis de sessão e estado de autenticação")
+    p_tasks = omega_sub.add_parser("tasks", parents=[common], help="Gerenciamento de tarefas de publicação")
+    p_tasks.add_argument("--action", default="list", choices=["list", "create", "approve", "reject", "verify"])
+    p_tasks.add_argument("--task-id", default="", help="ID da tarefa")
+    p_tasks.add_argument("--platform", default="youtube", help="Plataforma")
+    p_tasks.add_argument("--video", default="", help="Caminho do arquivo de vídeo")
+    p_tasks.add_argument("--title", default="", help="Título do vídeo")
+    p_tasks.add_argument("--operator", default="operator_admin", help="Operador responsável")
+    p_tasks.add_argument("--reason", default="", help="Motivo da rejeição")
+    p_tasks.add_argument("--comment", default="", help="Comentário da aprovação")
+    p_tasks.add_argument("--limit", type=int, default=20, help="Limite de tarefas")
+    p_tasks.add_argument("--auto-approve", action="store_true", help="Pular fila de aprovação humana")
+
     # serve (compatibilidade web)
     p_serve = subparsers.add_parser("serve", parents=[common], help="Inicia o Web Studio Dashboard")
     p_serve.add_argument("--port", type=int, default=8787, help="Porta TCP do servidor (padrão: 8787)")
@@ -262,6 +384,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_jobs(args, out_dir)
     elif args.subcommand == "audit":
         return cmd_audit(args, out_dir)
+    elif args.subcommand == "omega":
+        return cmd_omega(args, out_dir)
     elif args.subcommand == "serve":
         from .webapp import serve_webapp
         serve_webapp(host="0.0.0.0", port=args.port, out_dir=str(out_dir))
