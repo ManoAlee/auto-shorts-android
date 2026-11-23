@@ -14,7 +14,6 @@ import re
 import shutil
 import struct
 import subprocess
-import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -438,10 +437,6 @@ def render_gamer_clip(
         return False
 
 
-_STREAMER_SNIPE_HISTORY: Dict[str, float] = {}
-_SNIPER_ACTIVE_LOCK = threading.Lock()
-
-
 def snip_streamer_highlight(
     target: StreamerTarget,
     out_dir: str | Path,
@@ -450,30 +445,7 @@ def snip_streamer_highlight(
     direct_url: Optional[str] = None,
     num_clips: int = 2,
 ) -> Optional[Dict[str, Any]]:
-    """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts with concurrency lock."""
-    if not _SNIPER_ACTIVE_LOCK.acquire(blocking=False):
-        return None
-    try:
-        return _snip_streamer_highlight_impl(
-            target=target,
-            out_dir=out_dir,
-            hook_banner=hook_banner,
-            clip_duration=clip_duration,
-            direct_url=direct_url,
-            num_clips=num_clips,
-        )
-    finally:
-        _SNIPER_ACTIVE_LOCK.release()
-
-
-def _snip_streamer_highlight_impl(
-    target: StreamerTarget,
-    out_dir: str | Path,
-    hook_banner: Optional[str] = None,
-    clip_duration: float = 50.0,
-    direct_url: Optional[str] = None,
-    num_clips: int = 2,
-) -> Optional[Dict[str, Any]]:
+    """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -492,12 +464,6 @@ def _snip_streamer_highlight_impl(
     buffer_sec = max(60, min(240, int(requested_clips * (clip_duration + 15))))
     ok = download_live_chunk(stream_url, raw_sample, duration_sec=buffer_sec)
     if not ok or not raw_sample.is_file():
-        try:
-            raw_sample.unlink(missing_ok=True)
-            part_f = raw_sample.with_name(raw_sample.name + ".part")
-            part_f.unlink(missing_ok=True)
-        except Exception:
-            pass
         return None
 
     # 2. Extract PCM audio and find non-overlapping reaction spikes
@@ -548,41 +514,15 @@ def _snip_streamer_highlight_impl(
 
     selected_starts.sort()
 
-    # 3. Detect actual game / content from title_source (never force GTA 6 if streamer is playing CS2, Valorant or chatting)
-    title_low = (title_source or "").lower()
-    clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
-    if any(k in title_low for k in ("gta", "grand theft auto", "vice city", "leonida", "lucia", "jason")):
-        game_label = "GTA 6"
-        niche_key = "games_gta6"
-        playlist_name = "Games e GTA 6 - Shorts"
-        hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
-    elif any(k in title_low for k in ("cs", "cs2", "counter-strike", "counter strike", "major", "tribo")):
-        game_label = "CS2"
-        niche_key = "games"
-        playlist_name = "Games e Gameplay - Shorts"
-        hashtags = ["#Shorts", "#CS2", "#CounterStrike", clean_tag, "#GamerBrasil"]
-    elif any(k in title_low for k in ("valorant", "vct")):
-        game_label = "Valorant"
-        niche_key = "games"
-        playlist_name = "Games e Gameplay - Shorts"
-        hashtags = ["#Shorts", "#Valorant", clean_tag, "#Gameplay", "#GamerBrasil"]
-    elif "fortnite" in title_low:
-        game_label = "Fortnite"
-        niche_key = "games"
-        playlist_name = "Games e Gameplay - Shorts"
-        hashtags = ["#Shorts", "#Fortnite", clean_tag, "#Gameplay", "#GamerBrasil"]
-    else:
-        game_label = "Ao Vivo"
-        niche_key = "games"
-        playlist_name = "Gameplay e Lives - Shorts"
-        hashtags = ["#Shorts", clean_tag, "#Gameplay", "#StreamerBrasil", "#GamerBrasil"]
-
+    # 3. Render each Short segment with dedicated hooks
+    is_real_gta = any(k in (title_source or "").lower() for k in ("gta", "grand theft auto", "leonida", "vice city", "rockstar"))
+    game_label = "GTA 6" if is_real_gta else "GAMEPLAY"
     banner_presets = [
-        f"{target.name.upper()}: MOMENTO INSANO NO {game_label.upper()}!" if game_label != "Ao Vivo" else f"{target.name.upper()}: AO VIVO AGORA!",
-        f"{target.name.upper()}: A REAÇÃO ÉPICA AO VIVO!",
-        f"{target.name.upper()}: INACREDITÁVEL AO VIVO!",
-        f"{target.name.upper()}: MOMENTO HISTÓRICO!",
-        f"{target.name.upper()}: NUNCA VISTO ANTES!",
+        f"{target.name.upper()}: O INÍCIO DO {game_label}!",
+        f"{target.name.upper()}: A REAÇÃO ÉPICA NO {game_label}!",
+        f"{target.name.upper()}: INSANO NO {game_label}!",
+        f"{target.name.upper()}: MOMENTO HISTÓRICO {game_label}!",
+        f"{target.name.upper()}: NUNCA VISTO NO {game_label}!",
     ]
 
     generated_clips: List[Dict[str, Any]] = []
@@ -609,22 +549,24 @@ def _snip_streamer_highlight_impl(
         )
 
         if rendered and out_mp4.is_file() and out_mp4.stat().st_size > 50000:
-            # Enforce minimum duration gate (reject anything under 20s)
-            from .validator import probe_media_file
-            probe = probe_media_file(out_mp4)
-            clip_dur = float(probe.get("duration", 0.0))
-            if clip_dur < 20.0:
-                logger.warning("Live snippet %s rejected: duration too short (%.1fs < 20s)", out_mp4.name, clip_dur)
-                out_mp4.unlink(missing_ok=True)
-                continue
-
             part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
+            clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
+            # SEO-compliant 5-tag cap (satisfies YouTube 3-5, IG max 5, and TikTok discovery)
+            if is_real_gta:
+                hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
+                playlist_name = "Games e GTA 6 - Shorts"
+                default_title_prefix = f"GTA 6 Ao Vivo: {target.name}"
+            else:
+                hashtags = ["#Shorts", "#GamerBrasil", clean_tag, "#AoVivo", "#Gameplay"]
+                playlist_name = "Games e Gameplay - Shorts"
+                default_title_prefix = f"Live Gamer: {target.name}"
+
             from .viral_titling import generate_smart_clip_title
             clean_title = generate_smart_clip_title(
                 clip_text="",
-                source_title=title_source or f"{target.name} {game_label} Ao Vivo",
+                source_title=title_source or default_title_prefix,
                 streamer_or_speaker=target.name,
-                niche=niche_key,
+                niche="games_gta6" if is_real_gta else "games",
                 part_num=idx,
             )
             caption = (
@@ -635,11 +577,12 @@ def _snip_streamer_highlight_impl(
                 f"{' '.join(hashtags)}"
             )
             created_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
+            body_desc = f"Reação de {target.name} jogando GTA 6 ao vivo no lançamento. {title_source}" if is_real_gta else f"Reação e gameplay ao vivo de {target.name}. {title_source}"
             from .cross_platform_adapter import adapt_short_for_all_platforms
             multi_platform = adapt_short_for_all_platforms(
                 title=clean_title.replace(" #Shorts", ""),
-                body_text=f"Reação de {target.name} ao vivo em {title_source}.",
-                niche=niche_key,
+                body_text=body_desc,
+                niche="games_gta6" if is_real_gta else "games",
                 hook_banner=current_banner[:42],
                 source_url=target.channel_url,
             )
@@ -649,7 +592,7 @@ def _snip_streamer_highlight_impl(
                 "hook_title": current_banner[:42],
                 "caption": caption,
                 "hashtags": hashtags,
-                "niche": niche_key,
+                "niche": "games_gta6" if is_real_gta else "games",
                 "playlist": playlist_name,
                 "composite_score": 115.0,
                 "opus_score": 95,
@@ -684,11 +627,9 @@ def _snip_streamer_highlight_impl(
                 "pack": pack_data,
             })
 
-    # Clean up raw sample and any .part fragment
+    # Clean up raw sample
     try:
         raw_sample.unlink(missing_ok=True)
-        part_f = raw_sample.with_name(raw_sample.name + ".part")
-        part_f.unlink(missing_ok=True)
     except Exception:
         pass
 
@@ -706,6 +647,9 @@ def _snip_streamer_highlight_impl(
     }
 
 
+_STREAMER_SNIPE_HISTORY: Dict[str, float] = {}
+
+
 def probe_and_snip_gta6_watchlist(out_dir: str | Path, num_clips: int = 3) -> Optional[Dict[str, Any]]:
     """Scan all streamers in the GTA6 launch watchlist and snip multiple highlights with fair rotation."""
     global _STREAMER_SNIPE_HISTORY
@@ -719,6 +663,10 @@ def probe_and_snip_gta6_watchlist(out_dir: str | Path, num_clips: int = 3) -> Op
         try:
             live_meta = check_streamer_is_live(target.channel_url)
             if live_meta:
+                title_low = (live_meta.get("title") or "").lower()
+                # Strict Game Authenticity Gate: only snip if streamer is ACTUALLY playing/talking about GTA 6 or GTA
+                if not any(k in title_low for k in ("gta", "grand theft auto", "leonida", "vice city", "rockstar")):
+                    continue
                 res = snip_streamer_highlight(target, out_dir=out_dir, num_clips=num_clips)
                 if res:
                     _STREAMER_SNIPE_HISTORY[target.name] = time.time()
