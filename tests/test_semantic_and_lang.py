@@ -33,3 +33,22 @@ def test_anime_title_respects_audio_language():
 
     pt_title = _build_clip_title(src, "PRESTA ATENCAO NISSO", 2, niche, audio_lang="pt")
     assert "Dublada" in pt_title
+
+
+def test_ensure_authentic_subject_footage(tmp_path):
+    from auto_shorts.semantic_visual_engine import ensure_authentic_subject_footage
+
+    # Create dummy local asset for GTA 6
+    gta_asset = tmp_path / "gp_gta6_trailer_official.mp4"
+    gta_asset.write_bytes(b"\x00" * 300_000)
+
+    # When topic is GTA 6, it MUST pick the authentic gta6 asset
+    picked = ensure_authentic_subject_footage(
+        title="Por que GTA 6 vai rodar a 30 FPS no PS5?",
+        summary="A Rockstar Games implementou simulação de maré em Leonida e física densa em Vice City.",
+        category="games_gta6",
+        cache_dir=tmp_path,
+        allow_download=False,
+    )
+    assert picked is not None
+    assert "gta6" in picked.name.lower()

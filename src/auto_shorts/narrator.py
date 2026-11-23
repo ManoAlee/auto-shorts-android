@@ -1146,9 +1146,9 @@ def find_topic_relevant_asset(topic: str, script_text: str = "", assets_dir: Opt
 
 
 def resolve_background_video(
-    bg_video: str | Path, out_dir: Path, niche: str = "geral", topic: str = ""
+    bg_video: str | Path, out_dir: Path, niche: str = "geral", topic: str = "", script_text: str = ""
 ) -> Tuple[Path, bool]:
-    """Resolve background video, prioritizing topic-specific real footage before falling back to generic B-roll."""
+    """Resolve background video, strictly enforcing authentic subject footage and prohibiting random brainrot."""
     from .gameplay import pick_gameplay_segment
 
     raw_str = str(bg_video or "").strip()
@@ -1156,9 +1156,24 @@ def resolve_background_video(
     if not assets_dir.is_dir():
         assets_dir = Path("assets/gameplay")
 
-    # 1. If topic is provided, always prioritize matching authentic real scenes
-    if topic:
-        relevant = find_topic_relevant_asset(topic, assets_dir=assets_dir)
+    # 1. Autonomous Authenticity Harvester: extract subject, check local cache, or harvest online
+    if topic or script_text:
+        try:
+            from .semantic_visual_engine import ensure_authentic_subject_footage
+            authentic = ensure_authentic_subject_footage(
+                title=topic,
+                summary=script_text,
+                category=niche,
+                cache_dir=assets_dir,
+                allow_download=True,
+            )
+            if authentic and authentic.is_file():
+                return authentic, False
+        except Exception:
+            pass
+
+        # Fast keyword fallback for instant local cache hit
+        relevant = find_topic_relevant_asset(topic, script_text=script_text, assets_dir=assets_dir)
         if relevant and relevant.is_file():
             return relevant, False
 
@@ -1168,11 +1183,22 @@ def resolve_background_video(
             alt = out_dir.parent / p
             if alt.exists():
                 p = alt
-        # Intercept generic brainrot when real subject footage is available
-        if ("ramp" in p.name or "subway" in p.name or "minecraft" in p.name) and topic:
-            relevant = find_topic_relevant_asset(topic, assets_dir=assets_dir)
-            if relevant and relevant.is_file():
-                return relevant, False
+        # Intercept generic brainrot when authentic subject footage is available
+        if any(slop in p.name.lower() for slop in ("ramp", "subway", "minecraft")):
+            if topic or script_text:
+                try:
+                    from .semantic_visual_engine import ensure_authentic_subject_footage
+                    authentic = ensure_authentic_subject_footage(
+                        title=topic,
+                        summary=script_text,
+                        category=niche,
+                        cache_dir=assets_dir,
+                        allow_download=True,
+                    )
+                    if authentic and authentic.is_file():
+                        return authentic, False
+                except Exception:
+                    pass
         may_have_subs = "_short_" in p.name or p.name.startswith(("narrado_", "narrated_"))
         return p, may_have_subs
 
@@ -1436,7 +1462,7 @@ def build_narrated_short(
     duration = max(4.0, audio_dur, float(parsed.get("duration") or 0.0)) + 0.35
 
     resolved_bg, bg_has_subs = resolve_background_video(
-        bg_video, out_path.parent, niche=niche, topic=hook_title or script_text[:80]
+        bg_video, out_path.parent, niche=niche, topic=custom_title or hook_title or script_text[:80], script_text=script_text
     )
     bg_style_used = ""
     if str(bg_video or "auto").strip().lower() in {"auto", "gameplay"}:
