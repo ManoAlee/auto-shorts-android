@@ -33,6 +33,9 @@ vendor-research/
 !docs/images/*.png
 !docs/images/*.jpg
 !docs/images/*.svg
+!docs/assets/screenshots/*.png
+!docs/assets/screenshots/*.jpg
+!docs/assets/screenshots/*.webp
 
 # Compiled binaries & build artifacts
 bin/
