@@ -15,7 +15,11 @@ def wipe_vault(vault_dir: Path, shared_movies_dir: Path = None):
 
     if vault_dir.is_dir():
         # Remove all video and metadata artifacts
-        patterns = ["*.mp4", "*.publish.json", "*.jpg", "*.png", "*.ass", "*.srt", "*.raw_chunk", "*.tmp"]
+        patterns = [
+            "*.mp4", "*.publish.json", "*.jpg", "*.png", "*.ass", "*.srt",
+            "*.raw_chunk", "*.tmp", "*.part", "*.ytdl", "*.part-Frag*",
+            "live_*.raw.mp4*", "_work_live_*"
+        ]
         for pat in patterns:
             for f in vault_dir.glob(pat):
                 try:

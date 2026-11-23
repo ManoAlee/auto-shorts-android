@@ -14,6 +14,7 @@ import re
 import shutil
 import struct
 import subprocess
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -437,6 +438,10 @@ def render_gamer_clip(
         return False
 
 
+_STREAMER_SNIPE_HISTORY: Dict[str, float] = {}
+_SNIPER_ACTIVE_LOCK = threading.Lock()
+
+
 def snip_streamer_highlight(
     target: StreamerTarget,
     out_dir: str | Path,
@@ -445,7 +450,30 @@ def snip_streamer_highlight(
     direct_url: Optional[str] = None,
     num_clips: int = 2,
 ) -> Optional[Dict[str, Any]]:
-    """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts."""
+    """Snip multiple high-energy live reactions from a streamer into 9:16 Shorts with concurrency lock."""
+    if not _SNIPER_ACTIVE_LOCK.acquire(blocking=False):
+        return None
+    try:
+        return _snip_streamer_highlight_impl(
+            target=target,
+            out_dir=out_dir,
+            hook_banner=hook_banner,
+            clip_duration=clip_duration,
+            direct_url=direct_url,
+            num_clips=num_clips,
+        )
+    finally:
+        _SNIPER_ACTIVE_LOCK.release()
+
+
+def _snip_streamer_highlight_impl(
+    target: StreamerTarget,
+    out_dir: str | Path,
+    hook_banner: Optional[str] = None,
+    clip_duration: float = 50.0,
+    direct_url: Optional[str] = None,
+    num_clips: int = 2,
+) -> Optional[Dict[str, Any]]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -464,6 +492,12 @@ def snip_streamer_highlight(
     buffer_sec = max(60, min(240, int(requested_clips * (clip_duration + 15))))
     ok = download_live_chunk(stream_url, raw_sample, duration_sec=buffer_sec)
     if not ok or not raw_sample.is_file():
+        try:
+            raw_sample.unlink(missing_ok=True)
+            part_f = raw_sample.with_name(raw_sample.name + ".part")
+            part_f.unlink(missing_ok=True)
+        except Exception:
+            pass
         return None
 
     # 2. Extract PCM audio and find non-overlapping reaction spikes
@@ -650,9 +684,11 @@ def snip_streamer_highlight(
                 "pack": pack_data,
             })
 
-    # Clean up raw sample
+    # Clean up raw sample and any .part fragment
     try:
         raw_sample.unlink(missing_ok=True)
+        part_f = raw_sample.with_name(raw_sample.name + ".part")
+        part_f.unlink(missing_ok=True)
     except Exception:
         pass
 
@@ -668,9 +704,6 @@ def snip_streamer_highlight(
         "title": first["title"],
         "pack": first["pack"],
     }
-
-
-_STREAMER_SNIPE_HISTORY: Dict[str, float] = {}
 
 
 def probe_and_snip_gta6_watchlist(out_dir: str | Path, num_clips: int = 3) -> Optional[Dict[str, Any]]:

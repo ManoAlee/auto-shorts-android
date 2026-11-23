@@ -207,6 +207,9 @@ class DriveSentinelEngine:
         last_live_sniper = float(self._state.get("last_live_sniper_ts") or 0.0)
         sniper_cooldown_min = 10.0
         if (time.time() - last_live_sniper) >= (sniper_cooldown_min * 60.0):
+            with self._lock:
+                self._state["last_live_sniper_ts"] = time.time()
+                self._persist_state()
             try:
                 from .live_stream_sniper import probe_and_snip_gta6_watchlist
                 sniper_res = probe_and_snip_gta6_watchlist(out_dir=self.out_dir, num_clips=self.num_clips_per_episode)
@@ -224,7 +227,6 @@ class DriveSentinelEngine:
                     except Exception:
                         pass
                     with self._lock:
-                        self._state["last_live_sniper_ts"] = time.time()
                         self._state["last_action"] = f"Live ativa detectada! Cortes gerados: {sniper_res.get('title', '')}"
                         self._state["mode"] = "live_sniper_done"
                         self._persist_state()

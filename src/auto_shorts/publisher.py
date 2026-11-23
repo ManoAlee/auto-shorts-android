@@ -29,9 +29,19 @@ def build_publish_pack(
 ) -> Dict:
     """Create platform-ready metadata (real title, rich PT-BR description, hashtags, CTA)."""
     hook = clip.get("hook_title") or clip.get("title") or "Destaque"
-    title = clip.get("title") or hook
     from .highlights import sanitize_repetitive_text
     summary = sanitize_repetitive_text(str(clip.get("clip_summary") or "").strip())
+    meta = source_meta or {}
+    src_title = str(meta.get("title") or "").strip()
+    raw_title = clip.get("title") or hook
+    from .viral_titling import generate_smart_clip_title
+    title = generate_smart_clip_title(
+        clip_text=summary or raw_title,
+        source_title=src_title or raw_title,
+        streamer_or_speaker=str(meta.get("channel") or meta.get("uploader") or clip.get("streamer") or ""),
+        niche=niche,
+        part_num=int(clip.get("part") or 1),
+    )
     retention_cta = get_retention_profile(platform).reels_cta_hint
     cta = clip.get("cta_line") or retention_cta
     niche_tags = {
