@@ -622,6 +622,48 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
 
     # Heal title (recover missing, sanitize greetings/quotes/>> markers, or translate English clickbait to clean PT-BR)
     title = _clean_source_title(str(pack.get("title") or ""))
+    caption_text = str(pack.get("caption") or "")
+
+    # Check for repetitive / simplistic / mismatched titles (e.g. GTA 6 Ao Vivo: Gaules (Parte 1), Reddit Parte 10, Biology labeled Economy)
+    from .viral_titling import generate_smart_clip_title
+    streamer_guess = ""
+    for s_name in ("Gaules", "LipaoGamer", "Davy Jones", "xQc", "Alanzoka", "Coringa", "Nobru"):
+        if s_name.lower() in mp4.stem.lower() or s_name.lower() in title.lower():
+            streamer_guess = s_name
+            break
+
+    part_guess = 1
+    m_p = re.search(r"_p(\d+)", mp4.stem) or re.search(r"\(Parte\s+(\d+)\)", title, flags=re.I)
+    if m_p:
+        part_guess = int(m_p.group(1))
+
+    needs_smart_retitle = (
+        "gta 6 ao vivo:" in title.lower()
+        or "reage ao gta 6" in title.lower()
+        or "histórias bizarras e assustadoras do reddit" in title.lower()
+        or "(parte " in title.lower()
+        or ("plantão economia" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("perereca", "sapo", "especie", "espécie", "descoberta", "animal", "fauna")))
+        or ("plantão tech" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("alcaraz", "zverev", "tenista", "atp", "futebol")))
+    )
+
+    if needs_smart_retitle:
+        clip_speech = (
+            pack.get("script")
+            or pack.get("body_text")
+            or pack.get("clip_summary")
+            or caption_text
+        )
+        smart_title = generate_smart_clip_title(
+            clip_text=clip_speech,
+            source_title=title,
+            streamer_or_speaker=streamer_guess,
+            niche=niche,
+            part_num=part_guess,
+            current_title=title,
+        )
+        if smart_title and smart_title != title:
+            title = smart_title
+
     bad_title_markers = (
         not title,
         title == mp4.name,
