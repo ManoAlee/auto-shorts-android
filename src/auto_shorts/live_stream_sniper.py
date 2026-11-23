@@ -456,7 +456,8 @@ def snip_streamer_highlight(
 
     title_source = (meta.get("title") if meta else "") or "GTA 6 Gameplay Ao Vivo"
     timestamp_tag = int(time.time())
-    raw_sample = out_dir / f"live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}_raw.mp4"
+    # Save raw stream buffer as hidden temporary chunk so it never leaks to webapp cards or Android Gallery
+    raw_sample = out_dir / f"_work_live_{target.name.lower().replace(' ', '_')}_{timestamp_tag}.raw_chunk"
 
     # 1. Download live sample proportional to requested clips
     requested_clips = max(1, min(5, int(num_clips)))
@@ -513,13 +514,41 @@ def snip_streamer_highlight(
 
     selected_starts.sort()
 
-    # 3. Render each Short segment with dedicated hooks
+    # 3. Detect actual game / content from title_source (never force GTA 6 if streamer is playing CS2, Valorant or chatting)
+    title_low = (title_source or "").lower()
+    clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
+    if any(k in title_low for k in ("gta", "grand theft auto", "vice city", "leonida", "lucia", "jason")):
+        game_label = "GTA 6"
+        niche_key = "games_gta6"
+        playlist_name = "Games e GTA 6 - Shorts"
+        hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
+    elif any(k in title_low for k in ("cs", "cs2", "counter-strike", "counter strike", "major", "tribo")):
+        game_label = "CS2"
+        niche_key = "games"
+        playlist_name = "Games e Gameplay - Shorts"
+        hashtags = ["#Shorts", "#CS2", "#CounterStrike", clean_tag, "#GamerBrasil"]
+    elif any(k in title_low for k in ("valorant", "vct")):
+        game_label = "Valorant"
+        niche_key = "games"
+        playlist_name = "Games e Gameplay - Shorts"
+        hashtags = ["#Shorts", "#Valorant", clean_tag, "#Gameplay", "#GamerBrasil"]
+    elif "fortnite" in title_low:
+        game_label = "Fortnite"
+        niche_key = "games"
+        playlist_name = "Games e Gameplay - Shorts"
+        hashtags = ["#Shorts", "#Fortnite", clean_tag, "#Gameplay", "#GamerBrasil"]
+    else:
+        game_label = "Ao Vivo"
+        niche_key = "games"
+        playlist_name = "Gameplay e Lives - Shorts"
+        hashtags = ["#Shorts", clean_tag, "#Gameplay", "#StreamerBrasil", "#GamerBrasil"]
+
     banner_presets = [
-        f"{target.name.upper()}: O INÍCIO DO GTA 6!",
-        f"{target.name.upper()}: A REAÇÃO ÉPICA NO GTA 6!",
-        f"{target.name.upper()}: INSANO NO GTA 6!",
-        f"{target.name.upper()}: MOMENTO HISTÓRICO GTA 6!",
-        f"{target.name.upper()}: NUNCA VISTO NO GTA 6!",
+        f"{target.name.upper()}: MOMENTO INSANO NO {game_label.upper()}!" if game_label != "Ao Vivo" else f"{target.name.upper()}: AO VIVO AGORA!",
+        f"{target.name.upper()}: A REAÇÃO ÉPICA AO VIVO!",
+        f"{target.name.upper()}: INACREDITÁVEL AO VIVO!",
+        f"{target.name.upper()}: MOMENTO HISTÓRICO!",
+        f"{target.name.upper()}: NUNCA VISTO ANTES!",
     ]
 
     generated_clips: List[Dict[str, Any]] = []
@@ -546,16 +575,22 @@ def snip_streamer_highlight(
         )
 
         if rendered and out_mp4.is_file() and out_mp4.stat().st_size > 50000:
+            # Enforce minimum duration gate (reject anything under 20s)
+            from .validator import probe_media_file
+            probe = probe_media_file(out_mp4)
+            clip_dur = float(probe.get("duration", 0.0))
+            if clip_dur < 20.0:
+                logger.warning("Live snippet %s rejected: duration too short (%.1fs < 20s)", out_mp4.name, clip_dur)
+                out_mp4.unlink(missing_ok=True)
+                continue
+
             part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
-            clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
-            # SEO-compliant 5-tag cap (satisfies YouTube 3-5, IG max 5, and TikTok discovery)
-            hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
             from .viral_titling import generate_smart_clip_title
             clean_title = generate_smart_clip_title(
                 clip_text="",
-                source_title=title_source or f"GTA 6 Ao Vivo: {target.name}",
+                source_title=title_source or f"{target.name} {game_label} Ao Vivo",
                 streamer_or_speaker=target.name,
-                niche="games_gta6",
+                niche=niche_key,
                 part_num=idx,
             )
             caption = (
@@ -569,8 +604,8 @@ def snip_streamer_highlight(
             from .cross_platform_adapter import adapt_short_for_all_platforms
             multi_platform = adapt_short_for_all_platforms(
                 title=clean_title.replace(" #Shorts", ""),
-                body_text=f"Reação de {target.name} jogando GTA 6 ao vivo no lançamento. {title_source}",
-                niche="games_gta6",
+                body_text=f"Reação de {target.name} ao vivo em {title_source}.",
+                niche=niche_key,
                 hook_banner=current_banner[:42],
                 source_url=target.channel_url,
             )
@@ -580,8 +615,8 @@ def snip_streamer_highlight(
                 "hook_title": current_banner[:42],
                 "caption": caption,
                 "hashtags": hashtags,
-                "niche": "games_gta6",
-                "playlist": "Games e GTA 6 - Shorts",
+                "niche": niche_key,
+                "playlist": playlist_name,
                 "composite_score": 115.0,
                 "opus_score": 95,
                 "channel_algo_score": 98,
