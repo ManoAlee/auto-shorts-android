@@ -83,7 +83,7 @@ namespace AutoShortsDesktop
                 ForeColor = OkGreen
             };
             var urlLbl = new Label { Text = "Servidor Android:", Location = new Point(470, 14), AutoSize = true, ForeColor = InkMuted };
-            _serverUrlBox = new TextBox { Text = "http://192.168.10.210:8787", Location = new Point(470, 36), Width = 280 };
+            _serverUrlBox = new TextBox { Text = "http://100.122.142.89:8787", Location = new Point(470, 36), Width = 280 };
             var syncBtn = MakeButton("Sincronizar", Primary, Color.White, new Point(762, 34), 120);
             syncBtn.Click += async delegate { await RefreshAllAsync(); };
             topBar.Controls.AddRange(new Control[] { titleLbl, _channelBadge, urlLbl, _serverUrlBox, syncBtn });
@@ -154,22 +154,24 @@ namespace AutoShortsDesktop
             _videosListBox.SelectedIndexChanged += delegate { ShowSelectedVideoDetail(); };
             _videoDetailBox = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Location = new Point(478, 44), Width = 420, Height = 360, BackColor = Surface, ForeColor = Ink };
 
-            var reloadVidsBtn = MakeButton("Atualizar Acervo", Color.White, Ink, new Point(20, 418), 160);
+            var reloadVidsBtn = MakeButton("Atualizar Acervo", Color.White, Ink, new Point(20, 418), 140);
             reloadVidsBtn.Click += async delegate { await LoadVideosAsync(); };
-            var valBtn = MakeButton("Validar Selecionado", Primary, Color.White, new Point(192, 418), 166);
+            var valBtn = MakeButton("Validar Selecionado", Primary, Color.White, new Point(168, 418), 150);
             valBtn.Click += async delegate { await ValidateSelectedVideoAsync(); };
-            var valAllBtn = MakeButton("Otimizar & Auditar Tudo", Color.FromArgb(109, 40, 217), Color.White, new Point(368, 418), 186);
+            var valAllBtn = MakeButton("Otimizar & Auditar Tudo", Color.FromArgb(109, 40, 217), Color.White, new Point(326, 418), 170);
             valAllBtn.Click += async delegate { await OptimizeAndValidateAllAsync(); };
-            var pubBtn = MakeButton("Publicar AleplayTV", OkGreen, Color.White, new Point(564, 418), 166);
+            var pubBtn = MakeButton("Publicar YouTube", OkGreen, Color.White, new Point(504, 418), 140);
             pubBtn.Click += async delegate { await PublishSelectedVideoAsync(); };
-            var openWebBtn = MakeButton("Abrir Web", Color.White, Ink, new Point(740, 418), 130);
+            var pubTikTokBtn = MakeButton("Publicar TikTok", Color.FromArgb(15, 23, 42), Color.White, new Point(652, 418), 136);
+            pubTikTokBtn.Click += async delegate { await PublishSelectedVideoTikTokAsync(); };
+            var openWebBtn = MakeButton("Abrir Web", Color.White, Ink, new Point(796, 418), 104);
             openWebBtn.Click += delegate { Process.Start(_serverUrlBox.Text.Trim()); };
 
             tabVideos.Controls.AddRange(new Control[]
             {
                 MakeLabel("Videos gerados no celular (output/)", 20, 20), _videosListBox,
                 MakeLabel("Detalhes de validacao, Opus Scorecard e link YouTube", 478, 20), _videoDetailBox,
-                reloadVidsBtn, valBtn, valAllBtn, pubBtn, openWebBtn
+                reloadVidsBtn, valBtn, valAllBtn, pubBtn, pubTikTokBtn, openWebBtn
             });
 
             // Tab 3: Editor FFmpeg Local (/video-editing Layer 3)
@@ -434,6 +436,25 @@ namespace AutoShortsDesktop
             catch (Exception ex)
             {
                 _statusBar.Text = "Erro ao publicar: " + ex.Message;
+            }
+        }
+
+        private async Task PublishSelectedVideoTikTokAsync()
+        {
+            if (_videosListBox.SelectedIndex < 0) return;
+            string fname = Convert.ToString(_videoItems[_videosListBox.SelectedIndex]["filename"]);
+            _statusBar.Text = "Publicando " + fname + " no TikTok (@aleplaytv5)...";
+            try
+            {
+                var res = await HttpJsonAsync("POST", "/api/publish-tiktok", new Dictionary<string, object> { { "filename", fname } });
+                string msg = res.ContainsKey("message") ? Convert.ToString(res["message"]) : "Publicado com sucesso!";
+                _statusBar.Text = "TikTok: " + msg;
+                NativeWin32.MessageBeep(0x00000040);
+                await RefreshAllAsync();
+            }
+            catch (Exception ex)
+            {
+                _statusBar.Text = "Erro ao publicar no TikTok: " + ex.Message;
             }
         }
 
