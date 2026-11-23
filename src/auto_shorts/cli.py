@@ -77,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    import sys
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args and raw_args[0] in {"status", "health", "jobs", "audit"}:
+        from .cli_anything import main as cli_anything_main
+        return cli_anything_main(raw_args)
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

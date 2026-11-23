@@ -8,10 +8,12 @@ persistent profile directory and optional cookie injection (`output/tiktok_cooki
 from __future__ import annotations
 
 import base64
+import gc
 import hashlib
 import json
 import os
 import shutil
+import signal
 import socket
 import struct
 import subprocess
@@ -278,7 +280,82 @@ def _launch_chromium(out_dir: Path, port: int, headless: bool = True) -> subproc
     if headless:
         args.append("--headless=new")
     args.append("about:blank")
-    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    extra_kwargs: Dict[str, Any] = {}
+    if os.name != "nt":
+        extra_kwargs["preexec_fn"] = os.setsid
+    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **extra_kwargs)
+
+
+def terminate_chromium_process_group(proc: Optional[subprocess.Popen], profile_name: str = "tiktok_chrome_profile") -> None:
+    """Terminate Chromium and all its child zygote/renderer/utility processes cleanly.
+
+    Prevents orphaned Chromium processes from accumulating in background and hoarding RAM,
+    which triggers Android Low Memory Killer (LMK).
+    """
+    if proc is None:
+        return
+
+    # 1. Graceful SIGTERM to entire process group if POSIX
+    if os.name != "nt":
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)
+        except OSError:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+    else:
+        try:
+            proc.terminate()
+        except OSError:
+            pass
+
+    # 2. Wait up to 3 seconds for graceful exit
+    try:
+        proc.wait(timeout=3)
+    except (subprocess.TimeoutExpired, OSError):
+        # 3. Force SIGKILL to process group if not exited
+        if os.name != "nt":
+            try:
+                pgid = os.getpgid(proc.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except OSError:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+        else:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        try:
+            proc.wait(timeout=2)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    # 4. Sweep any leftover orphaned processes matching this specific profile
+    if os.name != "nt" and profile_name:
+        try:
+            subprocess.run(
+                ["pkill", "-9", "-f", profile_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        except Exception:
+            pass
+
+    # 5. Flush Python memory and trim C-heap
+    gc.collect()
+    try:
+        import ctypes
+        libc = ctypes.CDLL("libc.so")
+        if hasattr(libc, "malloc_trim"):
+            libc.malloc_trim(0)
+    except Exception:
+        pass
 
 
 def _wait_cdp_page_ws(port: int, timeout: float = 15.0) -> str:
@@ -541,11 +618,7 @@ def publish_pack_to_tiktok_cdp(
             _inject_cookies(cdp, out_dir)
             return _publish_single_in_cdp(cdp, mp4, out_dir, force=force, dry_run=dry_run)
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        terminate_chromium_process_group(proc, "tiktok_chrome_profile")
 
 
 def publish_batch_to_tiktok_cdp(
@@ -607,11 +680,7 @@ def publish_batch_to_tiktok_cdp(
                 if res.get("status") == "login_required":
                     break
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        terminate_chromium_process_group(proc, "tiktok_chrome_profile")
 
     return {
         "status": "batch_complete",
@@ -650,9 +719,5 @@ def keepalive_tiktok_cdp(out_dir: Path, headless: bool = True) -> Dict[str, Any]
             st = get_tiktok_cdp_status(out_dir)
             return {"ok": st["has_sessionid"], "synced_cookies": saved, "current_url": cur_url, **st}
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        terminate_chromium_process_group(proc, "tiktok_chrome_profile")
 

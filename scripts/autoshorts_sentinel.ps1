@@ -35,7 +35,8 @@ function Test-WebStatus([string]$Url, [int]$TimeoutSec = 6) {
         $ok = ($res.StatusCode -eq [System.Net.HttpStatusCode]::OK)
         $res.Close()
         return $ok
-    } catch {
+    }
+    catch {
         return $false
     }
 }
@@ -73,13 +74,13 @@ while ($true) {
                     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [RECUPERADO] AutoShorts Studio respondendo 100%!" -ForegroundColor Green
                     $consecutiveFails = 0
                 }
-            } else {
+            }
+            else {
                 $consecutiveFails++
                 if ($consecutiveFails -ge 2) {
-                    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [ALERTA] WebApp nao respondeu. Disparando despertar do Termux..." -ForegroundColor Red
-                    & $AdbPath shell "am startservice -n com.termux/.app.TermuxService ; cmd package compile -m speed com.termux 2>/dev/null" 2>$null
-                    & $AdbPath shell "settings put global stay_on_while_plugged_in 7" 2>$null
-                    Start-Sleep -Seconds 2
+                    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [ALERTA] WebApp nao respondeu. Disparando despertar do Termux via TermuxActivity..." -ForegroundColor Red
+                    & $AdbPath shell "am start -n com.termux/.app.TermuxActivity ; settings put global stay_on_while_plugged_in 7" 2>$null
+                    Start-Sleep -Seconds 3
                 }
             }
 
@@ -87,7 +88,8 @@ while ($true) {
             $tunnelUrl = ""
             try {
                 $tunnelUrl = (& ssh -p 8022 -o StrictHostKeyChecking=no -o ConnectTimeout=2 127.0.0.1 "cat ~/auto-shorts-android/output/tunnel_url.txt 2>/dev/null").Trim()
-            } catch {}
+            }
+            catch {}
 
             if ($tunnelUrl -and $tunnelUrl -match "^https://" -and $tunnelUrl -ne $lastTunnelUrl) {
                 $lastTunnelUrl = $tunnelUrl
@@ -95,7 +97,8 @@ while ($true) {
                 Write-Host "[$(Get-Date -Format 'HH:mm:ss')] [TUNNEL] Atalho Nuvem atualizado: $tunnelUrl" -ForegroundColor Cyan
             }
         }
-    } catch {
+    }
+    catch {
         # Resiliencia contra interrupcoes
     }
 
