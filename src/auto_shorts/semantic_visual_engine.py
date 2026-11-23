@@ -177,11 +177,15 @@ def ensure_authentic_subject_footage(
         "vice_city": ["gp_gta6_trailer_official.mp4"],
         "red_dead": ["gp_rdr2_agnes_dowd.mp4"],
         "rdr2": ["gp_rdr2_agnes_dowd.mp4"],
-        "sukuna": ["gp_dbz_trunks_real.mp4"],
-        "jujutsu": ["gp_dbz_trunks_real.mp4"],
+        "agnes": ["gp_rdr2_agnes_dowd.mp4"],
+        "sukuna": ["gp_jujutsu_sukuna_real.mp4"],
+        "jujutsu": ["gp_jujutsu_sukuna_real.mp4"],
+        "samsung": ["gp_drone_cinema_DesiBXmyCBQ.mp4"],
         "space": ["gp_space_cosmos_0i9wZ-xDC04.mp4"],
         "radio": ["gp_space_cosmos_0i9wZ-xDC04.mp4"],
         "cosmos": ["gp_space_cosmos_0i9wZ-xDC04.mp4"],
+        "cosmico": ["gp_space_cosmos_0i9wZ-xDC04.mp4"],
+        "universo": ["gp_space_cosmos_0i9wZ-xDC04.mp4"],
     }
     for alias_key, cand_files in aliases.items():
         if alias_key in slug:

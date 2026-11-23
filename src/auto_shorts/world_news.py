@@ -1101,10 +1101,9 @@ def produce_world_news_short(
         detected_niche = "games_gta6" if (topic == "games" or any(k in (pack.get("pt_title", "") + " " + topic).lower() for k in ("gta", "rockstar", "jogo", "games", "gameplay", "playstation", "xbox"))) else ("ia_tech" if topic in ("tech", "ia") else "noticias_mundiais")
 
         comp = None
-        # For sensitive tragedy/death news or stories with authentic article photos, use journalistic photo ambient
-        # to ensure zero foreign text burn-ins, no awkward video loops, and 100% broadcast compliance.
-        has_news_photo = bool(str(picked.get("image_url") or "").startswith("http"))
-        if is_sensitive_tragedy or has_news_photo:
+        # Only use static journalistic photo ambient for grave tragedy/death reports where motion gameplay is insensitive.
+        # For general news, gaming, and tech, ALWAYS use moving authentic video B-Roll composited with the headline card.
+        if is_sensitive_tragedy:
             bg_style_used = "journalistic_photo_ambient"
             resolved_bg = str(_build_news_backdrop_video(str(picked.get("image_url") or ""), bg_dir))
             burned_card = False
@@ -1127,6 +1126,26 @@ def produce_world_news_short(
                         pack["source_name"],
                         bg_dir,
                     )
+
+            if comp is None:
+                # 1. Try topic-specific authentic footage first (e.g. GTA 6 trailer, RDR2, space, tech)
+                from .semantic_visual_engine import ensure_authentic_subject_footage
+                auth_bg = ensure_authentic_subject_footage(
+                    title=pack.get("pt_title", ""),
+                    summary=str(picked.get("summary") or pack.get("spoken_script", "")),
+                    category=detected_niche,
+                    cache_dir=out_root.parent / "assets" / "gameplay",
+                    allow_download=True,
+                )
+                if auth_bg is not None and auth_bg.is_file():
+                    comp = _build_news_over_gameplay_video(
+                        auth_bg, 0.0,
+                        str(picked.get("image_url") or ""),
+                        pack["pt_title"],
+                        pack["source_name"],
+                        bg_dir,
+                    )
+                    bg_style_used = "authentic_subject_footage"
 
             if comp is None:
                 gp = pick_evolving_background(

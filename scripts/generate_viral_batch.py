@@ -50,10 +50,10 @@ def main():
             "custom_title": "O Segredo Macabro de Agnes Dowd nos Pântanos de Red Dead Redemption 2",
             "style_key": "thalita_hd",
             "niche": "podcast",
+            "force_rerender": True,
             "bg_candidates": [
                 repo_root / "assets" / "gameplay" / "gp_rdr2_agnes_dowd.mp4",
-                repo_root / "assets" / "gameplay" / "gp_dbz_trunks_real.mp4",
-                repo_root / "assets" / "gameplay" / "gp_subway_QPW3XwBoQlw.mp4",
+                repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
             ],
             "script": (
                 "Você sabia que a Rockstar escondeu uma das histórias mais assustadoras dos games nos pântanos de Lemoyne? "
@@ -72,10 +72,9 @@ def main():
             "custom_title": "Samsung Libera Bloqueio Individual de Apps com Biometria na One UI | Plantão Tech",
             "style_key": "narrador_pro",
             "niche": "ia_tech",
+            "force_rerender": True,
             "bg_candidates": [
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
-                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
-                repo_root / "assets" / "gameplay" / "gp_minecraft_7yl7Wc1dtWc.mp4",
             ],
             "script": (
                 "A Samsung finalmente atendeu ao pedido mais antigo dos usuários da linha Galaxy. "
@@ -95,10 +94,10 @@ def main():
             "custom_title": "Astrônomos Detectam Pulso de Rádio Cósmico Repetido a Cada 22 Minutos | Ciência Hoje",
             "style_key": "thalita_hd",
             "niche": "noticias_mundiais",
+            "force_rerender": True,
             "bg_candidates": [
+                repo_root / "assets" / "gameplay" / "gp_space_cosmos_0i9wZ-xDC04.mp4",
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
-                repo_root / "assets" / "gameplay" / "gp_minecraft_7yl7Wc1dtWc.mp4",
-                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
             ],
             "script": (
                 "Astrônomos em todo o mundo estão perplexos com um sinal de rádio captado das profundezas do universo "
@@ -117,9 +116,9 @@ def main():
             "custom_title": "Por que os Dedos de Sukuna São Indestrutíveis em Jujutsu Kaisen? Teoria Revelada",
             "style_key": "narrador_pro",
             "niche": "entretenimento_animes",
+            "force_rerender": True,
             "bg_candidates": [
-                repo_root / "assets" / "gameplay" / "gp_dbz_trunks_real.mp4",
-                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
+                repo_root / "assets" / "gameplay" / "gp_jujutsu_sukuna_real.mp4",
                 repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
             ],
             "script": (
@@ -128,6 +127,12 @@ def main():
                 "do sistema de energia amaldiçoada de Jujutsu Kaisen: os votos de restrição após a morte. "
                 "Na Era de Ouro de Heian, quando Sukuna dividiu sua alma em vinte objetos amaldiçoados de grau especial, "
                 "ele aceitou a restrição de ficar completamente inerte e dormente por mais de mil anos. "
+                "Em troca dessa limitação absoluta, os seus fragmentos receberam a propriedade da indestrutibilidade permanente. "
+                "Nenhum ataque de energia pura consegue sobrepor uma regra cósmica forjada por pacto de alma. "
+                "A única maneira real de erradicá-los para sempre é através de um receptáculo humano como Yuji Itadori. "
+                "Você já conhecia essa regra dos pactos? Comenta o que acha e segue para mais teorias de anime."
+            ),
+        },
                 "Em troca dessa limitação absoluta, os seus fragmentos receberam a propriedade da indestrutibilidade permanente. "
                 "Nenhum ataque de energia pura consegue sobrepor uma regra cósmica forjada por pacto de alma. "
                 "A única maneira real de erradicá-los para sempre é através de um receptáculo humano como Yuji Itadori. "
