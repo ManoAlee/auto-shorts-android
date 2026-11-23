@@ -20,19 +20,62 @@ from .job_recovery import JobRecoveryManager, JobState
 
 
 def get_system_health(out_dir: Path) -> Dict[str, Any]:
-    """Coleta métricas reais de saúde de baixo nível sem suposições."""
-    import psutil
+    """Coleta métricas reais de saúde de baixo nível sem suposições e sem dependência estrita de psutil."""
+    total_mb = 0
+    avail_mb = 0
+    percent_used = 0.0
+    swap_used_mb = 0
 
-    vm = psutil.virtual_memory()
-    swap = psutil.swap_memory()
-    disk = psutil.disk_usage(str(out_dir.resolve()))
+    # 1. Tentar psutil se instalado
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        total_mb = vm.total // (1024 * 1024)
+        avail_mb = vm.available // (1024 * 1024)
+        percent_used = vm.percent
+        swap_used_mb = swap.used // (1024 * 1024)
+    except ImportError:
+        # Fallback Linux/Android: ler /proc/meminfo diretamente
+        meminfo_path = Path("/proc/meminfo")
+        if meminfo_path.is_file():
+            try:
+                info: Dict[str, int] = {}
+                for line in meminfo_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        k = parts[0].strip()
+                        v = parts[1].strip().split()[0]
+                        info[k] = int(v)
+                total_kb = info.get("MemTotal", 0)
+                avail_kb = info.get("MemAvailable", info.get("MemFree", 0))
+                total_mb = total_kb // 1024
+                avail_mb = avail_kb // 1024
+                used_kb = total_kb - avail_kb
+                percent_used = round((used_kb / total_kb * 100.0), 1) if total_kb > 0 else 0.0
+                swap_total_kb = info.get("SwapTotal", 0)
+                swap_free_kb = info.get("SwapFree", 0)
+                swap_used_mb = (swap_total_kb - swap_free_kb) // 1024
+            except Exception:
+                pass
 
     pressure = "NORMAL"
-    avail_mb = vm.available // (1024 * 1024)
     if avail_mb < 250:
         pressure = "CRITICAL"
     elif avail_mb < 500:
         pressure = "CONSTRAINED"
+
+    # Disk usage via shutil.disk_usage (Standard Library)
+    import shutil
+    try:
+        disk = shutil.disk_usage(str(out_dir.resolve()))
+        total_gb = round(disk.total / (1024**3), 1)
+        free_gb = round(disk.free / (1024**3), 1)
+        disk_pct = round((disk.used / disk.total * 100.0), 1) if disk.total > 0 else 0.0
+    except Exception:
+        total_gb = 0.0
+        free_gb = 0.0
+        disk_pct = 0.0
 
     # Checar portas locais
     web_ok = False
@@ -61,16 +104,16 @@ def get_system_health(out_dir: Path) -> Dict[str, Any]:
             "sshd_8022": {"alive": ssh_ok, "port": 8022},
         },
         "memory": {
-            "total_mb": vm.total // (1024 * 1024),
+            "total_mb": total_mb,
             "available_mb": avail_mb,
-            "percent_used": vm.percent,
-            "swap_used_mb": swap.used // (1024 * 1024),
+            "percent_used": percent_used,
+            "swap_used_mb": swap_used_mb,
             "pressure": pressure,
         },
         "storage": {
-            "total_gb": round(disk.total / (1024**3), 1),
-            "free_gb": round(disk.free / (1024**3), 1),
-            "percent_used": disk.percent,
+            "total_gb": total_gb,
+            "free_gb": free_gb,
+            "percent_used": disk_pct,
         },
     }
 

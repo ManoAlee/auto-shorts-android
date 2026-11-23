@@ -22,7 +22,6 @@ from .tiktok_cdp import (
     _pick_free_port,
     _wait_cdp_page_ws,
     find_chromium_binary,
-    terminate_chromium_process_group,
 )
 
 _YT_AUTH_COOKIE_NAMES = frozenset({"SID", "SAPISID", "SSID", "HSID", "__Secure-1PSID", "__Secure-3PSID"})
@@ -140,10 +139,7 @@ def _launch_yt_chromium(out_dir: Path, port: int, headless: bool = True) -> subp
     if headless:
         args.append("--headless=new")
     args.append("about:blank")
-    extra_kwargs: Dict[str, Any] = {}
-    if os.name != "nt":
-        extra_kwargs["preexec_fn"] = os.setsid
-    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **extra_kwargs)
+    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def _inject_yt_cookies(cdp: CDPClient, out_dir: Path) -> None:
@@ -378,7 +374,11 @@ def publish_pack_to_youtube_cdp(
                 dry_run=dry_run,
             )
     finally:
-        terminate_chromium_process_group(proc, "youtube_chrome_profile")
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 def publish_batch_to_youtube_cdp(
@@ -447,7 +447,11 @@ def publish_batch_to_youtube_cdp(
                 if res.get("status") == "login_required":
                     break
     finally:
-        terminate_chromium_process_group(proc, "youtube_chrome_profile")
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
     return {
         "status": "batch_complete",
