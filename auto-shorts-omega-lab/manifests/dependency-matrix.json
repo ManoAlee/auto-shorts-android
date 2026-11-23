@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-11-23T13:40:00Z",
+  "dependencies": {
+    "system_aarch64_termux": [
+      {"name": "clang", "version": ">=18.0", "role": "Compilação C11 nativa (autoshorts.c)"},
+      {"name": "ffmpeg", "version": ">=6.0", "role": "Decodificação, filtros de áudio/vídeo e multiplexação H.264/AAC"},
+      {"name": "openssh", "version": ">=9.0", "role": "Canal seguro de controle e telemetria (:8022)"},
+      {"name": "git", "version": ">=2.40", "role": "Versionamento e pontos de recuperação"},
+      {"name": "python", "version": ">=3.12", "role": "Runtime do orquestrador AutoShorts"},
+      {"name": "chromium", "version": ">=120.0", "role": "Navegação CDP isolada (modo headless controlado)"}
+    ],
+    "python_core_packages": [
+      {"name": "pytest", "version": ">=8.0", "scope": "test", "status": "INSTALLED"},
+      {"name": "requests", "version": ">=2.31", "scope": "runtime", "status": "INSTALLED"},
+      {"name": "aiohttp", "version": ">=3.9", "scope": "runtime", "status": "INSTALLED"}
+    ],
+    "native_c11_modules": [
+      {"name": "autoshorts", "path": "native-c/autoshorts.c", "binary": "$PREFIX/bin/autoshorts", "status": "COMPILED_AND_ACTIVE"}
+    ],
+    "prohibited_dependencies_termux": [
+      {"name": "pytorch", "reason": "Alocação excessiva de RAM (> 1.2GB) levando a SIGKILL pelo Android LMK"},
+      {"name": "cuda_heavy_runtimes", "reason": "Inexistência de GPU NVIDIA no smartphone Exynos"},
+      {"name": "electron_monoliths", "reason": "Consumo de heap descontrolado em background"}
+    ]
+  }
+}

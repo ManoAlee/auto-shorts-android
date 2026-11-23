@@ -313,6 +313,160 @@ def cmd_omega(args: argparse.Namespace, out_dir: Path) -> int:
                 print(f"[Omega] Tarefa {t.task_id} verificada. Estado: {t.state.value}")
             return 0
 
+    elif action == "inventory":
+        health = get_system_health(out_dir)
+        catalog_path = Path("auto-shorts-omega-lab/manifests/repository-catalog.json")
+        cat_count = 0
+        if catalog_path.is_file():
+            try:
+                cat_count = len(json.loads(catalog_path.read_text(encoding="utf-8")).get("repositories", []))
+            except Exception:
+                pass
+        inv = {
+            "host_os": os.name,
+            "system_health": health,
+            "catalog_repositories_count": cat_count,
+            "harness": "Omega Repository Integration Harness",
+            "compliance": "HKUDS/CLI-Anything Spec",
+        }
+        if args.json:
+            print(json.dumps(inv, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== OMEGA SYSTEM & REPOSITORY INVENTORY ===")
+            print(f" Status Host : {health.get('status')}")
+            print(f" Memória RAM : {health.get('memory', {}).get('available_mb')} MB livres")
+            print(f" Repositórios: {cat_count} catalogados no laboratório")
+            print("===========================================\n")
+        return 0
+
+    elif action == "repos":
+        sub_act = getattr(args, "repo_action", "audit")
+        try:
+            from scripts.omega_repo_harness import OmegaRepoHarness
+        except ImportError:
+            repo_root = Path(__file__).resolve().parent.parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from scripts.omega_repo_harness import OmegaRepoHarness
+        harness = OmegaRepoHarness()
+        if sub_act == "audit":
+            res = harness.run_audit()
+        elif sub_act == "clone":
+            res = harness.run_clone()
+        elif sub_act == "test":
+            res = harness.run_test()
+        else:
+            res = harness.run_dry_run()
+
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n=== OMEGA REPOSITORIES ({sub_act.upper()}) ===")
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+            print("=========================================\n")
+        return 0
+
+    elif action == "integrations":
+        plan_path = Path("auto-shorts-omega-lab/manifests/integration-plan.json")
+        data = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.is_file() else {"plan": []}
+        if args.json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== PLANO DE INTEGRAÇÕES OMEGA ===")
+            for step in data.get("plan", []):
+                print(f" [{step.get('status')}] {step.get('phase')}: {', '.join(step.get('deliverables', []))}")
+            print("==================================\n")
+        return 0
+
+    elif action == "live":
+        from .live_stream_sniper import GTA6_LAUNCH_WATCHLIST
+        targets = [{"name": s.name, "platform": s.platform, "url": s.channel_url} for s in GTA6_LAUNCH_WATCHLIST]
+        if args.json:
+            print(json.dumps({"watchlist": targets, "count": len(targets)}, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n=== LIVE STREAM SNIPER WATCHLIST ({len(targets)}) ===")
+            for t in targets:
+                print(f" [{t['platform'].upper()}] {t['name']}: {t['url']}")
+            print("===================================================\n")
+        return 0
+
+    elif action == "clips":
+        from .live_clipping_multimodal import MultimodalHighlightScorer
+        scorer = MultimodalHighlightScorer()
+        fake_audio = [0.1, 0.2, 0.15, 0.8, 1.9, 2.4, 1.8, 0.3, 0.2] * 20
+        fake_scenes = [12.0, 35.0, 50.0]
+        fake_speech = [(2.0, 18.0), (22.0, 48.0)]
+        candidates = scorer.evaluate_live_window(fake_audio, fake_scenes, fake_speech)
+        res = {"candidates": [c.to_dict() for c in candidates], "count": len(candidates)}
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n=== CANDIDATOS A CORTE MULTIMODAL ({len(candidates)}) ===")
+            for c in candidates:
+                print(f" [{c.trigger_type}] {c.start_sec}s -> {c.end_sec}s ({c.duration_sec}s) | Score: {c.overall_score}")
+            print("=======================================================\n")
+        return 0
+
+    elif action == "forensics":
+        from .viral_forensics import ViralForensicsEngine
+        engine = ViralForensicsEngine()
+        dossier = engine.analyze_short_structure(
+            video_id=getattr(args, "video_id", "viral_ref_01"),
+            title=getattr(args, "title", "O segredo oculto da nova IA"),
+            transcript_text=getattr(args, "transcript", "Como a nova inteligencia artificial consegue rodar inteiramente dentro do seu celular em 2026 sem esquentar a bateria."),
+            duration_sec=getattr(args, "duration", 42.0),
+            niche=getattr(args, "niche", "tech"),
+        )
+        json_p, md_p = engine.export_reports(dossier, out_dir=out_dir)
+        res = {"dossier": dossier.to_dict(), "json_report": str(json_p), "markdown_report": str(md_p)}
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== LAUDO PERICIAL DE ENGENHARIA REVERSA (VIRAL FORENSICS) ===")
+            print(f" Vídeo     : {dossier.source_title}")
+            print(f" Hook Score: {dossier.hook_analysis.retention_score}/100 ({dossier.hook_analysis.hook_type})")
+            print(f" Ritmo CPM : {dossier.pacing_analysis.cuts_per_minute} cortes/min")
+            print(f" Relatórios: {json_p.name} e {md_p.name}")
+            print("==============================================================\n")
+        return 0
+
+    elif action == "video":
+        sub_act = getattr(args, "video_action", "validate")
+        from .visual_qa_engine import VisualQAEngine
+        engine = VisualQAEngine(out_dir=out_dir)
+        target_f = getattr(args, "file", "")
+        if not target_f or not Path(target_f).is_file():
+            err = {"error": f"Arquivo de vídeo não encontrado: {target_f}"}
+            print(json.dumps(err) if args.json else err["error"], file=sys.stderr)
+            return 2
+        diag = engine.run_deep_diagnostics(target_f)
+        if args.json:
+            print(json.dumps(diag, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== DIAGNOSTICO VISUAL QA ===")
+            print(f" Arquivo    : {diag.get('file_name')}")
+            print(f" Telas Pretas: {diag.get('black_frames_detected')}")
+            print(f" Telas Congel: {diag.get('frozen_frames_detected')}")
+            print(f" Silêncio   : {diag.get('silence_intervals_detected')}")
+            print(f" Aprovado   : {'SIM' if diag.get('passed') else 'NAO'}")
+            print("=============================\n")
+        return 0 if diag.get("passed") else 1
+
+    elif action == "report":
+        try:
+            from scripts.omega_repo_harness import OmegaRepoHarness
+        except ImportError:
+            repo_root = Path(__file__).resolve().parent.parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from scripts.omega_repo_harness import OmegaRepoHarness
+        rep = OmegaRepoHarness().run_report()
+        if args.json:
+            print(json.dumps(rep, indent=2, ensure_ascii=False))
+        else:
+            print(f"[Omega] Relatório gerado com sucesso: {rep.get('title')}")
+        return 0
+
     return 2
 
 
@@ -430,6 +584,23 @@ def build_cli_parser() -> argparse.ArgumentParser:
     p_tasks.add_argument("--comment", default="", help="Comentário da aprovação")
     p_tasks.add_argument("--limit", type=int, default=20, help="Limite de tarefas")
     p_tasks.add_argument("--auto-approve", action="store_true", help="Pular fila de aprovação humana")
+
+    omega_sub.add_parser("inventory", parents=[common], help="Inventário de hardware, OS, memória e catálogo de repositórios")
+    p_repos = omega_sub.add_parser("repos", parents=[common], help="Gerenciador de auditoria e clonagem dos repositórios open-source")
+    p_repos.add_argument("repo_action", choices=["audit", "clone", "test", "status"], default="audit", nargs="?")
+    omega_sub.add_parser("integrations", parents=[common], help="Plano e estado das integrações tecnológicas")
+    omega_sub.add_parser("live", parents=[common], help="Monitoramento de streamers de games e lives")
+    omega_sub.add_parser("clips", parents=[common], help="Detecção de cortes multimodais em lives")
+    p_foren = omega_sub.add_parser("forensics", parents=[common], help="Engenharia reversa criativa e laudo de viralidade")
+    p_foren.add_argument("--video-id", default="viral_ref_01", help="ID do vídeo analisado")
+    p_foren.add_argument("--title", default="O segredo da IA", help="Título do vídeo")
+    p_foren.add_argument("--transcript", default="Texto da transcrição", help="Texto de fala")
+    p_foren.add_argument("--duration", type=float, default=45.0, help="Duração em segundos")
+    p_foren.add_argument("--niche", default="tech", help="Nicho")
+    p_vid = omega_sub.add_parser("video", parents=[common], help="Diagnóstico visual profundo (blackdetect, freezedetect)")
+    p_vid.add_argument("file", help="Caminho do arquivo MP4")
+    p_vid.add_argument("--video-action", default="validate", choices=["validate"])
+    omega_sub.add_parser("report", parents=[common], help="Gera o relatório executivo de integração")
 
     # studio
     p_studio = subparsers.add_parser("studio", parents=[common], help="Comandos do Atlas Studio (Design System, Quality Gates, 13 Personas)")

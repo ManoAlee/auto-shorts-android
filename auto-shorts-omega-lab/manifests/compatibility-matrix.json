@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-11-23T13:40:00Z",
+  "matrix": [
+    {
+      "tier": "TIER_1_NATIVE_ANDROID",
+      "description": "Componentes que executam 100% no smartphone com sub-segundo e baixo consumo de memória",
+      "tools": ["autoshorts.c", "whisper.cpp (Q4_0)", "streamlink", "yt-dlp", "piper-tts", "pytest", "ruff", "ffmpeg"]
+    },
+    {
+      "tier": "TIER_2_ADAPTED_PYTHON",
+      "description": "Algoritmos adaptados para dispensar dependências C/NumPy pesadas, usando chamadas FFmpeg diretas",
+      "tools": ["auto-editor (via silencedetect)", "PySceneDetect (via scene score)", "ClipCaptionAI (via ASS sub)", "clipper (via MultimodalHighlightScorer)"]
+    },
+    {
+      "tier": "TIER_3_DESKTOP_AUXILIARY",
+      "description": "Componentes opcionais de alta carga delegados ao Windows Desktop Worker quando conectado",
+      "tools": ["remotion", "faster-whisper (large)", "whisperX", "coqui-tts (XTTS)", "vmaf"]
+    }
+  ]
+}

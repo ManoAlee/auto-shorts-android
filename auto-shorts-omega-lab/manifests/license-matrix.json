@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-11-23T13:40:00Z",
+  "policy": "Permissivo para core; compliance com LGPL 2.1 para binários dinâmicos; isolamento de licenças GPL",
+  "licenses": [
+    {"name": "MIT", "count": 14, "commercial_safety": "TOTAL", "derivative_rights": "LIVRE"},
+    {"name": "BSD-2/3-Clause", "count": 5, "commercial_safety": "TOTAL", "derivative_rights": "LIVRE"},
+    {"name": "Apache-2.0", "count": 3, "commercial_safety": "TOTAL", "derivative_rights": "LIVRE (Preservar NOTICE)"},
+    {"name": "Unlicense", "count": 2, "commercial_safety": "TOTAL (Domínio Público)", "derivative_rights": "LIVRE"},
+    {"name": "LGPL-2.1+", "count": 1, "commercial_safety": "PERMITIDO (Vínculo dinâmico / CLI)", "derivative_rights": "SEM CONTAMINAÇÃO"},
+    {"name": "GPLv3", "count": 3, "commercial_safety": "ISOLAMENTO EXIGIDO (Uso como processo isolado via IPC)", "derivative_rights": "NÃO ESTENDER AO CORE"}
+  ]
+}
