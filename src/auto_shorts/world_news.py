@@ -205,14 +205,16 @@ def fetch_world_news_headlines(
     get = fetcher or _http_get_text
     collected: List[Dict] = []
 
-    # 1. Multi-Portal Brazilian & Global RSS Desks (Diversified & Load-Balanced)
+    # 1. Multi-Portal Brazilian & Global RSS Desks (Rich Content Desks First)
+    # Prefer portals with rich multi-paragraph RSS descriptions over 1-sentence stubs
     base_sources = [
-        ("https://news.google.com/rss/search?q=Microsoft+OR+CrowdStrike+OR+AWS+OR+Cloudflare+OR+apagao+OR+pane+when:2d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Tech Global", "tech_ia"),
+        ("https://viciados.net/feed/", "Viciados.net - GTA 6 & Rockstar", "games"),
+        ("https://ign.com/br/feed.xml", "IGN Brasil", "games"),
         ("https://tecnoblog.net/feed/", "Tecnoblog", "tech_ia"),
+        ("https://canaltech.com.br/rss/", "Canaltech", "tech_ia"),
+        ("https://olhardigital.com.br/feed/", "Olhar Digital", "tech_ia"),
         ("https://feeds.bbci.co.uk/portuguese/rss.xml", "BBC News Brasil", "mundo"),
         ("https://pt.euronews.com/rss?level=theme&name=news", "Euronews Mundo", "mundo"),
-        ("https://olhardigital.com.br/feed/", "Olhar Digital", "tech_ia"),
-        ("https://canaltech.com.br/rss/", "Canaltech", "tech_ia"),
         ("https://www.cnnbrasil.com.br/feed/", "CNN Brasil", "mundo"),
         ("https://www.metropoles.com/feed", "Metrópoles", "mundo"),
         ("https://www.infomoney.com.br/feed/", "InfoMoney", "economia"),
@@ -220,9 +222,6 @@ def fetch_world_news_headlines(
         ("https://g1.globo.com/rss/g1/economia/", "G1 Economia", "economia"),
         ("https://g1.globo.com/rss/g1/mundo/", "G1 Mundo", "mundo"),
         ("https://www.bleepingcomputer.com/feed/", "BleepingComputer", "tech_ia"),
-        ("https://viciados.net/feed/", "Viciados.net - GTA 6 & Rockstar", "games"),
-        ("https://news.google.com/rss/search?q=GTA+6+OR+Rockstar+Games+OR+PlayStation+when:3d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Games & GTA 6", "games"),
-        ("https://ign.com/br/feed.xml", "IGN Brasil", "games"),
     ]
 
     # Topic-specific source filtering to guarantee strict relevance
@@ -637,13 +636,17 @@ def build_brazil_news_story_pack(
         elif pt_summary.lower().startswith(pt_title.lower()):
             pt_summary = pt_summary[len(pt_title):].lstrip(" .,:;-—")
 
-    # A headline alone (or a 1-sentence Google News RSS stub) is NEVER enough for a news Short.
+    # A headline alone (or a 1-sentence Google News RSS stub echoing the title) is NEVER enough for a news Short.
+    sentences = [s.strip() for s in re.split(r"[.!?]+", pt_summary) if len(s.strip().split()) >= 3]
+    is_single_sentence_stub = (len(sentences) < 2 and clean_t in clean_s)
     if (
         not pt_summary
         or clean_s == clean_t
         or len(pt_summary) < 85
         or len(pt_summary.split()) < 14
+        or is_single_sentence_stub
         or pt_summary.lower() == pt_title.lower()
+        or _clean_alnum(pt_summary) == _clean_alnum(pt_title)
     ):
         raise ValueError(
             f"Notícia descartada: {source_name} forneceu apenas manchete/stub insuficiente para '{pt_title}'."
@@ -1071,9 +1074,49 @@ def produce_world_news_short(
 
     pack = None
     rejected: List[str] = []
+    sentinel_report = None
     for picked in candidates:
         try:
-            pack = build_brazil_news_story_pack(picked, use_llm=use_llm, target_platform=target_platform)
+            cand_pack = build_brazil_news_story_pack(picked, use_llm=use_llm, target_platform=target_platform)
+            # Run Sentinel Pre-Render QA to guarantee substantive narrative, hook strength, and safe durations
+            from .sentinel_pre_render import (
+                SentinelPreRenderOrchestrator,
+                ContentBrief,
+                SceneContract,
+                PreviewMode,
+            )
+
+            brief = ContentBrief(
+                title=cand_pack["title"],
+                topic=cand_pack.get("category", "mundo"),
+                platform="tiktok_rewards" if target_platform == "tiktok_rewards" else "youtube_shorts",
+                niche=cand_pack.get("niche", "noticias_mundiais"),
+            )
+            script_words = cand_pack["script"].split()
+            half = max(1, len(script_words) // 2)
+            scenes = [
+                SceneContract("s1", 0.0, 20.0, 20.0, " ".join(script_words[:half]), "breaking_news_event", "news_lead.mp4"),
+                SceneContract("s2", 20.0, 42.0, 22.0, " ".join(script_words[half:]), "journalistic_context", "news_context.mp4"),
+            ]
+            orchestrator = SentinelPreRenderOrchestrator(out_dir=out_root / "sentinel")
+            report = orchestrator.run_pre_render_validation(
+                brief=brief,
+                script_text=cand_pack["script"],
+                scenes=scenes,
+                preview_mode=PreviewMode.STORYBOARD_ONLY,
+                auto_correct=True,
+            )
+
+            if not report.is_approved:
+                rejected.append(f"Sentinel QA Reprovou '{cand_pack['title'][:35]}' (Score: {report.overall_score})")
+                continue
+
+            if report.revision_history and report.title != cand_pack["title"]:
+                cand_pack["title"] = report.title
+                cand_pack["seo_title"] = report.title
+
+            pack = cand_pack
+            sentinel_report = report
             break
         except ValueError as exc:
             rejected.append(str(exc))
@@ -1201,6 +1244,10 @@ def produce_world_news_short(
             saved["source_news"] = {"source": pack["source_name"], "url": pack["source_url"]}
             if pack.get("multi_platform"):
                 saved["multi_platform"] = pack["multi_platform"]
+            if sentinel_report is not None:
+                saved["sentinel_report"] = sentinel_report.to_dict()
+                saved["sentinel_overall_score"] = sentinel_report.overall_score
+                saved["sentinel_approved"] = sentinel_report.is_approved
             publish_json.write_text(json.dumps(saved, indent=2, ensure_ascii=False), encoding="utf-8")
         except (OSError, json.JSONDecodeError):
             pass

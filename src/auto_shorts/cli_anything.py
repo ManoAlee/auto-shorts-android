@@ -16,6 +16,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+if __package__ in (None, ""):
+    _src = Path(__file__).resolve().parent.parent
+    if str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
+    __package__ = "auto_shorts"
+
 from .job_recovery import JobRecoveryManager, JobState
 
 
@@ -539,6 +545,82 @@ def cmd_studio(args: argparse.Namespace, out_dir: Path) -> int:
     return 2
 
 
+def cmd_sentinel(args, out_dir: Path) -> int:
+    """Executa auditoria pre-render multimodal e 10 Quality Gates do Sentinel."""
+    from .sentinel_pre_render import (
+        ContentBrief,
+        PreviewMode,
+        SceneContract,
+        SentinelPreRenderOrchestrator,
+    )
+
+    act = getattr(args, "sentinel_action", "status") or "status"
+
+    if act == "status":
+        reports_dir = out_dir / "sentinel" / "reports"
+        reports_count = len(list(reports_dir.glob("*.json"))) if reports_dir.is_dir() else 0
+        data = {
+            "ok": True,
+            "engine": "AutoShortsSentinelPreRenderEngine",
+            "active": True,
+            "reports_count": reports_count,
+            "reports_dir": str(reports_dir),
+        }
+        if args.json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== AUTO SHORTS SENTINEL (PRE-RENDER INTELLIGENCE) ===")
+            print(" Status: ATIVO")
+            print(f" Relatórios Gerados: {reports_count}")
+            print(f" Diretório: {reports_dir}")
+            print("======================================================\n")
+        return 0
+
+    elif act == "validate":
+        title = getattr(args, "title", "Vídeo Planejado")
+        script_text = getattr(args, "script", "")
+        niche = getattr(args, "niche", "geral")
+        platform = getattr(args, "platform", "youtube_shorts")
+        auto_correct = not getattr(args, "no_auto_correct", False)
+
+        brief = ContentBrief(
+            title=title,
+            topic=getattr(args, "topic", "Geral"),
+            platform=platform,
+            niche=niche,
+        )
+        orch = SentinelPreRenderOrchestrator(out_dir=out_dir / "sentinel")
+        report = orch.run_pre_render_validation(
+            brief=brief,
+            script_text=script_text,
+            auto_correct=auto_correct,
+        )
+
+        if args.json:
+            print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+        else:
+            print("\n=== SENTINEL PRE-RENDER QUALITY GATES AUDIT ===")
+            print(f" Título     : {report.title}")
+            print(f" Nota Geral : {report.overall_score}/100")
+            print(f" Autorizado : {'LIBERADO PARA PRODUÇÃO' if report.is_approved else 'BLOQUEADO'}")
+            for g_id, g in report.gates.items():
+                status_sym = "✅ PASS" if g.status.value == "PASS" else f"❌ {g.status.value}"
+                print(f" {g_id} ({g.name}): {status_sym} (Score: {g.score}/100)")
+            if report.detected_issues:
+                print("\n Problemas Detectados:")
+                for iss in report.detected_issues:
+                    print(f"  - [{iss.get('gate')}]: {'; '.join(iss.get('errors') or iss.get('warnings') or [])}")
+            if report.revision_history:
+                print("\n Auto-Correções Aplicadas:")
+                for rev in report.revision_history:
+                    print(f"  - [{rev.get('type')}]: {rev}")
+            print("===============================================\n")
+
+        return 0 if report.is_approved else 1
+
+    return 2
+
+
 def build_cli_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="Saída em formato JSON estruturado (Agent-First)")
@@ -617,6 +699,18 @@ def build_cli_parser() -> argparse.ArgumentParser:
     p_pipe.add_argument("--job-id", default="", help="ID do job")
     p_pipe.add_argument("--operator", default="operator_admin", help="Operador responsável")
 
+    # sentinel (Pre-Render Intelligence & Quality Gates)
+    p_sentinel = subparsers.add_parser("sentinel", parents=[common], help="Auto Shorts Sentinel — Pre-Render Intelligence & Quality Gates")
+    sentinel_sub = p_sentinel.add_subparsers(dest="sentinel_action", help="Ação do Sentinel")
+    sentinel_sub.add_parser("status", parents=[common], help="Verifica status e relatórios recentes do Sentinel")
+    p_sval = sentinel_sub.add_parser("validate", parents=[common], help="Valida roteiro, cenas, promessas e 10 Quality Gates antes de renderizar")
+    p_sval.add_argument("--title", default="Vídeo Planejado", help="Título editorial candidato")
+    p_sval.add_argument("--script", default="", help="Texto completo do roteiro planejado")
+    p_sval.add_argument("--topic", default="Geral", help="Tópico principal")
+    p_sval.add_argument("--niche", default="geral", help="Nicho do canal")
+    p_sval.add_argument("--platform", default="youtube_shorts", help="Plataforma alvo")
+    p_sval.add_argument("--no-auto-correct", action="store_true", help="Desabilitar auto-correção automática de títulos e legendas")
+
     # serve (compatibilidade web)
     p_serve = subparsers.add_parser("serve", parents=[common], help="Inicia o Web Studio Dashboard")
     p_serve.add_argument("--port", type=int, default=8787, help="Porta TCP do servidor (padrão: 8787)")
@@ -643,6 +737,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_omega(args, out_dir)
     elif args.subcommand == "studio":
         return cmd_studio(args, out_dir)
+    elif args.subcommand == "sentinel":
+        return cmd_sentinel(args, out_dir)
     elif args.subcommand == "serve":
         from .webapp import serve_webapp
         serve_webapp(host="0.0.0.0", port=args.port, out_dir=str(out_dir))

@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 
+def _clean_alnum(s: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]", "", s.lower())
+
+
 MAHORAGA_SPOKES: List[Dict[str, str]] = [
     {
         "id": "spoke_1_investigativo",
@@ -135,8 +139,7 @@ _PLACEHOLDER_PATTERNS = (
 
 _TRAGEDY_SENSITIVE_KEYWORDS = (
     "morreu", "morte", "morto", "morta", "assassina", "assassinato", "vítima",
-    "vitima", "luto", "tragédia", "tragedia", "crime", "acidente", "polícia",
-    "policia", "preso", "prisão", "prisao", "hospital", "sepultado", "enterro",
+    "vitima", "luto", "tragédia", "tragedia", "sepultado", "enterro",
     "desaparecido", "chacina", "homicídio", "homicidio", "fatal", "baleado",
     "tiroteio", "mal súbito", "mal subito", "passar mal", "falecimento", "cadáver", "cadaver"
 )
@@ -494,6 +497,14 @@ class MahoragaEngine:
             sum_styled_start = budgeted_summary[0].lower() + budgeted_summary[1:]
         else:
             sum_styled_start = budgeted_summary
+
+        # Strip echo if sum_styled_start starts by repeating title_clean
+        norm_t_lead = _clean_alnum(title_clean[:35])
+        norm_s_lead = _clean_alnum(sum_styled_start[:50])
+        if norm_t_lead and norm_t_lead in norm_s_lead:
+            m_split = re.search(r"^.*?[.!?]\s*", sum_styled_start)
+            if m_split and len(sum_styled_start[m_split.end():].strip()) >= 35:
+                sum_styled_start = sum_styled_start[m_split.end():].strip()
 
         # Act 2 & 3: Journalistic Attribution + Budgeted Core Facts
         act2_body = f"Segundo apuração divulgada por {source_name}, {sum_styled_start}"

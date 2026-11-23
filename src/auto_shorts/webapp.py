@@ -1173,6 +1173,41 @@ def make_handler(out_dir: Path):
                 self._send_json(200, {"presets": DesignSystemManager().list_presets()})
                 return
 
+            if parsed.path == "/api/sentinel/status":
+                from .sentinel_pre_render import SentinelPreRenderOrchestrator
+                reports_dir = out_dir / "sentinel" / "reports"
+                reports = []
+                if reports_dir.is_dir():
+                    for f in sorted(reports_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:10]:
+                        try:
+                            reports.append(json.loads(f.read_text(encoding="utf-8")))
+                        except Exception:
+                            pass
+                self._send_json(200, {
+                    "ok": True,
+                    "active": True,
+                    "engine": "AutoShortsSentinelPreRenderEngine",
+                    "recent_reports": reports,
+                    "reports_count": len(reports),
+                })
+                return
+
+            if parsed.path == "/api/sentinel/report":
+                query = urllib.parse.parse_qs(parsed.query)
+                rep_id = (query.get("id") or [""])[0]
+                rep_file = out_dir / "sentinel" / "reports" / f"{rep_id}.json"
+                if not rep_file.is_file():
+                    rep_file = out_dir / "sentinel" / "reports" / f"{rep_id}_report.json"
+                if rep_file.is_file():
+                    try:
+                        self._send_json(200, json.loads(rep_file.read_text(encoding="utf-8")))
+                        return
+                    except Exception as err:
+                        self._send_json(500, {"ok": False, "message": str(err)})
+                        return
+                self._send_json(404, {"ok": False, "message": "Relatório Sentinel não encontrado"})
+                return
+
             if parsed.path == "/api/studio/status":
                 from .design_system import DesignSystemManager
                 evidence_dir = out_dir / "studio_evidence"
@@ -1597,6 +1632,52 @@ def make_handler(out_dir: Path):
                 engine = QualityGatesEngine(out_dir)
                 card = engine.evaluate_video(mp4_path=mp4_path, title=title, niche=niche, platform=platform)
                 self._send_json(200, card.to_dict())
+                return
+
+            if parsed.path == "/api/sentinel/validate":
+                from .sentinel_pre_render import (
+                    ContentBrief,
+                    PreviewMode,
+                    SceneContract,
+                    SentinelPreRenderOrchestrator,
+                )
+                title = str(body.get("title") or "Vídeo Sem Título")
+                topic = str(body.get("topic") or "Geral")
+                script_text = str(body.get("script") or "")
+                platform = str(body.get("platform") or "youtube_shorts")
+                niche = str(body.get("niche") or "geral")
+                auto_correct = bool(body.get("auto_correct", True))
+                scenes_raw = body.get("scenes") or []
+
+                scenes = []
+                for idx, s in enumerate(scenes_raw, 1):
+                    scenes.append(SceneContract(
+                        scene_id=str(s.get("scene_id") or f"scene_{idx:02d}"),
+                        timestamp_start=float(s.get("timestamp_start") or 0.0),
+                        timestamp_end=float(s.get("timestamp_end") or 5.0),
+                        duration_seconds=float(s.get("duration_seconds") or 5.0),
+                        narration=str(s.get("narration") or ""),
+                        visual_intent=str(s.get("visual_intent") or ""),
+                        media_asset=str(s.get("media_asset") or ""),
+                        expected_objects=list(s.get("expected_objects") or []),
+                    ))
+
+                brief = ContentBrief(
+                    title=title,
+                    topic=topic,
+                    platform=platform,
+                    niche=niche,
+                    target_duration_sec=float(body.get("target_duration") or 60.0),
+                )
+
+                orch = SentinelPreRenderOrchestrator(out_dir=out_dir / "sentinel")
+                report = orch.run_pre_render_validation(
+                    brief=brief,
+                    script_text=script_text,
+                    scenes=scenes,
+                    auto_correct=auto_correct,
+                )
+                self._send_json(200, report.to_dict())
                 return
 
             if parsed.path == "/api/tiktok/cdp/cookies":

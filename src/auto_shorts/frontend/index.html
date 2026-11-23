@@ -95,6 +95,11 @@ __INLINE_CSS__
             <span>Tendências &amp; Radar</span>
             <span class="nav-badge-hot">EM ALTA</span>
           </button>
+          <button type="button" role="tab" id="tab-sentinel" aria-selected="false" aria-controls="panel-sentinel" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="3"/></svg>
+            <span>Sentinel QA</span>
+            <span class="nav-badge-hot">PRE-RENDER</span>
+          </button>
           <button type="button" role="tab" id="tab-sistema" aria-selected="false" aria-controls="panel-sistema" tabindex="-1">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.78 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Configurações</span>
@@ -726,6 +731,56 @@ __INLINE_CSS__
           </div>
         </form>
         <div id="ai-chat-output" class="meta-pre" hidden></div>
+      </section>
+
+      <!-- Pre-Render Review Studio & Sentinel Multimodal QA Panel -->
+      <section id="panel-sentinel" role="tabpanel" aria-labelledby="tab-sentinel" class="panel" hidden>
+        <div class="workstation-grid">
+          <div>
+            <h2>🛡️ Sentinel Pre-Render Intelligence &amp; Creative Review</h2>
+            <p class="panel-lead">Audite roteiro, promessas do título, alinhamento visual de cenas, contact sheet e 10 Quality Gates antes de renderizar o vídeo final.</p>
+
+            <form id="sentinel-form" novalidate style="margin-bottom: 20px;">
+              <div class="studio-config-grid">
+                <div>
+                  <label for="sentinel-title">Título Candidato do Vídeo</label>
+                  <input id="sentinel-title" name="title" type="text" placeholder="Ex: 5 Erros que Destroem seu Computador" value="5 Erros que Destroem seu Computador" required />
+                </div>
+                <div>
+                  <label for="sentinel-platform">Plataforma Alvo</label>
+                  <select id="sentinel-platform" name="platform">
+                    <option value="youtube_shorts">YouTube Shorts (máx 60s)</option>
+                    <option value="tiktok_rewards">TikTok Rewards (61–75s)</option>
+                    <option value="instagram_reels">Instagram Reels (15–58s)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <label for="sentinel-script">Roteiro Completo Planejado (Narração)</label>
+                <textarea id="sentinel-script" name="script" rows="4" style="width:100%; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:6px; padding:10px; font-family:inherit;" placeholder="Cole o texto de fala aqui...">Você sabia que pequenos descuidos podem destruir o processador do seu computador? Primeiro, a poeira acumulada bloqueia os dissipadores e eleva a temperatura a mais de cem graus. Segundo, usar pasta térmica de baixa qualidade impede a transferência de calor eficiente. Terceiro, fontes genéricas sem certificação causam surtos de tensão fatais. Quarto, bloquear a saída de ar com o gabinete prensado na parede. E quinto, nunca atualizar o sistema de refrigeração. Cuide da sua máquina e se inscreva para mais dicas de hardware!</textarea>
+              </div>
+
+              <div class="actions" style="margin-top: 14px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" id="btn-run-sentinel">🔍 Executar Auditoria Sentinel (10 Gates)</button>
+                <button type="button" class="btn btn-secondary" id="btn-sentinel-autoheal">🪄 Auto-Corrigir Defeitos</button>
+              </div>
+            </form>
+
+            <div id="sentinel-result-box" class="sentinel-result-box" hidden style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                <h3 id="sentinel-result-title" style="margin:0; font-size:1.15rem; color:#38bdf8;">Resultado da Auditoria</h3>
+                <span id="sentinel-auth-badge" class="badge" style="padding:4px 10px; border-radius:4px; font-weight:bold; background:#10b981; color:#fff;">LIBERADO PARA PRODUÇÃO</span>
+              </div>
+              <div id="sentinel-gates-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:16px;"></div>
+              <div id="sentinel-issues-list" style="margin-top:12px;"></div>
+              <div id="sentinel-storyboard-wrap" style="margin-top:16px;">
+                <h4>Storyboard &amp; Contact Sheet</h4>
+                <div id="sentinel-contact-sheet-container" style="text-align:center; margin-top:8px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   </div>

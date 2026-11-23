@@ -2,13 +2,18 @@
 """Retroactive Title Healing & Anti-Repetition Engine.
 
 Inspects all video metadata sidecars (*.publish.json) in the vault and repairs:
-1. Formulaic streamer live cuts: "GTA 6 Ao Vivo: Gaules (Parte 1) | Gameplay #Shorts"
-   -> Context-specific viral curiosity titles based on streamer & segment transcript.
-2. Generic Reddit / nosleep stories: "Histórias Bizarras e Assustadoras do Reddit (r/nosleep) (Parte 10)"
-   -> Saliency-extracted mystery headlines ("A Coisa Que Sorriu na Floresta | Relatos do Reddit").
-3. Category-mismatched news:
+1. Streamer templates falsely applied to non-gamers (Anime, Business, Podcasts, Tutorials):
+   - "A reação inacreditável do Escanor Animes ao vivo! #Shorts" -> "Entrada Épica de Netero e Zeno vs Pitou | Hunter x Hunter #Shorts"
+   - "Negócios em Mente descobriu esse segredo ao vivo! #Shorts" -> "As 4 Ferramentas e a Fórmula Secreta de Agentes de IA #Shorts"
+   - "O Maior Caos do Jhonatas Silva no GTA 6! #Shorts" -> "Como Criar 200 Cortes com 1 Clique Usando Opus Clip #Shorts"
+   - "Irmãos Dias Podcast perdeu o controle nessa hora! #Shorts" -> "Como Ultrapassei Todos no Marketing Digital em 1 Ano | Irmãos Dias Podcast #Shorts"
+   - "Esse foi o momento mais insano do Jhonny Salazar Olivera! #Shorts" -> "Naruto vs Sasuke Dublado: O Confronto Final Decisivo! #Shorts"
+2. Category-mismatched news:
+   - São Paulo severe rain labeled as "Plantão Esportes" -> "Chuvas em São Paulo Fazem Cidade Entrar em Estado de Alerta | Mundo Hoje"
+   - Microsoft / Outlook email outage labeled as "Ciência & Natureza" -> "Microsoft Admite: E-mails Não Foram Entregues Após Apagão | Plantão Tech"
    - Biology / frog discovery labeled as "Plantão Economia" -> "Ciência & Natureza"
    - Sports / tennis (Carlos Alcaraz) labeled as "Plantão Tech" -> "Plantão Esportes"
+3. Formulaic streamer live cuts & generic Reddit / nosleep stories with part numbers.
 4. Preserves backward compatibility and writes directly to *.publish.json and shorts_evolution.db.
 """
 
@@ -29,7 +34,12 @@ SRC_DIR = BASE_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from auto_shorts.viral_titling import generate_smart_clip_title, detect_accurate_category
+from auto_shorts.viral_titling import (
+    generate_smart_clip_title,
+    detect_accurate_category,
+    VERIFIED_GAMING_STREAMERS,
+    _clean_alnum_text,
+)
 from auto_shorts.viral_intelligence import AntiSlopHumanizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -45,7 +55,6 @@ def _extract_text_from_ass_or_srt(ass_or_srt_path: Path) -> str:
     except OSError:
         return ""
 
-    # Parse ASS Dialogue lines
     lines = []
     for line in content.splitlines():
         if line.startswith("Dialogue:"):
@@ -62,32 +71,25 @@ def _extract_text_from_ass_or_srt(ass_or_srt_path: Path) -> str:
 
 
 def _detect_streamer_from_name(name: str) -> str:
-    """Identify streamer from video stem or title."""
+    """Identify streamer ONLY if matching verified gaming streamers."""
     low = name.lower()
-    if "gaules" in low:
-        return "Gaules"
-    if "lipao" in low or "lipaogamer" in low:
-        return "LipaoGamer"
-    if "davy" in low or "davyjones" in low:
-        return "Davy Jones"
-    if "xqc" in low:
-        return "xQc"
-    if "alanzoka" in low:
-        return "Alanzoka"
-    if "coringa" in low:
-        return "Coringa"
-    if "nobru" in low:
-        return "Nobru"
-    if "cerol" in low:
-        return "Cerol"
-    if "casimiro" in low or "caze" in low:
-        return "Casimiro"
+    for s in VERIFIED_GAMING_STREAMERS:
+        if s in low:
+            if s in ("lipao", "lipaogamer"):
+                return "LipaoGamer"
+            if s in ("davy", "davy jones", "davyjones"):
+                return "Davy Jones"
+            if s == "xqc":
+                return "xQc"
+            if s == "casimiro" or s == "caze":
+                return "Casimiro"
+            return s.capitalize()
     return ""
 
 
 def _detect_part_number(stem: str, title: str) -> int:
-    """Extract part number from filename suffix (_p01) or title ((Parte N))."""
-    m_file = re.search(r"_p(\d+)", stem)
+    """Extract part number from filename suffix (_p01, _short_02) or title ((Parte N))."""
+    m_file = re.search(r"_(?:p|short_)0*(\d+)", stem)
     if m_file:
         return int(m_file.group(1))
     m_title = re.search(r"\(Parte\s+(\d+)\)", title, flags=re.I)
@@ -97,12 +99,12 @@ def _detect_part_number(stem: str, title: str) -> int:
 
 
 def is_title_problematic(title: str, caption: str = "", filename: str = "") -> bool:
-    """Determine whether a title is simplistic, repetitive, or mismatched."""
+    """Determine whether a title is simplistic, repetitive, clickbait-hijacked, or mismatched."""
     t_low = title.lower()
     c_low = caption.lower()
     f_low = filename.lower()
     
-    # 1. Repetitive streamer live cuts
+    # 1. Repetitive streamer live cuts formula
     if "gta 6 ao vivo:" in t_low or "reage ao gta 6" in t_low:
         return True
     
@@ -110,7 +112,47 @@ def is_title_problematic(title: str, caption: str = "", filename: str = "") -> b
     if "histórias bizarras e assustadoras do reddit" in t_low or "r/nosleep" in t_low:
         return True
 
-    # 3. Category mismatch in news
+    # 3. Streamer clickbait falsely applied to non-gamers (Anime, Business, Podcasts, Tutorials)
+    clickbait_templates = (
+        "descobriu esse segredo ao vivo",
+        "perdeu o controle nessa hora",
+        "a reação inacreditável do",
+        "o momento exato em que",
+        "ficou em choque total",
+        "nem o",
+        "quase não acreditou no que viu",
+        "esse foi o momento mais insano do",
+    )
+    for cb in clickbait_templates:
+        if cb in t_low:
+            # Check if uploader/channel in title is NOT a verified gamer
+            is_real_gamer = any(g in t_low for g in VERIFIED_GAMING_STREAMERS)
+            if not is_real_gamer:
+                return True
+
+    # 4. Erroneously claims "no GTA 6!" when the content is not GTA 6
+    body_caption = c_low.replace(t_low, "")
+    if "gta 6" in t_low or "gta" in t_low:
+        if any(w in body_caption for w in ("opus clip", "marçal", "marcal", "monetizar", "marketing digital", "agente", "podcast")):
+            return True
+        if not any(w in body_caption for w in ("rockstar", "gta vi", "gta 6", "vice city", "lucia", "jason", "trevor", "michael", "franklin")):
+            if not any(g in t_low for g in VERIFIED_GAMING_STREAMERS):
+                return True
+
+    # 5. Category mismatch in news
+    if "plantão esportes" in t_low:
+        if any(w in t_low or w in c_low for w in (
+            "chuva", "chuvas", "temporal", "alagamento", "inundação", "enchente",
+            "defesa civil", "regula", "orgao regulador", "órgão regulador",
+            "concessionaria", "prefeitura", "governo", "governador", "tarifa"
+        )):
+            return True
+        sports_terms = ("futebol", "gol", "gols", "campeonato", "brasileirao", "tenis", "atp", "flamengo", "palmeiras", "corinthians", "sao paulo fc", "vasco", "gremio", "cruzeiro", "santos fc", "zverev", "alcaraz")
+        if not any(w in t_low or w in c_low for w in sports_terms):
+            return True
+    if "ciência & natureza" in t_low:
+        if any(w in t_low or w in c_low for w in ("microsoft", "outlook", "exchange", "email", "e-mail", "apagão", "apagao", "servidor")):
+            return True
     if "plantão economia" in t_low:
         if any(w in t_low or w in c_low for w in ("perereca", "sapo", "especie", "espécie", "descoberta", "biologia", "animal", "fauna")):
             return True
@@ -118,15 +160,58 @@ def is_title_problematic(title: str, caption: str = "", filename: str = "") -> b
         if any(w in t_low or w in c_low for w in ("alcaraz", "zverev", "tenista", "atp", "futebol", "neymar", "flamengo")):
             return True
 
-    # 4. Bare filename or empty
+    # 6. Bare filename or empty or truncated
     if not title or title.strip() == filename.replace(".mp4", "") or title.startswith("short_live_"):
         return True
 
-    # 5. Generic (Parte N) suffix on general titles
+    # 7. Generic (Parte N) suffix on general titles
     if re.search(r"\(Parte\s+\d+\)\s*\|\s*Gameplay\s*#Shorts", title, flags=re.I):
         return True
 
     return False
+
+
+def _extract_source_info_from_caption(caption: str) -> Tuple[str, str, str]:
+    """Extract (source_title, uploader_channel, spoken_text) from caption text."""
+    source_title = ""
+    channel = ""
+    spoken_text = ""
+
+    # 1. Fonte / Referencia line
+    m_fonte = re.search(r"Fonte\s*/\s*Referencia:\s*\n([^\n]+)", caption, flags=re.I)
+    if m_fonte:
+        ref_line = m_fonte.group(1).strip()
+        if " - " in ref_line:
+            parts = ref_line.split(" - ", 1)
+            channel = parts[0].strip()
+            source_title = parts[1].strip()
+        else:
+            source_title = ref_line
+
+    # 2. Fonte original with URL slug
+    m_orig = re.search(r"Fonte original.*?\((.*?)\):\s*https?://[^\s/]+/([^/\s]+)/([^\s/]+)", caption, flags=re.I)
+    if m_orig:
+        slug = m_orig.group(3).strip().replace("-", " ")
+        if not source_title or len(source_title) < 15:
+            source_title = slug
+
+    # 3. Destaque line
+    m_destaque = re.search(r"Destaque:\s*([^\n]+)", caption, flags=re.I)
+    if m_destaque:
+        dest = m_destaque.group(1).strip()
+        if not source_title:
+            source_title = dest
+
+    # 4. Spoken text / summary
+    m_sobre = re.search(r"Sobre este corte:\s*\n(.*?)(?:\n\nFonte|\Z)", caption, flags=re.I | re.DOTALL)
+    if m_sobre:
+        spoken_text = m_sobre.group(1).strip()
+    else:
+        m_resumo = re.search(r"Resumo da noticia.*:\s*\n(.*?)(?:\n\nFonte|\Z)", caption, flags=re.I | re.DOTALL)
+        if m_resumo:
+            spoken_text = m_resumo.group(1).strip()
+
+    return source_title, channel, spoken_text
 
 
 def heal_single_pack(
@@ -146,15 +231,18 @@ def heal_single_pack(
     if not is_title_problematic(old_title, caption=caption, filename=filename):
         return None
 
+    # Extract real context from caption and sidecars
+    cap_src_title, cap_channel, cap_speech = _extract_source_info_from_caption(caption)
+
     # Gather spoken transcript
     clip_text = (
         pack.get("script")
         or pack.get("body_text")
         or pack.get("clip_summary")
+        or cap_speech
         or ""
     )
     if not clip_text or len(clip_text) < 40:
-        # Try finding subtitle file alongside mp4
         mp4_path = json_path.parent / filename
         sub_cands = [
             json_path.parent / f"_narrate_{mp4_path.stem}" / f"{mp4_path.stem}.ass",
@@ -167,16 +255,18 @@ def heal_single_pack(
                 clip_text = sub_text
                 break
 
-    if not clip_text and caption:
-        clip_text = caption
-
-    streamer = _detect_streamer_from_name(filename) or _detect_streamer_from_name(old_title)
+    source_title = pack.get("source_title") or cap_src_title or old_title
+    streamer = _detect_streamer_from_name(cap_channel) or _detect_streamer_from_name(filename) or _detect_streamer_from_name(old_title)
     part_num = _detect_part_number(filename, old_title)
     niche = str(pack.get("niche") or "geral")
 
+    # If niche was misclassified as games_gta6 for tutorial
+    if "opus clip" in caption.lower() or "como criar 200 cortes" in caption.lower() or "ai agents" in caption.lower():
+        niche = "ia_tech"
+
     new_title = generate_smart_clip_title(
         clip_text=clip_text,
-        source_title=old_title,
+        source_title=source_title,
         streamer_or_speaker=streamer,
         niche=niche,
         part_num=part_num,
@@ -189,13 +279,31 @@ def heal_single_pack(
     if not dry_run:
         pack["title"] = new_title
         pack["youtube_title"] = new_title
+        pack["niche"] = niche
         pack["hook_title"] = new_title.split("|")[0].split("—")[0].strip()[:42]
         
         # Update caption replacing old title header
-        if old_title and old_title in caption:
-            pack["caption"] = caption.replace(old_title, new_title)
-        elif new_title not in caption:
-            pack["caption"] = f"{new_title}\n\n{caption}".strip()
+        new_caption = caption
+        if old_title and old_title in new_caption:
+            new_caption = new_caption.replace(old_title, new_title)
+        elif new_title not in new_caption:
+            new_caption = f"{new_title}\n\n{new_caption}".strip()
+
+        # Fix category mismatch in caption footers and hashtags
+        if "mundo_br_20261123_043904" in filename or "chuvas em são paulo" in old_title.lower():
+            pack["niche"] = "noticias_mundiais"
+            new_caption = new_caption.replace("O que você achou dessa conquista? Deixe seu comentário e siga o canal para novidades do esporte!", "Fique atento aos alertas da Defesa Civil e compartilhe para avisar mais pessoas!")
+            new_caption = re.sub(r"#Esportes\s+#Futebol\s+#Tenis\s+#EsporteBrasil", "#Mundo #Brasil #SaoPaulo #Clima #Alerta #Chuva", new_caption)
+
+        if "mundo_br_20261123_130740" in filename or "microsoft admite" in old_title.lower():
+            pack["niche"] = "tech_ia"
+            new_caption = new_caption.replace("Curtiu essa descoberta? Deixe seu like e siga o canal para mais fatos fascinantes da ciência!", "Seu e-mail também foi afetado pela instabilidade da Microsoft? Deixe sua experiência nos comentários!")
+            new_caption = re.sub(r"#Ciencia\s+#Natureza\s+#Descobertas\s+#Biologia\s+#Curiosidades", "#Microsoft #Outlook #Exchange #Tecnologia #Tech #NoticiasTech", new_caption)
+
+        if "3usldBhhO5c" in filename:
+            pack["niche"] = "ia_tech"
+
+        pack["caption"] = new_caption
 
         # Update cross-platform title if present
         if isinstance(pack.get("multi_platform"), dict):
@@ -218,7 +326,6 @@ def update_db_titles(db_path: Path, changes: List[Tuple[str, str, str]]) -> int:
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
         
-        # Check if table exists
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='clip_runs'")
         if cur.fetchone():
             for filename, old_t, new_t in changes:

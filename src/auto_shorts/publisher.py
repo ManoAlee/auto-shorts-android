@@ -655,6 +655,10 @@ def optimize_existing_publish_pack(mp4_path: str | Path, ass_path: Optional[Path
         or "(parte " in title.lower()
         or ("plantão economia" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("perereca", "sapo", "especie", "espécie", "descoberta", "animal", "fauna")))
         or ("plantão tech" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("alcaraz", "zverev", "tenista", "atp", "futebol")))
+        or ("plantão esportes" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("chuva", "chuvas", "temporal", "alagamento", "inundação", "enchente")))
+        or ("ciência & natureza" in title.lower() and any(w in title.lower() or w in caption_text.lower() for w in ("microsoft", "outlook", "email", "e-mail", "exchange", "apagão")))
+        or (any(p in title.lower() for p in ("descobriu esse segredo ao vivo", "perdeu o controle nessa hora", "a reação inacreditável", "esse foi o momento mais insano", "nem o")) and not streamer_guess)
+        or ("no gta 6!" in title.lower() and not any(w in caption_text.lower() for w in ("gta", "grand theft auto", "rockstar")))
     )
 
     if needs_smart_retitle:
