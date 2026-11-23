@@ -191,7 +191,7 @@ def _sanitize_highlights(
 
         raw_title = str(item.get("title") or "").strip()
         if _is_placeholder_text(raw_title):
-            title = _build_clip_title(source_title, hook_title, idx, niche or NICHES["geral"])
+            title = _build_clip_title(source_title, hook_title, idx, niche or NICHES["geral"], clip_text=" ".join(clip_texts))
         else:
             title = raw_title[:90]
 
@@ -727,6 +727,7 @@ def _build_clip_title(
     part_num: int,
     niche: NicheProfile,
     audio_lang: Optional[str] = None,
+    clip_text: str = "",
 ) -> str:
     clean_src = _clean_source_title(source_title)
     is_anime = "anime" in niche.label.lower() or "entretenimento_animes" in str(getattr(niche, "key", "")).lower()
@@ -770,6 +771,15 @@ def _build_clip_title(
         return f"{source_cut.rstrip(' -:,.!?;')} — {edition_tag}{suffix}"[:90]
 
     if clean_src and not _looks_english_title(clean_src):
+        from .viral_titling import generate_smart_clip_title
+        smart = generate_smart_clip_title(
+            clip_text=clip_text,
+            source_title=clean_src,
+            niche=niche.label,
+            part_num=part_num,
+        )
+        if smart and smart != clean_src and len(smart) >= 8:
+            return smart[:90]
         base = clean_src[: 90 - len(suffix)].rstrip(" -|:")
         return f"{base}{suffix}"
     pt_translated = _translate_title_to_ptbr(clean_src)

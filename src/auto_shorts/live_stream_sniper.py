@@ -547,13 +547,20 @@ def snip_streamer_highlight(
 
         if rendered and out_mp4.is_file() and out_mp4.stat().st_size > 50000:
             part_str = f" (Parte {idx})" if len(selected_starts) > 1 else ""
-            clean_title = f"{target.name} Reage ao GTA 6{part_str} | Gameplay Ao Vivo #Shorts"
             clean_tag = "#" + re.sub(r"[^\w]", "", target.name)
             # SEO-compliant 5-tag cap (satisfies YouTube 3-5, IG max 5, and TikTok discovery)
             hashtags = ["#Shorts", "#GTA6", clean_tag, "#GTA6Gameplay", "#GamerBrasil"]
-            clean_title = f"GTA 6 Ao Vivo: {target.name}{part_str} | Gameplay #Shorts"
+            from .viral_titling import generate_smart_clip_title
+            clean_title = generate_smart_clip_title(
+                clip_text="",
+                source_title=title_source or f"GTA 6 Ao Vivo: {target.name}",
+                streamer_or_speaker=target.name,
+                niche="games_gta6",
+                part_num=idx,
+            )
             caption = (
-                f"{target.name} jogando GTA 6 ao vivo no lançamento!{part_str}\n\n"
+                f"{clean_title.replace(' #Shorts', '')}!\n\n"
+                f"Streamer: {target.name}\n"
                 f"Transmissão original: {title_source}\n"
                 f"Canal do streamer: {target.channel_url}\n\n"
                 f"{' '.join(hashtags)}"

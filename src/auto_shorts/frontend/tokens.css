@@ -18,6 +18,7 @@
   --color-neutral: rgba(223, 226, 229, 0.18);
   
   /* Surfaces */
+  --canvas: #F8FAFC;
   --color-background-body: #070B12;
   --color-background-surface: #0F172A;
   --color-background-card: #151F34;

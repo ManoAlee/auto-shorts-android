@@ -224,13 +224,29 @@ def fetch_world_news_headlines(
         ("https://news.google.com/rss/search?q=GTA+6+OR+Rockstar+Games+OR+PlayStation+when:3d&hl=pt-BR&gl=BR&ceid=BR:pt-419", "Plantão Games & GTA 6", "games"),
         ("https://ign.com/br/feed.xml", "IGN Brasil", "games"),
     ]
-    if fetcher is None:
-        import random
-        # In live production, randomize order so BBC or G1 don't monopolize the headlines
-        active_sources = list(base_sources)
-        random.shuffle(active_sources)
+
+    # Topic-specific source filtering to guarantee strict relevance
+    topic_low = (topic or "").lower().strip()
+    if topic_low in ("tech", "tech_ia", "ia", "ia_tech"):
+        matched = [s for s in base_sources if s[2] == "tech_ia"]
+        active_sources = matched if len(matched) >= 2 else base_sources
+    elif topic_low in ("games", "gameplay", "jogos"):
+        matched = [s for s in base_sources if s[2] == "games"]
+        active_sources = matched if len(matched) >= 2 else base_sources
+    elif topic_low in ("financas", "economia", "mercado"):
+        matched = [s for s in base_sources if s[2] == "economia"]
+        active_sources = matched if len(matched) >= 2 else base_sources
+    elif topic_low in ("mundo", "world", "noticias_mundo", "noticias_mundiais"):
+        matched = [s for s in base_sources if s[2] == "mundo"]
+        active_sources = matched if len(matched) >= 2 else base_sources
     else:
         active_sources = base_sources
+
+    if fetcher is None:
+        import random
+        # In live production, randomize order within the relevant sources
+        active_sources = list(active_sources)
+        random.shuffle(active_sources)
 
     for rss_url, src_label, cat_name in active_sources:
         try:
@@ -602,21 +618,9 @@ def build_brazil_news_story_pack(
     else:
         pt_summary = ""
 
-    # Auto-detect category strictly from headline + category + lead snippet (avoiding article footer false positives)
-    title_low = orig_title.lower()
-    content_blob = f"{orig_title} {orig_summary[:180]} {category}".lower()
-    if category in ("humor", "memes", "humor_memes") or any(re.search(rf"\b{k}\b", content_blob) for k in ("meme", "memes", "engracado", "engraçado", "comedia", "comédia", "piada", "zoeira", "casimiro", "defante", "shitpost")):
-        effective_category = "humor_memes"
-    elif category in ("games", "jogo", "jogos") or any(re.search(rf"\b{k}\b", content_blob) for k in ("gta", "gta 6", "rockstar", "playstation", "ps5", "xbox", "nintendo", "gamer", "gameplay", "platina")):
-        effective_category = "games"
-    elif category in ("tech", "ia", "tech_ia") or any(re.search(rf"\b{k}\b", title_low) for k in ("ia", "inteligencia artificial", "inteligência artificial", "openai", "nvidia", "deepseek", "chatgpt", "software", "tecnologia", "google", "microsoft", "apple", "chip", "chips", "robô", "robo")):
-        effective_category = "tech_ia"
-    elif category in ("economia", "financas") or any(re.search(rf"\b{k}\b", content_blob) for k in ("dolar", "dólar", "inflacao", "inflação", "juros", "selic", "bolsa de valores", "banco central", "pib", "escala 5x2", "stf")):
-        effective_category = "economia"
-    elif category in ("ciencia", "ciencia_espaco", "espaco") or any(re.search(rf"\b{k}\b", content_blob) for k in ("nasa", "spacex", "foguete", "astronomia", "telescopio", "telescópio", "planeta", "lua", "marte")):
-        effective_category = "ciencia_espaco"
-    else:
-        effective_category = "mundo"
+    # Auto-detect category strictly from headline + lead summary (avoiding feed misclassifications)
+    from .viral_titling import detect_accurate_category
+    effective_category = detect_accurate_category(orig_title, summary=orig_summary, hint_category=category)
 
     # Clean comparison: remove source suffixes like " - G1", " - Tecnoblog", or bare " G1" / " UOL"
     clean_t = re.sub(r"\s+(?:[-–|]\s+.*|G1|UOL|R7|Folha|Estadão|Terra|BBC)$", "", pt_title).strip().lower()
@@ -675,6 +679,18 @@ def build_brazil_news_story_pack(
             "seo_suffix": " | Plantão Ciência",
             "hashtags": ["#Ciencia", "#Espaco", "#Astronomia", "#NASA", "#Curiosidades", "#Shorts"],
             "cta": "Curtiu essa descoberta? Deixe seu like e siga o canal para mais explorações científicas!",
+        },
+        "ciencia_natureza": {
+            "niche": "ciencia_espaco",
+            "seo_suffix": " | Ciência & Natureza",
+            "hashtags": ["#Ciencia", "#Natureza", "#Descobertas", "#Biologia", "#Curiosidades", "#Shorts"],
+            "cta": "Curtiu essa descoberta? Deixe seu like e siga o canal para mais fatos fascinantes da ciência!",
+        },
+        "esportes": {
+            "niche": "esportes",
+            "seo_suffix": " | Plantão Esportes",
+            "hashtags": ["#Shorts", "#Esportes", "#Futebol", "#Tenis", "#EsporteBrasil"],
+            "cta": "O que você achou dessa conquista? Deixe seu comentário e siga o canal para novidades do esporte!",
         },
         "mundo": {
             "niche": "noticias_mundiais",
