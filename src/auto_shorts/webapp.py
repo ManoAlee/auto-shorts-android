@@ -1168,6 +1168,28 @@ def make_handler(out_dir: Path):
                 self._send_json(200, {"tasks": [t.to_dict() for t in orch.list_tasks()]})
                 return
 
+            if parsed.path == "/api/studio/presets":
+                from .design_system import DesignSystemManager
+                self._send_json(200, {"presets": DesignSystemManager().list_presets()})
+                return
+
+            if parsed.path == "/api/studio/status":
+                from .design_system import DesignSystemManager
+                evidence_dir = out_dir / "studio_evidence"
+                runs = []
+                if evidence_dir.is_dir():
+                    for f in sorted(evidence_dir.glob("studio_harness_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:10]:
+                        try:
+                            runs.append(json.loads(f.read_text(encoding="utf-8")))
+                        except Exception:
+                            pass
+                self._send_json(200, {
+                    "ok": True,
+                    "presets_count": len(DesignSystemManager().list_presets()),
+                    "recent_runs": runs,
+                })
+                return
+
             if parsed.path == "/api/youtube/cdp/status":
                 from .youtube_cdp import get_youtube_cdp_status
                 self._send_json(200, get_youtube_cdp_status(out_dir))
@@ -1552,6 +1574,29 @@ def make_handler(out_dir: Path):
                     self._send_json(202, {"ok": True})
                 else:
                     self._send_json(200, resp)
+                return
+
+            if parsed.path == "/api/studio/pipeline":
+                from .atlas_studio_harness import AtlasStudioMultiAgentHarness
+                job_id = str(body.get("job_id") or f"job_studio_{int(time.time())}")
+                niche = str(body.get("niche") or "tech")
+                topic = str(body.get("topic") or "IA e Automacao")
+                operator = str(body.get("operator") or "operator_admin")
+                harness = AtlasStudioMultiAgentHarness(out_dir)
+                res = harness.execute_studio_pipeline(job_id=job_id, niche=niche, topic=topic, operator=operator)
+                self._send_json(200, res)
+                return
+
+            if parsed.path == "/api/studio/gates":
+                from .quality_gates import QualityGatesEngine
+                file_name = str(body.get("file_name") or "")
+                title = str(body.get("title") or "Video de Teste")
+                niche = str(body.get("niche") or "podcast")
+                platform = str(body.get("platform") or "youtube_shorts")
+                mp4_path = out_dir / file_name if file_name else Path()
+                engine = QualityGatesEngine(out_dir)
+                card = engine.evaluate_video(mp4_path=mp4_path, title=title, niche=niche, platform=platform)
+                self._send_json(200, card.to_dict())
                 return
 
             if parsed.path == "/api/tiktok/cdp/cookies":

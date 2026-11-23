@@ -316,6 +316,75 @@ def cmd_omega(args: argparse.Namespace, out_dir: Path) -> int:
     return 2
 
 
+def cmd_studio(args: argparse.Namespace, out_dir: Path) -> int:
+    from .design_system import DesignSystemManager
+    from .quality_gates import QualityGatesEngine
+    from .atlas_studio_harness import AtlasStudioMultiAgentHarness
+
+    act = getattr(args, "studio_action", "presets")
+
+    if not act or act == "presets":
+        ds = DesignSystemManager()
+        presets = ds.list_presets()
+        if args.json:
+            print(json.dumps({"presets": presets}, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n=== ATLAS STUDIO DESIGN PRESETS ({len(presets)}) ===")
+            for p in presets:
+                print(f" [{p['id']}] {p['label']} | Cor: {p['accent_color_hex']} | Fonte: {p['primary_font']}")
+            print("==================================================\n")
+        return 0
+
+    elif act == "gates":
+        file_path = getattr(args, "file", "")
+        if not file_path or not Path(file_path).is_file():
+            err = {"error": f"Arquivo MP4 nao encontrado: {file_path}"}
+            print(json.dumps(err) if args.json else err["error"], file=sys.stderr)
+            return 2
+        engine = QualityGatesEngine(out_dir)
+        card = engine.evaluate_video(
+            mp4_path=file_path,
+            title=getattr(args, "title", "Video de Teste"),
+            niche=getattr(args, "niche", "podcast"),
+            platform=getattr(args, "platform", "youtube_shorts"),
+        )
+        if args.json:
+            print(json.dumps(card.to_dict(), indent=2, ensure_ascii=False))
+        else:
+            print("\n=== ATLAS STUDIO QUALITY GATES (A-G) ===")
+            print(f" Arquivo    : {card.file_name}")
+            print(f" Nota Geral : {card.overall_score}/100")
+            print(f" Aprovado   : {'SIM' if card.is_approved else 'NAO'}")
+            for k, g in card.gates.items():
+                print(f" Gate {k} ({g.gate_name}): {'PASS' if g.passed else 'FAIL'} (Score: {g.score})")
+            print("=========================================\n")
+        return 0 if card.is_approved else 1
+
+    elif act == "pipeline":
+        niche = getattr(args, "niche", "tech")
+        topic = getattr(args, "topic", "Inovacoes de IA no Brasil")
+        job_id = getattr(args, "job_id", f"job_studio_{int(time.time())}")
+        harness = AtlasStudioMultiAgentHarness(out_dir)
+        res = harness.execute_studio_pipeline(
+            job_id=job_id,
+            niche=niche,
+            topic=topic,
+            operator=getattr(args, "operator", "operator_admin"),
+        )
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+        else:
+            print("\n=== ATLAS STUDIO 13-PERSONA HARNESS PIPELINE ===")
+            print(f" Job ID   : {res['job_id']}")
+            print(f" Nicho    : {res['niche']} (Preset: {res['preset_applied']})")
+            print(f" Contratos: {res['contracts_count']} personas executadas")
+            print(f" Status   : {res['status']}")
+            print("================================================\n")
+        return 0
+
+    return 2
+
+
 def build_cli_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="Saída em formato JSON estruturado (Agent-First)")
@@ -362,6 +431,21 @@ def build_cli_parser() -> argparse.ArgumentParser:
     p_tasks.add_argument("--limit", type=int, default=20, help="Limite de tarefas")
     p_tasks.add_argument("--auto-approve", action="store_true", help="Pular fila de aprovação humana")
 
+    # studio
+    p_studio = subparsers.add_parser("studio", parents=[common], help="Comandos do Atlas Studio (Design System, Quality Gates, 13 Personas)")
+    studio_sub = p_studio.add_subparsers(dest="studio_action", help="Ação do Studio")
+    studio_sub.add_parser("presets", parents=[common], help="Lista os presets do Design System")
+    p_gates = studio_sub.add_parser("gates", parents=[common], help="Avalia os 7 Quality Gates (A-G) em um vídeo")
+    p_gates.add_argument("file", help="Caminho do arquivo de vídeo MP4")
+    p_gates.add_argument("--title", default="Vídeo de Teste", help="Título editorial")
+    p_gates.add_argument("--niche", default="podcast", help="Nicho de conteúdo")
+    p_gates.add_argument("--platform", default="youtube_shorts", help="Plataforma alvo")
+    p_pipe = studio_sub.add_parser("pipeline", parents=[common], help="Executa o pipeline multiagente das 13 personas")
+    p_pipe.add_argument("--niche", default="tech", help="Nicho do vídeo")
+    p_pipe.add_argument("--topic", default="IA e Automação", help="Tópico central")
+    p_pipe.add_argument("--job-id", default="", help="ID do job")
+    p_pipe.add_argument("--operator", default="operator_admin", help="Operador responsável")
+
     # serve (compatibilidade web)
     p_serve = subparsers.add_parser("serve", parents=[common], help="Inicia o Web Studio Dashboard")
     p_serve.add_argument("--port", type=int, default=8787, help="Porta TCP do servidor (padrão: 8787)")
@@ -386,6 +470,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_audit(args, out_dir)
     elif args.subcommand == "omega":
         return cmd_omega(args, out_dir)
+    elif args.subcommand == "studio":
+        return cmd_studio(args, out_dir)
     elif args.subcommand == "serve":
         from .webapp import serve_webapp
         serve_webapp(host="0.0.0.0", port=args.port, out_dir=str(out_dir))
