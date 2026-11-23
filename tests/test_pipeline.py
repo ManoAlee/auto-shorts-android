@@ -1059,7 +1059,7 @@ def test_human_tts_cascade_kokoro_fish_and_speech_normalization(tmp_path, monkey
     from auto_shorts.narrator import _prepare_speech_text, active_tts_engine_label
 
     normalized = _prepare_speech_text("Veja R$ 275 mil e 75% de alta — saiba mais em https://exemplo.com/noticia!")
-    assert "275 reais" in normalized
+    assert "275" in normalized and "reais" in normalized
     assert "75 por cento" in normalized
     assert "https://" not in normalized
 

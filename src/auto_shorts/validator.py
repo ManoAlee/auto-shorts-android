@@ -153,6 +153,8 @@ def inspect_media_metrics(mp4_path: str | Path) -> Dict:
 
     mean_vol: Optional[float] = None
     max_vol: Optional[float] = None
+    ebu_lufs: Optional[float] = None
+    true_peak_db: Optional[float] = None
     if a_stream:
         vol_proc = subprocess.run(
             [
@@ -171,6 +173,16 @@ def inspect_media_metrics(mp4_path: str | Path) -> Dict:
         if m_max:
             max_vol = float(m_max.group(1))
 
+        # Precision EBU R128 loudness metrics (ffmpeg-skill loudness.py)
+        try:
+            from .smart_media_engine import measure_audio_loudness
+            loud_data = measure_audio_loudness(p)
+            if not loud_data.get("silent"):
+                ebu_lufs = round(float(loud_data.get("input_i", -20.0)), 1)
+                true_peak_db = round(float(loud_data.get("input_tp", -1.0)), 1)
+        except Exception:
+            pass
+
     duration = float(fmt.get("duration") or 0.0)
     size_bytes = int(fmt.get("size") or p.stat().st_size)
 
@@ -187,6 +199,8 @@ def inspect_media_metrics(mp4_path: str | Path) -> Dict:
         "channels": int((a_stream or {}).get("channels") or 0),
         "mean_volume_db": mean_vol,
         "max_volume_db": max_vol,
+        "ebu_lufs": ebu_lufs,
+        "true_peak_db": true_peak_db,
     }
 
 

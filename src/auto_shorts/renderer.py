@@ -3,7 +3,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .config import LOUDNORM_FILTER, METADATA_SCRUB, QUALITY_PRESETS
 from .mahoraga import MahoragaEngine, clean_word_boundary_hook
@@ -109,6 +109,7 @@ def build_video_filter(
     font_path: Optional[str] = None,
     punch_zoom: float = 1.0,
     focus_x: Optional[float] = None,
+    is_hdr: bool = False,
 ) -> str:
     """Build a single-pass FFmpeg -vf / filter_complex graph for 9:16 shorts.
 
@@ -148,11 +149,16 @@ def build_video_filter(
             f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2"
         )
 
-    post_filters: List[str] = [
+    post_filters: List[str] = []
+    if is_hdr:
+        from .smart_media_engine import build_hdr_to_sdr_filter_chain
+        post_filters.append(build_hdr_to_sdr_filter_chain())
+
+    post_filters.extend([
         "setsar=1",
         "eq=contrast=1.06:saturation=1.14",
         "unsharp=3:3:0.45:3:3:0.0",
-    ]
+    ])
     if punch_zoom > 1.0:
         zoom_expr = build_pattern_interrupt_filter(width, height, zoom=punch_zoom)
         if zoom_expr:
@@ -228,12 +234,27 @@ def build_ffmpeg_command(
     encoder: str = "libx264",
     normalize_audio: bool = True,
     punch_zoom: float = 1.0,
+    is_hdr: Optional[bool] = None,
+    loudnorm_stats: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     """Assemble the complete FFmpeg render command for one vertical clip."""
+    from .smart_media_engine import (
+        build_two_pass_loudnorm_filter,
+        detect_color_profile,
+        get_bt709_vui_args,
+    )
     q = QUALITY_PRESETS.get(quality, QUALITY_PRESETS["mobile"])
     width = int(q["width"])
     height = int(q["height"])
     focus_x = detect_face_crop_offset_x(source_path, start_time, end_time) if layout == "center_crop" else None
+
+    if is_hdr is None:
+        try:
+            profile = detect_color_profile(source_path)
+            is_hdr = bool(profile.get("is_hdr"))
+        except Exception:
+            is_hdr = False
+
     vf = build_video_filter(
         layout=layout,
         width=width,
@@ -243,6 +264,7 @@ def build_ffmpeg_command(
         font_path=font_path,
         punch_zoom=punch_zoom,
         focus_x=focus_x,
+        is_hdr=is_hdr,
     )
 
     dur = max(0.1, end_time - start_time)
@@ -265,8 +287,14 @@ def build_ffmpeg_command(
     else:
         cmd.extend(["-c:v", "libx264", "-preset", q["preset"], "-crf", q["crf"]])
 
+    # VUI Color Space preservation (ffmpeg-skill _common/color.py)
+    cmd.extend(get_bt709_vui_args(encoder))
+
     if normalize_audio:
-        cmd.extend(["-af", LOUDNORM_FILTER])
+        if loudnorm_stats:
+            cmd.extend(["-af", build_two_pass_loudnorm_filter(loudnorm_stats)])
+        else:
+            cmd.extend(["-af", LOUDNORM_FILTER])
 
     cmd.extend([
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -278,19 +306,9 @@ def build_ffmpeg_command(
 
 
 def cut_segment_temp(source_path: str | Path, start: float, end: float, out_path: str | Path) -> Path:
-    """Extract raw subclip in strict CFR 30fps / 44.1kHz stereo prior to silence trimming."""
-    dur = max(0.1, end - start)
-    cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-ss", f"{start:.3f}", "-t", f"{dur:.3f}",
-        "-i", str(source_path),
-        "-fps_mode", "cfr", "-r", "30", "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-        str(out_path),
-    ]
-    subprocess.run(cmd, check=True)
-    return Path(out_path)
+    """Extract raw subclip using lossless GOP smart-cut where eligible, falling back to CFR 30fps."""
+    from .smart_media_engine import smart_cut_segment
+    return smart_cut_segment(source_path, start, end, out_path, crf=18, preset="ultrafast")
 
 
 def build_jump_cut_filter(keep_intervals: List[Tuple[float, float]], fps: int = 30, sample_rate: int = 44100) -> str:
@@ -341,9 +359,18 @@ def render_clip(
     encoder: str = "libx264",
     normalize_audio: bool = True,
     punch_zoom: float = 1.0,
+    two_pass_loudness: bool = True,
 ) -> Path:
-    """Render final vertical clip, falling back to libx264 if mediacodec fails."""
+    """Render final vertical clip with studio two-pass loudness, falling back to libx264 if mediacodec fails."""
     font_path = find_default_font()
+    loudnorm_stats = None
+    if normalize_audio and two_pass_loudness:
+        try:
+            from .smart_media_engine import measure_audio_loudness
+            loudnorm_stats = measure_audio_loudness(source_path)
+        except Exception:
+            loudnorm_stats = None
+
     cmd = build_ffmpeg_command(
         source_path=source_path,
         out_path=out_path,
@@ -357,6 +384,7 @@ def render_clip(
         encoder=encoder,
         normalize_audio=normalize_audio,
         punch_zoom=punch_zoom,
+        loudnorm_stats=loudnorm_stats,
     )
     try:
         subprocess.run(cmd, check=True)

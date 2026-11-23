@@ -48,6 +48,7 @@ dist/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp*/
 .pytest_tmp/
 .coverage
 htmlcov/
