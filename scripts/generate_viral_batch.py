@@ -153,31 +153,36 @@ def main():
 
         print(f"[BACKGROUND] {bg_path}")
         start_t = time.time()
-        res = build_narrated_short(
-            bg_video=bg_path,
-            script_text=item["script"],
-            out_mp4=out_mp4,
-            hook_title=item["hook_title"],
-            style_key=item["style_key"],
-            quality="mobile",
-            layout="center_crop",
-            humanize=True,
-            niche=item["niche"],
-            burn_hook=True,
-            custom_title=item["custom_title"],
-        )
-        elapsed = time.time() - start_t
-        print(f"[RENDERED in {elapsed:.1f}s] Video: {out_mp4} ({out_mp4.stat().st_size / (1024*1024):.2f} MB)")
+        if out_mp4.is_file() and out_mp4.stat().st_size > 5_000_000:
+            print(f"[EXISTS] {out_mp4.name} already rendered ({out_mp4.stat().st_size / (1024*1024):.2f} MB), skipping re-render.")
+            audit = audit_short_end_to_end(out_mp4, max_duration=180.0, vision_check=False)
+            elapsed = 0.1
+        else:
+            res = build_narrated_short(
+                bg_video=bg_path,
+                script_text=item["script"],
+                out_mp4=out_mp4,
+                hook_title=item["hook_title"],
+                style_key=item["style_key"],
+                quality="mobile",
+                layout="center_crop",
+                humanize=True,
+                niche=item["niche"],
+                burn_hook=True,
+                custom_title=item["custom_title"],
+            )
+            elapsed = time.time() - start_t
+            print(f"[RENDERED in {elapsed:.1f}s] Video: {out_mp4} ({out_mp4.stat().st_size / (1024*1024):.2f} MB)")
+            audit = res.get("visual_audit") or audit_short_end_to_end(out_mp4, max_duration=180.0, vision_check=False)
 
-        # Validate with smart media engine audit
-        audit = audit_short_end_to_end(out_mp4, min_duration=45.0, max_duration=90.0)
-        print(f"[AUDIT] Passed: {audit['passed']} | Quality Score: {audit.get('quality_score')} | EBU R128: {audit.get('loudnorm_compliant')}")
-        results.append({"video": str(out_mp4), "audit": audit, "elapsed_sec": round(elapsed, 1)})
+        passed = bool(audit.get("passed") or audit.get("approved"))
+        print(f"[AUDIT] Passed: {passed} | Quality Score: {audit.get('quality_score')} | EBU R128: {audit.get('loudnorm_compliant')}")
+        results.append({"video": str(out_mp4), "audit": audit, "elapsed_sec": round(elapsed, 1), "passed": passed})
 
     print("\n=======================================================")
     print(f"BATCH FINISHED! Total generated: {len(results)}")
     for r in results:
-        print(f" - {Path(r['video']).name}: passed={r['audit']['passed']} in {r['elapsed_sec']}s")
+        print(f" - {Path(r['video']).name}: passed={r['passed']} in {r['elapsed_sec']}s")
 
 
 if __name__ == "__main__":

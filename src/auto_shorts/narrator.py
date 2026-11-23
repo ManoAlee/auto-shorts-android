@@ -1199,11 +1199,11 @@ def _ensure_ambient_bgm(out_root: Path, niche: str = "podcast") -> Optional[Path
         genre = "cinematic_tension"
 
     bgm_file = out_root / "_bgm" / f"{genre}_bed.wav"
+    bgm_file.parent.mkdir(parents=True, exist_ok=True)
     if bgm_file.is_file() and bgm_file.stat().st_size > 10_000:
         return bgm_file
     try:
         from .procedural_music import generate_procedural_track
-        bgm_file.parent.mkdir(parents=True, exist_ok=True)
         return generate_procedural_track(genre=genre, duration_sec=65.0, out_path=bgm_file)
     except Exception:
         pass
