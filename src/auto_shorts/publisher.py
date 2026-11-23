@@ -92,11 +92,19 @@ def build_publish_pack(
 
 
 def export_to_android_gallery(mp4_path: Path, dest_dir: Optional[Path] = None) -> Optional[Path]:
-    """Copy finished MP4 to Android shared Movies/AutoShorts when Termux storage is mounted."""
-    target_root = dest_dir or (Path.home() / "storage" / "shared" / "Movies" / "AutoShorts")
+    """Copy finished MP4 to Android shared storage only if explicitly requested, protected by .nomedia."""
+    if os.getenv("EXPORT_TO_GALLERY", "").strip().lower() not in ("1", "true", "yes"):
+        return None
+    target_root = dest_dir or (Path.home() / "storage" / "shared" / "Movies" / ".AutoShortsVault")
     if not (Path.home() / "storage" / "shared").exists() and dest_dir is None:
         return None
     target_root.mkdir(parents=True, exist_ok=True)
+    nomedia_marker = target_root / ".nomedia"
+    if not nomedia_marker.exists():
+        try:
+            nomedia_marker.touch()
+        except Exception:
+            pass
     target = target_root / mp4_path.name
     shutil.copy2(mp4_path, target)
     return target
