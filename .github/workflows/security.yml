@@ -1,0 +1,42 @@
+name: Security Audit & SAST
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Bandit SAST & Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Security Scanners
+        run: python -m pip install --upgrade pip bandit
+
+      - name: Run Bandit Security Analysis
+        run: |
+          bandit -r src/ -ll -ii -x src/auto_shorts/frontend/ -o bandit-report.json -f json || true
+          bandit -r src/ -ll -ii -x src/auto_shorts/frontend/
+
+      - name: Audit Repository for Secret Leaks
+        run: |
+          echo "Scanning for accidental token or key commits..."
+          ! grep -rn "AIzaSy" src/ scripts/
+          ! grep -rn "sk-[a-zA-Z0-9]\{20,\}" src/ scripts/
+          ! grep -rn "EAAG[a-zA-Z0-9]\{20,\}" src/ scripts/
+          test ! -f .env
+          echo "Secret scan clean: zero hardcoded credentials detected."

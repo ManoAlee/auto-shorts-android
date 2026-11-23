@@ -1,19 +1,32 @@
 ---
 name: Bug Report
-about: Report a bug in AutoShorts Android, Web Studio, or CLI
-title: "[Bug] "
-labels: bug
+about: Create a detailed report to help reproduce and fix a defect
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
 ---
 
-## Environment
-- Device / OS (e.g., Android Termux aarch64, Windows 11 Desktop):
-- Python Version:
-- Active TTS / LLM Backend (Kokoro, Edge-TTS, llama-cli, OpenRouter):
+### Problem Description
+A clear and concise description of the unexpected behavior or error.
 
-## Steps to Reproduce
-1.
-2.
+### Reproduction Steps
+1. Execute command: `...`
+2. Configure parameters: `...`
+3. Observe failure: `...`
 
-## Expected vs Actual Behavior
-...
+### Expected Behavior
+A clear and concise description of what should happen.
 
+### Runtime Environment
+- **Device / Host:** Samsung Galaxy A55 5G / Termux aarch64 / Windows 11 / Linux x86_64
+- **OS Version:** Android 14 / Windows 11 23H2 / Ubuntu 22.04 LTS
+- **Python Version:** `python --version` (e.g. 3.11.x, 3.12.x, 3.14.x)
+- **Active TTS Backend:** Kokoro-82M Offline / Edge-TTS / OpenAI TTS / ElevenLabs
+- **FFmpeg Version:** `ffmpeg -version`
+
+### Diagnostic Logs
+```text
+Paste terminal traceback, Web Studio console logs, or Sentinel report excerpt here
+```
+
+### Additional Context
+Any relevant context (e.g., video duration, topic niche, storage limits).
