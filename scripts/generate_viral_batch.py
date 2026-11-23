@@ -133,12 +133,6 @@ def main():
                 "Você já conhecia essa regra dos pactos? Comenta o que acha e segue para mais teorias de anime."
             ),
         },
-                "Em troca dessa limitação absoluta, os seus fragmentos receberam a propriedade da indestrutibilidade permanente. "
-                "Nenhum ataque de energia pura consegue sobrepor uma regra cósmica forjada por pacto de alma. "
-                "A única maneira real de erradicá-los para sempre é através de um receptáculo humano como Yuji Itadori. "
-                "Você já conhecia essa regra dos pactos? Comenta o que acha e segue para mais teorias de anime."
-            ),
-        },
     ]
 
     results = []
