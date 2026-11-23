@@ -66,6 +66,74 @@ def main():
                 "Você já encontrou a Agnes? Me conta nos comentários e segue o canal para não perder o próximo mistério."
             ),
         },
+        {
+            "name": "short_samsung_app_lock_biometria.mp4",
+            "hook_title": "SAMSUNG BLOQUEIA APPS COM DIGITAL",
+            "custom_title": "Samsung Libera Bloqueio Individual de Apps com Biometria na One UI | Plantão Tech",
+            "style_key": "narrador_pro",
+            "niche": "ia_tech",
+            "bg_candidates": [
+                repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
+                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
+                repo_root / "assets" / "gameplay" / "gp_minecraft_7yl7Wc1dtWc.mp4",
+            ],
+            "script": (
+                "A Samsung finalmente atendeu ao pedido mais antigo dos usuários da linha Galaxy. "
+                "Na nova atualização da One UI, você agora pode bloquear qualquer aplicativo individualmente "
+                "usando sua impressão digital, reconhecimento facial, padrão ou PIN de segurança. "
+                "Antes dessa função nativa, quem queria privacidade extra no WhatsApp, galeria de fotos ou banco "
+                "precisava recorrer a aplicativos de terceiros cheios de propagandas suspeitas ou usar a Pasta Segura. "
+                "Agora, o bloqueio acontece direto no sistema operacional, com criptografia integrada ao processador Knox. "
+                "Assim que você tenta abrir o app protegido, a tela de biometria surge instantaneamente sem atraso. "
+                "O recurso estreou na versão beta e está sendo liberado gradualmente para os aparelhos compatíveis. "
+                "Seu celular já recebeu a novidade? Deixa nos comentários e segue aqui para mais dicas de tecnologia."
+            ),
+        },
+        {
+            "name": "short_pulso_radio_misterio_espaco.mp4",
+            "hook_title": "SINAL MISTERIOSO REPETE NO ESPAÇO",
+            "custom_title": "Astrônomos Detectam Pulso de Rádio Cósmico Repetido a Cada 22 Minutos | Ciência Hoje",
+            "style_key": "thalita_hd",
+            "niche": "noticias_mundiais",
+            "bg_candidates": [
+                repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
+                repo_root / "assets" / "gameplay" / "gp_minecraft_7yl7Wc1dtWc.mp4",
+                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
+            ],
+            "script": (
+                "Astrônomos em todo o mundo estão perplexos com um sinal de rádio captado das profundezas do universo "
+                "que desafia as leis conhecidas da física estelar. O objeto cósmico emite ondas de rádio extremamente brilhantes "
+                "que duram até cinco minutos seguidos e se repetem com precisão milimétrica a cada vinte e dois minutos. "
+                "Pela teoria astronômica tradicional, estrelas de nêutrons ou pulsares de rotação lenta não deveriam ter "
+                "energia magnética suficiente para gerar emissões tão poderosas nessa frequência periódica. "
+                "Cientistas da Universidade de Curtin já confirmaram que não se trata de interferência terrestre nem satélite. "
+                "A principal hipótese atual é que seja um magnetar ultra-lento ou uma classe de corpo celeste nunca antes observada. "
+                "Será que estamos descobrindo um novo fenômeno do cosmos? Deixa sua opinião e segue para mais exploração espacial."
+            ),
+        },
+        {
+            "name": "short_jujutsu_sukuna_dedos_segredo.mp4",
+            "hook_title": "O SEGREDO DOS DEDOS DE SUKUNA",
+            "custom_title": "Por que os Dedos de Sukuna São Indestrutíveis em Jujutsu Kaisen? Teoria Revelada",
+            "style_key": "narrador_pro",
+            "niche": "entretenimento_animes",
+            "bg_candidates": [
+                repo_root / "assets" / "gameplay" / "gp_dbz_trunks_real.mp4",
+                repo_root / "assets" / "gameplay" / "gp_gta_ramp_a_QRwCGtf_Q.mp4",
+                repo_root / "assets" / "gameplay" / "gp_drone_cinema_DesiBXmyCBQ.mp4",
+            ],
+            "script": (
+                "Você já se perguntou por que nem mesmo Satoru Gojo ou o fogo do próprio Sukuna conseguem destruir "
+                "um único dedo do Rei das Maldições? A resposta está escondida em um dos princípios mais profundos "
+                "do sistema de energia amaldiçoada de Jujutsu Kaisen: os votos de restrição após a morte. "
+                "Na Era de Ouro de Heian, quando Sukuna dividiu sua alma em vinte objetos amaldiçoados de grau especial, "
+                "ele aceitou a restrição de ficar completamente inerte e dormente por mais de mil anos. "
+                "Em troca dessa limitação absoluta, os seus fragmentos receberam a propriedade da indestrutibilidade permanente. "
+                "Nenhum ataque de energia pura consegue sobrepor uma regra cósmica forjada por pacto de alma. "
+                "A única maneira real de erradicá-los para sempre é através de um receptáculo humano como Yuji Itadori. "
+                "Você já conhecia essa regra dos pactos? Comenta o que acha e segue para mais teorias de anime."
+            ),
+        },
     ]
 
     results = []
