@@ -112,10 +112,22 @@ def _delete_video_with_sidecars(mp4_path: Path) -> int:
 
 
 def _prune_chrome_profile_caches(out_root: Path) -> int:
-    """Trim heavy browser cache dirs inside *_chrome_profile while keeping login cookies."""
+    """Trim heavy browser cache dirs inside *_chrome_profile* while keeping login cookies."""
     freed = 0
-    cache_names = ("Cache", "Code Cache", "GPUCache", "GrShaderCache", "ShaderCache", "Media Cache")
-    for prof in out_root.glob("*_chrome_profile"):
+    cache_names = (
+        "Cache",
+        "Code Cache",
+        "GPUCache",
+        "GrShaderCache",
+        "ShaderCache",
+        "Media Cache",
+        "DawnCache",
+        "component_crx_cache",
+        "WasmTtsEngine",
+        "OnDeviceHeadSuggestModel",
+        "BrowserMetrics",
+    )
+    for prof in out_root.glob("*_chrome_profile*"):
         if not prof.is_dir():
             continue
         for sub in (prof / "Default", prof):
@@ -126,6 +138,14 @@ def _prune_chrome_profile_caches(out_root: Path) -> int:
                 if cdir.is_dir():
                     freed += _dir_bytes(cdir)
                     shutil.rmtree(cdir, ignore_errors=True)
+            sw_cache = sub / "Service Worker" / "CacheStorage"
+            if sw_cache.is_dir():
+                freed += _dir_bytes(sw_cache)
+                shutil.rmtree(sw_cache, ignore_errors=True)
+            sw_script = sub / "Service Worker" / "ScriptCache"
+            if sw_script.is_dir():
+                freed += _dir_bytes(sw_script)
+                shutil.rmtree(sw_script, ignore_errors=True)
     return freed
 
 
@@ -216,10 +236,10 @@ def prune_storage(
     # 1b. Trim Chrome cache bloat while keeping cookies
     freed_bytes += _prune_chrome_profile_caches(out_root)
 
-    # 2. Classify generated MP4s (excluding temp/raw prefixes) and purge corrupted/orphaned ones
+    # 2. Classify generated MP4s (excluding _work_/temp_ raw prefixes) and purge corrupted/orphaned ones
     records: List[Dict] = []
     for mp4 in sorted(out_root.glob("*.mp4"), key=lambda p: p.stat().st_mtime):
-        if ".raw_chunk" in mp4.name or mp4.name.startswith(("_", "temp_")):
+        if ".raw_chunk" in mp4.name or mp4.name.startswith(("_work_", "temp_")):
             continue
         try:
             st = mp4.stat()
@@ -254,6 +274,7 @@ def prune_storage(
         is_dup = bool(pack.get("duplicate_of"))
         records.append({
             "path": mp4,
+            "size": st.st_size,
             "mtime": st.st_mtime,
             "is_dup": is_dup,
             "is_rejected": not vis_ok,
@@ -267,9 +288,9 @@ def prune_storage(
         if not entry.is_file():
             continue
         suf = entry.suffix.lower()
-        if suf in {".ass", ".srt"} or entry.name.endswith(("_thumb_16x9.jpg", "_cover_9x16.jpg", ".publish.json")):
+        if suf in {".ass", ".srt"} or entry.name.endswith(("_thumb_16x9.jpg", "_cover_9x16.jpg", ".mp4.jpg", ".publish.json")):
             stem = entry.name
-            for tag in ("_thumb_16x9.jpg", "_cover_9x16.jpg", ".publish.json", ".ass", ".srt"):
+            for tag in ("_thumb_16x9.jpg", "_cover_9x16.jpg", ".mp4.jpg", ".publish.json", ".ass", ".srt"):
                 if stem.endswith(tag):
                     stem = stem[: -len(tag)]
                     break
@@ -290,19 +311,19 @@ def prune_storage(
         else:
             kept.append(rec)
 
-    # 4. Enforce max_videos & max_output_mb: published oldest first, then lowest-score/oldest unpublished
-    total_mb = _dir_bytes(out_root) / (1024 * 1024)
-    if len(kept) > max_v or total_mb > max_mb:
+    # 4. Enforce max_videos & max_output_mb against video footprint (not Chrome profile dir)
+    videos_mb = sum(r["size"] for r in kept) / (1024 * 1024)
+    if len(kept) > max_v or videos_mb > max_mb:
         prune_order = sorted(
             kept,
             key=lambda r: (0 if r["is_published"] else 1, r["score"], r["mtime"]),
         )
         for rec in prune_order:
-            if len(kept) <= max_v and total_mb <= max_mb:
+            if len(kept) <= max_v and videos_mb <= max_mb:
                 break
             b = _delete_video_with_sidecars(rec["path"])
             freed_bytes += b
-            total_mb = max(0.0, total_mb - (b / (1024 * 1024)))
+            videos_mb = max(0.0, videos_mb - (rec["size"] / (1024 * 1024)))
             removed_videos.append(rec["path"].name)
             kept.remove(rec)
 
