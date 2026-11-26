@@ -135,7 +135,9 @@ def build_reanimate_motion_filter(
         return ""
     amp = max(0.005, zoom - 1.0)
     period = max(1.5, float(interval_sec))
-    phase = f"(mod(t,{period:.2f})/{period:.2f})"
+    # Use (t/P - floor(t/P)) instead of mod(t,P) so zero unescaped commas enter FFmpeg filtergraphs
+    t_div = f"(t/{period:.2f})"
+    phase = f"({t_div}-floor({t_div}))"
     if curve == "easeOutBack":
         # Fast snap with subtle overshoot settle
         envelope = f"(1-pow(1-{phase},3)*(1+0.35*sin(PI*{phase})))"

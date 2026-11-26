@@ -32,7 +32,17 @@ def test_build_reanimate_motion_filter_valid_expressions() -> None:
 
     expr = build_pattern_interrupt_filter(1080, 1920, zoom=1.06, interval_sec=3.2)
     assert "scale=" in expr and "crop=1080:1920" in expr and "exp(" in expr
+    assert "mod(" not in expr
     assert build_reanimate_motion_filter(1080, 1920, zoom=1.0) == ""
+
+    if shutil.which("ffmpeg"):
+        for curve in ("easeOutExpo", "easeOutBack", "linear"):
+            vf = build_pattern_interrupt_filter(360, 640, zoom=1.06, interval_sec=3.2, curve=curve)
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=360x640:d=0.4", "-vf", vf, "-f", "null", "-"],
+                capture_output=True, text=True, check=False,
+            )
+            assert proc.returncode == 0, f"FFmpeg rejected {curve} filter: {proc.stderr}"
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
