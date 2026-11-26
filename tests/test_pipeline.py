@@ -1837,6 +1837,46 @@ def test_offline_llm_title_hygiene_and_v1_endpoints(tmp_path):
     assert q1.exists() and pr["freed_mb"] > 0.1
 
 
+def test_prune_storage_brutal_raw_chunks_chrome_and_hard_cap(tmp_path: Path) -> None:
+    import os
+    from auto_shorts.retention import prune_storage
+
+    s_dir = tmp_path / "brutal_storage"
+    s_dir.mkdir()
+
+    raw = s_dir / "_work_live_lipaogamer_1795640467.raw_chunk.mp4"
+    raw.write_bytes(b"0" * 200000)
+    os.utime(raw, (1000.0, 1000.0))
+
+    zero_mp4 = s_dir / "mundo_br_broken.mp4"
+    zero_mp4.write_bytes(b"")
+    os.utime(zero_mp4, (1000.0, 1000.0))
+
+    cache_dir = s_dir / "tiktok_chrome_profile" / "Default" / "Cache"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "data_0").write_bytes(b"0" * 100000)
+    cookies = s_dir / "tiktok_chrome_profile" / "Default" / "Cookies"
+    cookies.write_bytes(b"keep-login")
+
+    low_unpub = s_dir / "unpub_low.mp4"
+    low_unpub.write_bytes(b"0" * 60000)
+    low_unpub.with_suffix(".publish.json").write_text(json.dumps({"sentinel_overall_score": 65, "validation": {"valid": True}}))
+    os.utime(low_unpub, (1000.0, 1000.0))
+
+    high_unpub = s_dir / "unpub_high.mp4"
+    high_unpub.write_bytes(b"0" * 60000)
+    high_unpub.with_suffix(".publish.json").write_text(json.dumps({"sentinel_overall_score": 92, "validation": {"valid": True}}))
+
+    pr = prune_storage(s_dir, max_videos=1, max_output_mb=50.0, keep_recent_work_hours=0.1)
+    assert not raw.exists()
+    assert not zero_mp4.exists()
+    assert not cache_dir.exists()
+    assert cookies.exists()
+    assert not low_unpub.exists()
+    assert high_unpub.exists()
+    assert pr["remaining_videos"] == 1
+
+
 def test_tiktok_content_posting_v2(tmp_path: Path, monkeypatch) -> None:
     import io
     import threading

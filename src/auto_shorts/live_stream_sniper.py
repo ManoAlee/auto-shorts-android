@@ -627,9 +627,11 @@ def snip_streamer_highlight(
                 "pack": pack_data,
             })
 
-    # Clean up raw sample
+    # Clean up raw sample (yt-dlp appends .mp4/.mkv/.webm to raw_sample.name)
     try:
-        raw_sample.unlink(missing_ok=True)
+        for chunk in out_dir.glob(f"{raw_sample.name}*"):
+            if chunk.is_file():
+                chunk.unlink(missing_ok=True)
     except Exception:
         pass
 

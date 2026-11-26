@@ -163,8 +163,8 @@ __INLINE_CSS__
         <div class="kpi-card"><div class="kpi-head"><span>Motor IA/Voz</span></div><div class="kpi-val" id="kpi-ai-val">Kokoro PT-BR</div><div class="kpi-sub" id="kpi-ai-sub">Feedback ainda não conectado</div></div>
       </div>
 
-      <!-- SENTINELA INTELIGENTE GOOGLE DRIVE 5TB -->
-      <section id="sentinel-banner" class="sentinel-card" aria-label="Sentinela Autônomo Google Drive">
+      <!-- MODO LOCAL CELULAR (Google Drive desativado) -->
+      <section id="sentinel-banner" class="sentinel-card" hidden aria-label="Modo Local Celular">
         <div class="sentinel-row">
           <div class="sentinel-brand">
             <div class="sentinel-icon" aria-hidden="true">
@@ -247,12 +247,11 @@ __INLINE_CSS__
               </div>
 
               <div class="source-section">
-                <label for="cut-source">Origem do Vídeo (YouTube, Drive 5TB, Episódio ou Local)</label>
+                <label for="cut-source">Origem do Vídeo (YouTube, Episódio ou Local no Celular)</label>
                 <div class="source-input-group">
-                  <input id="cut-source" name="source" type="text" placeholder="https://... ou gdrive:Animes_Para_Cortar/ep01.mp4" />
-                  <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" title="Ver animes do seu Google Drive 5TB">
-                    <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    <span>Drive 5TB</span>
+                  <input id="cut-source" name="source" type="text" placeholder="https://... ou caminho local no celular" />
+                  <button type="button" class="btn btn-secondary" id="btn-browse-gdrive" hidden aria-hidden="true">
+                    <span>Drive</span>
                   </button>
                   <button type="button" class="btn btn-secondary" id="btn-search-full-episodes" title="Buscar episódios inteiros dublados no Archive.org e na web">
                     <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>

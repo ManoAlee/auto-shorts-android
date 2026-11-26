@@ -2561,13 +2561,12 @@ def serve_webapp(host: str = "0.0.0.0", port: int = 8787, out_dir: str | Path = 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     _save_scheduler_cfg(out_path, _load_scheduler_cfg(out_path))
-    global _DRIVE_SENTINEL
     try:
-        from .sentinel import DriveSentinelEngine
-        _DRIVE_SENTINEL = DriveSentinelEngine(out_path, poll_interval_sec=45)
-        _DRIVE_SENTINEL.start()
-    except Exception as exc:
-        print(f"[DriveSentinel] Falha ao iniciar daemon: {exc}", flush=True)
+        prune_storage(out_path)
+    except Exception:
+        pass
+    global _DRIVE_SENTINEL
+    _DRIVE_SENTINEL = None  # Phone-only local mode: Google Drive sentinel disabled
     threading.Thread(target=_autonomous_loop, args=(out_path,), daemon=True).start()
     threading.Thread(target=_prewarm_radar_cache, daemon=True).start()
     server = _StudioHTTPServer((host, port), make_handler(out_path))

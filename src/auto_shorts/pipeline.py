@@ -424,18 +424,6 @@ def run_pipeline(
                 else:
                     delivery_status = f"delivery_error: {msg}"
 
-        # Auto-backup rendered shorts to Google Drive 5TB (if configured)
-        from .downloader import build_drive_niche_folder, upload_to_rclone
-        try:
-            drive_folder = build_drive_niche_folder(niche)
-            upload_to_rclone(out_mp4, drive_folder)
-            if thumb_16x9 and thumb_16x9.is_file():
-                upload_to_rclone(thumb_16x9, drive_folder)
-            if cover_9x16 and cover_9x16.is_file():
-                upload_to_rclone(cover_9x16, drive_folder)
-        except Exception:
-            pass
-
         rendered.append({
             **clip,
             "clip_id": clip_id,
@@ -500,26 +488,7 @@ def run_autopilot(
         else [niche]
     )
 
-    # Prioridade 1: Se houver vídeos pendentes no Google Drive na pasta Animes_Para_Cortar
-    from .downloader import list_gdrive_episodes
-    gdrive_items = []
-    if niche in {"entretenimento_animes", "all"}:
-        try:
-            gdrive_files = list_gdrive_episodes("gdrive:Animes_Para_Cortar")
-            for gf in gdrive_files:
-                gf_name = Path(gf).name
-                if gf_name not in seen_ids:
-                    gdrive_items.append({
-                        "id": gf_name,
-                        "url": gf,
-                        "title": Path(gf_name).stem.replace("_", " ").title(),
-                        "channel": "Google Drive 5TB",
-                        "_niche": "entretenimento_animes",
-                    })
-        except Exception:
-            pass
-
-    all_candidates: List[Dict] = list(gdrive_items)
+    all_candidates: List[Dict] = []
     for active_niche in target_niches:
         found = discover_videos(
             niche=active_niche,
