@@ -1225,6 +1225,17 @@ def make_handler(out_dir: Path):
                 })
                 return
 
+            if parsed.path == "/api/reanimate/analyze":
+                from .reanimate_motion import compute_video_activity_curve
+                qs = urllib.parse.parse_qs(parsed.query)
+                fname = str((qs.get("file") or [""])[0]).strip()
+                target = _safe_child_path(out_dir, fname)
+                if not target or not target.is_file():
+                    self._send_json(404, {"ok": False, "message": "Video nao encontrado em output/."})
+                    return
+                self._send_json(200, compute_video_activity_curve(target))
+                return
+
             if parsed.path == "/api/youtube/cdp/status":
                 from .youtube_cdp import get_youtube_cdp_status
                 self._send_json(200, get_youtube_cdp_status(out_dir))
@@ -1678,6 +1689,16 @@ def make_handler(out_dir: Path):
                     auto_correct=auto_correct,
                 )
                 self._send_json(200, report.to_dict())
+                return
+
+            if parsed.path == "/api/reanimate/compare":
+                from .reanimate_motion import compare_motion_videos
+                ref_p = _safe_child_path(out_dir, str(body.get("ref") or ""))
+                clone_p = _safe_child_path(out_dir, str(body.get("clone") or ""))
+                if not ref_p or not ref_p.is_file() or not clone_p or not clone_p.is_file():
+                    self._send_json(404, {"ok": False, "message": "Informe arquivos ref e clone validos em output/."})
+                    return
+                self._send_json(200, compare_motion_videos(ref_p, clone_p))
                 return
 
             if parsed.path == "/api/tiktok/cdp/cookies":

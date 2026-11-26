@@ -55,19 +55,26 @@ def get_retention_profile(platform: str) -> RetentionProfile:
     return RETENTION_PROFILES.get(platform, RETENTION_PROFILES["instagram_reels"])
 
 
-def build_pattern_interrupt_filter(width: int, height: int, zoom: float = 1.05, interval_sec: float = 3.5) -> str:
-    """Return a zero-overhead FFmpeg scale+crop expression toggling subtle zoom every N seconds.
+def build_pattern_interrupt_filter(
+    width: int,
+    height: int,
+    zoom: float = 1.05,
+    interval_sec: float = 3.5,
+    curve: str = "easeOutExpo",
+) -> str:
+    """Return a zero-overhead FFmpeg scale+crop expression toggling eased zoom every N seconds.
 
-    Breaks visual monotony every 2.5-3.5s (2025/2026 retention benchmark) to prevent swipe-aways.
+    Uses reanimate's easeOutExpo / easeOutBack motion dynamics by default to prevent swipe-aways.
     """
     if zoom <= 1.0:
         return ""
-    amp = (zoom - 1.0) / 2.0
-    # Smooth cos-eased zoom pulse avoiding jarring jumps while preserving eval=frame
-    return (
-        f"scale='trunc((iw*(1+{amp:.4f}*(1-cos(2*PI*t/{interval_sec}))))/2)*2':"
-        f"'trunc((ih*(1+{amp:.4f}*(1-cos(2*PI*t/{interval_sec}))))/2)*2':eval=frame,"
-        f"crop={width}:{height}:(iw-{width})/2:(ih-{height})/2"
+    from .reanimate_motion import build_reanimate_motion_filter
+    return build_reanimate_motion_filter(
+        width=width,
+        height=height,
+        zoom=zoom,
+        interval_sec=interval_sec,
+        curve=curve,
     )
 
 

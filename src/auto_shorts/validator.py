@@ -714,8 +714,22 @@ def audit_short_end_to_end(
     if media_val.get("valid", False) and not visual.get("visual_ok", False):
         reject_reasons.append(str(visual.get("vision_verdict") or "Falha na inspecao visual dos frames."))
 
+    reanimate_motion: Dict = {}
+    if media_val.get("valid", False) and dur >= 6.0:
+        try:
+            from .reanimate_motion import compute_video_activity_curve
+            reanimate_motion = compute_video_activity_curve(p, fps=4, max_frames=32)
+            if reanimate_motion.get("ok") and reanimate_motion.get("frozen_ratio", 0.0) > 0.90 and reanimate_motion.get("mean_activity", 0.0) < 0.004:
+                reject_reasons.append(
+                    f"Video visualmente congelado (reanimate frozen_ratio={reanimate_motion['frozen_ratio']:.0%}, motion_score={reanimate_motion['motion_score']})."
+                )
+        except Exception:
+            reanimate_motion = {}
+
     approved = (len(reject_reasons) == 0) and bool(media_val.get("valid", False)) and bool(visual.get("visual_ok", False))
     base_score = int(visual.get("vision_score") or 80)
+    if reanimate_motion.get("ok") and approved:
+        base_score = int(round(base_score * 0.8 + float(reanimate_motion.get("motion_score", base_score)) * 0.2))
     if not approved:
         base_score = min(base_score, 42)
     elif 22.0 <= dur <= 57.0:
@@ -728,6 +742,7 @@ def audit_short_end_to_end(
         "reject_reasons": reject_reasons,
         "media": media_val,
         "visual": visual,
+        "reanimate_motion": reanimate_motion,
     }
 
 
